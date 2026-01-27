@@ -37,14 +37,15 @@ export default async function RootLayout({
   const session = await getServerSession();
 
   return (
-    <html lang="en" className="dark" style={{ colorScheme: "dark" }}>
+    // <html lang="en" className="dark" style={{ colorScheme: "dark" }}>
+    <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${dmSans.variable} antialiased font-sans`}
       >
         <QueryProvider>
           <SessionProvider initialSession={session}>
             <NextTopLoader showSpinner={false} height={2} color="#34d399" />
-            <Toaster position="bottom-right" theme="dark" />
+            <Toaster position="bottom-right"/>
             <main className="min-h-screen">
               {children}
             </main>

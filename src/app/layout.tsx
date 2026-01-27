@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, DM_Sans } from "next/font/google";
 import "./globals.css";
 import NextTopLoader from "nextjs-toploader";
 import QueryProvider from "@/context/QueryProvider";
@@ -17,9 +17,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
 export const metadata: Metadata = {
-  title: "Next.js Starter Kit",
-  description: "Next.js 16 Starter Kit with Authentication, TailwindCSS, and more. better auth, prisma orm",
+  title: "Financial Forecaster | Peak Transport",
+  description: "Internal financial management system for Peak Transport LLC. Bookkeeping, Forecasting, and Reporting.",
 };
 
 export default async function RootLayout({
@@ -31,14 +37,14 @@ export default async function RootLayout({
   const session = await getServerSession();
 
   return (
-    <html lang="en">
+    <html lang="en" className="dark" style={{ colorScheme: "dark" }}>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${dmSans.variable} antialiased font-sans`}
       >
         <QueryProvider>
           <SessionProvider initialSession={session}>
-            <NextTopLoader showSpinner={false} height={2} color="#000000" />
-            <Toaster position="bottom-right" />
+            <NextTopLoader showSpinner={false} height={2} color="#34d399" />
+            <Toaster position="bottom-right" theme="dark" />
             <main className="min-h-screen">
               {children}
             </main>

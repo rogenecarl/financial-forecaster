@@ -3,182 +3,127 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Sparkles, LayoutDashboard, LogOut, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks";
-import { getRoleRedirect } from "@/config/auth";
-
-const navLinks = [
-  { href: "#features", label: "Features" },
-  { href: "#tech-stack", label: "Tech Stack" },
-  { href: "#testimonials", label: "Testimonials" },
-];
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { isAuthenticated, isLoading, role, signOut } = useAuth();
-
-  // Get dashboard URL based on user role
-  const dashboardUrl = getRoleRedirect(role);
+  const [activeSection, setActiveSection] = useState("");
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+      setIsScrolled(window.scrollY > 50);
+
+      // Track active section
+      const sections = ["features", "metrics", "tech-stack"];
+      for (const section of sections) {
+        const element = document.getElementById(section);
+        if (element) {
+          const rect = element.getBoundingClientRect();
+          if (rect.top <= 100 && rect.bottom >= 100) {
+            setActiveSection(section);
+            break;
+          }
+        }
+      }
     };
+
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const navLinks = [
+    { label: "Features", href: "#features" },
+    { label: "Metrics", href: "#metrics" },
+    { label: "Stack", href: "#tech-stack" },
+  ];
+
   return (
     <header
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled
-          ? "bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-sm"
-          : "bg-transparent"
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-500",
+        isScrolled ? "py-3" : "py-6"
       )}
     >
-      <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/25 transition-transform group-hover:scale-105">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight">
-              StarterKit
-            </span>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex md:items-center md:gap-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          {/* Desktop CTA - Auth Aware */}
-          <div className="hidden md:flex md:items-center md:gap-3">
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : isAuthenticated ? (
-              <>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href={dashboardUrl} className="flex items-center gap-2">
-                    <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
-                  </Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={signOut}
-                  className="flex items-center gap-2"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/login">Sign In</Link>
-                </Button>
-                <Button size="sm" asChild>
-                  <Link href="/register">Get Started</Link>
-                </Button>
-              </>
-            )}
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            type="button"
-            className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label="Toggle menu"
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-5 w-5" />
-            ) : (
-              <Menu className="h-5 w-5" />
-            )}
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        <div
+      <div className="mx-auto max-w-7xl px-6">
+        <nav
           className={cn(
-            "md:hidden overflow-hidden transition-all duration-300 ease-in-out",
-            isMobileMenuOpen ? "max-h-80 pb-4" : "max-h-0"
+            "relative flex items-center justify-between px-6 py-3 rounded-2xl transition-all duration-500",
+            isScrolled
+              ? "glass-panel-strong shadow-2xl shadow-black/20"
+              : "bg-transparent"
           )}
         >
-          <div className="flex flex-col gap-2 pt-2">
+          {/* Logo */}
+          <Link href="/" className="group flex items-center gap-3">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl blur-lg opacity-50 group-hover:opacity-80 transition-opacity" />
+              <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                <svg
+                  className="h-5 w-5 text-black"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 3v18h18" />
+                  <path d="m19 9-5 5-4-4-3 3" />
+                </svg>
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold tracking-tight text-white leading-none">
+                Financial
+              </span>
+              <span className="text-[10px] font-medium text-emerald-400/80 tracking-widest uppercase">
+                Forecaster
+              </span>
+            </div>
+          </Link>
+
+          {/* Center Navigation */}
+          <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                onClick={() => setIsMobileMenuOpen(false)}
+                className={cn(
+                  "relative px-4 py-2 text-sm font-medium transition-colors",
+                  activeSection === link.href.slice(1)
+                    ? "text-white"
+                    : "text-neutral-400 hover:text-white"
+                )}
               >
                 {link.label}
+                {activeSection === link.href.slice(1) && (
+                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-400" />
+                )}
               </Link>
             ))}
-            <div className="mt-2 flex flex-col gap-2 border-t border-border pt-4">
-              {isLoading ? (
-                <div className="flex justify-center py-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              ) : isAuthenticated ? (
-                <>
-                  <Button variant="outline" size="sm" asChild className="w-full">
-                    <Link
-                      href={dashboardUrl}
-                      className="flex items-center justify-center gap-2"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <LayoutDashboard className="h-4 w-4" />
-                      Dashboard
-                    </Link>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="w-full flex items-center justify-center gap-2"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      signOut();
-                    }}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Sign Out
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="outline" size="sm" asChild className="w-full">
-                    <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                      Sign In
-                    </Link>
-                  </Button>
-                  <Button size="sm" asChild className="w-full">
-                    <Link href="/register" onClick={() => setIsMobileMenuOpen(false)}>
-                      Get Started
-                    </Link>
-                  </Button>
-                </>
-              )}
-            </div>
           </div>
-        </div>
-      </nav>
+
+          {/* Right Side */}
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="hidden sm:block text-sm font-medium text-neutral-400 hover:text-white transition-colors"
+            >
+              Sign in
+            </Link>
+
+            <Button
+              size="sm"
+              asChild
+              className="relative overflow-hidden rounded-xl bg-white text-black hover:bg-neutral-100 font-semibold px-5 h-10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Link href="/login">
+                <span className="relative z-10">Get Started</span>
+              </Link>
+            </Button>
+          </div>
+        </nav>
+      </div>
     </header>
   );
 }

@@ -1,16 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, Github, Twitter } from "lucide-react";
 
 const footerLinks = {
-  product: {
-    title: "Product",
+  platform: {
+    title: "Platform",
     links: [
       { label: "Features", href: "#features" },
+      { label: "Metrics", href: "#metrics" },
       { label: "Tech Stack", href: "#tech-stack" },
-      { label: "Testimonials", href: "#testimonials" },
-      { label: "Pricing", href: "#" },
     ],
   },
   resources: {
@@ -18,126 +16,117 @@ const footerLinks = {
     links: [
       { label: "Documentation", href: "#" },
       { label: "API Reference", href: "#" },
-      { label: "Guides", href: "#" },
-      { label: "Examples", href: "#" },
+      { label: "Support", href: "#" },
     ],
   },
   company: {
     title: "Company",
     links: [
-      { label: "About", href: "#" },
-      { label: "Blog", href: "#" },
-      { label: "Careers", href: "#" },
+      { label: "About Us", href: "#" },
       { label: "Contact", href: "#" },
-    ],
-  },
-  legal: {
-    title: "Legal",
-    links: [
-      { label: "Privacy", href: "#" },
-      { label: "Terms", href: "#" },
-      { label: "License", href: "#" },
     ],
   },
 };
 
-const socialLinks = [
-  {
-    label: "GitHub",
-    href: "https://github.com",
-    icon: Github,
-  },
-  {
-    label: "Twitter",
-    href: "https://twitter.com",
-    icon: Twitter,
-  },
-];
-
 export function Footer() {
   return (
-    <footer className="relative border-t border-border bg-muted/30">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Main Footer */}
-        <div className="py-12 lg:py-16">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
-            {/* Brand Column */}
-            <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-8 lg:mb-0">
-              <Link href="/" className="flex items-center gap-2 group">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/25">
-                  <Sparkles className="h-5 w-5" />
+    <footer className="relative bg-[#020304] border-t border-white/[0.04]">
+      {/* Main Footer */}
+      <div className="mx-auto max-w-7xl px-6 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12">
+          {/* Brand Column */}
+          <div className="lg:col-span-2">
+            <Link href="/" className="group flex items-center gap-3 mb-6">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity" />
+                <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                  <svg
+                    className="h-5 w-5 text-black"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 3v18h18" />
+                    <path d="m19 9-5 5-4-4-3 3" />
+                  </svg>
                 </div>
-                <span className="text-lg font-semibold tracking-tight">
-                  StarterKit
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-bold tracking-tight text-white leading-none">
+                  Financial
                 </span>
-              </Link>
-              <p className="mt-4 text-sm text-muted-foreground max-w-xs">
-                A production-ready starter kit for building secure, scalable web
-                applications with modern technologies.
-              </p>
-
-              {/* Social Links */}
-              <div className="mt-6 flex items-center gap-4">
-                {socialLinks.map((social) => {
-                  const Icon = social.icon;
-                  return (
-                    <Link
-                      key={social.label}
-                      href={social.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-foreground transition-colors"
-                      aria-label={social.label}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </Link>
-                  );
-                })}
+                <span className="text-[10px] font-medium text-emerald-400/80 tracking-widest uppercase">
+                  Forecaster
+                </span>
               </div>
+            </Link>
+            <p className="text-neutral-500 text-sm leading-relaxed max-w-sm mb-6">
+              AI-powered financial forecasting platform. Predict revenue, optimize cash flow,
+              and make data-driven decisions with confidence.
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-sm text-neutral-400">All systems operational</span>
             </div>
-
-            {/* Link Columns */}
-            {Object.values(footerLinks).map((section) => (
-              <div key={section.title}>
-                <h3 className="text-sm font-semibold mb-4">{section.title}</h3>
-                <ul className="space-y-3">
-                  {section.links.map((link) => (
-                    <li key={link.label}>
-                      <Link
-                        href={link.href}
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
           </div>
-        </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-border py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} StarterKit. All rights reserved.
+          {/* Links Columns */}
+          {Object.values(footerLinks).map((section) => (
+            <div key={section.title}>
+              <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">
+                {section.title}
+              </h3>
+              <ul className="space-y-3">
+                {section.links.map((link) => (
+                  <li key={link.label}>
+                    <Link
+                      href={link.href}
+                      className="text-sm text-neutral-500 hover:text-white transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom Bar */}
+      <div className="border-t border-white/[0.04]">
+        <div className="mx-auto max-w-7xl px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-neutral-600">
+            &copy; {new Date().getFullYear()} Financial Forecaster. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="text-sm text-neutral-500 hover:text-white transition-colors"
             >
-              Privacy Policy
+              Privacy
             </Link>
             <Link
               href="#"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="text-sm text-neutral-500 hover:text-white transition-colors"
             >
-              Terms of Service
+              Terms
+            </Link>
+            <Link
+              href="#"
+              className="text-sm text-neutral-500 hover:text-white transition-colors"
+            >
+              Security
             </Link>
           </div>
         </div>
       </div>
+
+      {/* Decorative gradient */}
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
     </footer>
   );
 }

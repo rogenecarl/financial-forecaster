@@ -1,108 +1,70 @@
 import { LoginInForm } from "@/components/auth/login-form"
+import Link from "next/link"
 
 export default function LoginPage() {
     return (
-        <div className="min-h-screen w-full lg:grid lg:grid-cols-2">
-            {/* Left Column: Visual/Marketing */}
-            <div className="relative hidden lg:flex min-h-screen h-full w-full flex-col items-center justify-between overflow-hidden bg-slate-950 p-12 text-white">
+        <div className="relative min-h-screen w-full flex items-center justify-center bg-[#030508] overflow-hidden">
+            {/* Background Effects */}
+            <div className="absolute inset-0">
+                {/* Geometric Grid */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
 
-                {/* Background Effects */}
-                <div className="absolute inset-0 z-0">
-                    <div className="absolute inset-0 bg-slate-950" />
-                    {/* Glowing Orbs */}
-                    <div className="absolute -top-[20%] -left-[10%] h-[600px] w-[600px] rounded-full bg-indigo-600/20 blur-[100px]" />
-                    <div className="absolute top-[30%] right-[10%] h-[300px] w-[300px] rounded-full bg-violet-500/10 blur-[80px]" />
-                    <div className="absolute -bottom-[10%] -right-[10%] h-[600px] w-[600px] rounded-full bg-blue-600/20 blur-[100px]" />
+                {/* Gradient Orbs */}
+                <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: "4s" }} />
+                <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-teal-500/8 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: "5s", animationDelay: "1s" }} />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-emerald-900/10 rounded-full blur-[80px]" />
 
-                    {/* Technical Grid Pattern */}
-                    <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:32px_32px]" />
+                {/* Grain Overlay */}
+                <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
+            </div>
 
-                    {/* Vignette */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/20" />
-                </div>
-
-                {/* Branding */}
-                <div className="relative z-10 w-full flex items-center gap-3 text-lg font-medium tracking-tight animate-in fade-in slide-in-from-top-4 duration-700">
-                    <span className="font-bold text-xl">StarterKit</span>
-                </div>
-
-                {/* Feature Showcase */}
-                <div className="relative z-10 my-auto flex flex-col gap-8 max-w-[500px]">
-                    <div className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-                        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                            Build production-ready apps faster.
-                        </h2>
-                        <p className="text-lg text-slate-400">
-                            Sign in to access your dashboard, manage your projects, and explore the full starter kit features.
-                        </p>
-                    </div>
-
-                    <div className="grid gap-4">
-                        {/* Feature 1 */}
-                        <div className="group relative overflow-hidden rounded-2xl bg-white/5 p-4 hover:bg-white/10 transition-colors border border-white/10 animate-in fade-in slide-in-from-right-8 duration-700 delay-200">
-                            <div className="flex items-center gap-4">
-                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-white">Secure Authentication</h3>
-                                    <p className="text-sm text-slate-400">Better Auth with email, OAuth, and role-based access control.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Feature 2 */}
-                        <div className="group relative overflow-hidden rounded-2xl bg-white/5 p-4 hover:bg-white/10 transition-colors border border-white/10 animate-in fade-in slide-in-from-right-8 duration-700 delay-300">
-                            <div className="flex items-center gap-4">
-                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-500/20 text-violet-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                                        <polyline points="7.5 4.21 12 6.81 16.5 4.21" />
-                                        <polyline points="7.5 19.79 7.5 14.6 3 12" />
-                                        <polyline points="21 12 16.5 14.6 16.5 19.79" />
-                                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                                        <line x1="12" y1="22.08" x2="12" y2="12" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-white">Type-Safe Database</h3>
-                                    <p className="text-sm text-slate-400">Prisma 7 ORM with PostgreSQL for reliable data management.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Feature 3 */}
-                        <div className="group relative overflow-hidden rounded-2xl bg-white/5 p-4 hover:bg-white/10 transition-colors border border-white/10 animate-in fade-in slide-in-from-right-8 duration-700 delay-400">
-                            <div className="flex items-center gap-4">
-                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/20 text-blue-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                                        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-white">Beautiful UI Components</h3>
-                                    <p className="text-sm text-slate-400">shadcn/ui with Tailwind CSS 4 and dark mode support.</p>
-                                </div>
-                            </div>
-                        </div>
+            {/* Logo */}
+            <Link href="/" className="absolute top-8 left-8 z-20 group flex items-center gap-3">
+                <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity" />
+                    <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                        <svg
+                            className="h-5 w-5 text-black"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <path d="M3 3v18h18" />
+                            <path d="m19 9-5 5-4-4-3 3" />
+                        </svg>
                     </div>
                 </div>
+                <div className="flex flex-col">
+                    <span className="text-sm font-bold tracking-tight text-white leading-none">
+                        Financial
+                    </span>
+                    <span className="text-[10px] font-medium text-emerald-400/80 tracking-widest uppercase">
+                        Forecaster
+                    </span>
+                </div>
+            </Link>
 
-                {/* Footer Metadata */}
-                <div className="relative z-10 w-full flex justify-between text-xs text-slate-500">
-                    <p>© 2024 StarterKit. MIT License.</p>
-                    <p>Next.js 16 • React 19 • TypeScript</p>
+            {/* Centered Form Container */}
+            <div className="relative z-10 w-full max-w-[480px] mx-auto px-6">
+                {/* Glass Card */}
+                <div className="relative rounded-3xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-xl p-8 sm:p-10 shadow-2xl shadow-black/20">
+                    {/* Card Glow */}
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 pointer-events-none" />
+
+                    {/* Top Accent Line */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent" />
+
+                    <div className="relative">
+                        <LoginInForm />
+                    </div>
                 </div>
             </div>
 
-            {/* Right Column: Form*/}
-            <div className="min-h-screen flex items-center justify-center p-8 lg:p-12 bg-white dark:bg-[#0B0F19]">
-                <div className="w-full max-w-[450px]">
-                    <LoginInForm />
-                </div>
-            </div>
+            {/* Bottom decorative line */}
+            <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-500/10 to-transparent" />
         </div>
     )
 }

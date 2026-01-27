@@ -5,102 +5,87 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Check } from "lucide-react";
 
 const benefits = [
-  "Production-ready authentication",
-  "Role-based access control",
-  "Type-safe database queries",
-  "Beautiful UI components",
-  "Dark mode support",
-  "Responsive design",
+  "AI-powered forecasting",
+  "Real-time analytics",
+  "Secure & compliant",
+  "Dedicated support",
 ];
 
 export function CTA() {
   return (
-    <section className="relative py-24 sm:py-32 bg-background overflow-hidden">
+    <section className="relative py-32 bg-[#030508] overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0">
-        {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
-
-        {/* Gradient Orbs */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-primary/10 blur-[128px]" />
-        <div className="absolute top-1/4 left-1/4 h-64 w-64 rounded-full bg-violet-500/10 blur-[100px]" />
-        <div className="absolute bottom-1/4 right-1/4 h-64 w-64 rounded-full bg-blue-500/10 blur-[100px]" />
-
-        {/* Grid Pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03]"
-          style={{
-            backgroundImage: `linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)`,
-            backgroundSize: "48px 48px",
-          }}
-        />
+        <div className="absolute inset-0 geometric-grid opacity-20" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-emerald-900/15 rounded-full blur-[150px]" />
+        <div className="absolute bottom-0 right-0 w-[600px] h-[400px] bg-teal-900/10 rounded-full blur-[120px]" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary mb-8">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-            </span>
-            Start building today
+      <div className="relative z-10 mx-auto max-w-7xl px-6">
+        <div className="relative rounded-[2.5rem] overflow-hidden">
+          {/* Animated border */}
+          <div className="absolute inset-0 rounded-[2.5rem] p-px bg-gradient-to-r from-emerald-500/50 via-teal-500/50 to-amber-500/50 animate-gradient">
+            <div className="absolute inset-px rounded-[calc(2.5rem-1px)] bg-[#0a0f14]" />
           </div>
 
-          {/* Headline */}
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl">
-            Ready to{" "}
-            <span className="bg-gradient-to-r from-primary via-violet-600 to-blue-600 bg-clip-text text-transparent dark:from-white dark:via-violet-400 dark:to-blue-400">
-              ship faster?
-            </span>
-          </h2>
+          {/* Content */}
+          <div className="relative px-8 py-20 sm:px-16 sm:py-24 text-center">
+            {/* Internal glow */}
+            <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-emerald-600/10 blur-[100px] rounded-full pointer-events-none" />
 
-          {/* Subheadline */}
-          <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Stop wasting time on boilerplate. Get a production-ready foundation
-            with authentication, database, and UI components — all configured
-            and ready for your next project.
-          </p>
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 mb-8">
+              <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-sm font-medium text-emerald-300">
+                Start Free Today
+              </span>
+            </div>
 
-          {/* Benefits Grid */}
-          <div className="mt-10 grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
-            {benefits.map((benefit) => (
-              <div
-                key={benefit}
-                className="flex items-center gap-2 text-sm text-muted-foreground"
-              >
-                <Check className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                <span>{benefit}</span>
-              </div>
-            ))}
-          </div>
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-6 leading-tight">
+              Ready to predict
+              <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-300 to-amber-200">
+                your financial future?
+              </span>
+            </h2>
 
-          {/* CTA Buttons */}
-          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <p className="mx-auto max-w-2xl text-lg text-neutral-400 mb-10 leading-relaxed">
+              Join thousands of finance teams using Financial Forecaster to make
+              smarter, data-driven decisions every day.
+            </p>
+
+            {/* Benefits */}
+            <div className="flex flex-wrap justify-center gap-6 mb-12">
+              {benefits.map((benefit) => (
+                <div
+                  key={benefit}
+                  className="flex items-center gap-2 text-sm text-neutral-300"
+                >
+                  <div className="h-5 w-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <Check className="h-3 w-3 text-emerald-400" />
+                  </div>
+                  {benefit}
+                </div>
+              ))}
+            </div>
+
+            {/* CTA Button */}
             <Button
               size="lg"
               asChild
-              className="w-full sm:w-auto text-base shadow-lg shadow-primary/25"
+              className="group relative h-16 px-10 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-400 text-black font-bold text-lg hover:from-emerald-300 hover:to-teal-300 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-2xl shadow-emerald-500/30"
             >
-              <Link href="/register">
+              <Link href="/login">
                 Get Started Free
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Link>
             </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              asChild
-              className="w-full sm:w-auto text-base"
-            >
-              <Link href="#features">Learn More</Link>
-            </Button>
-          </div>
 
-          {/* Trust Indicators */}
-          <p className="mt-8 text-sm text-muted-foreground">
-            Free to use • MIT License • No credit card required
-          </p>
+            <p className="mt-6 text-sm text-neutral-500">
+              No credit card required
+            </p>
+          </div>
         </div>
       </div>
     </section>

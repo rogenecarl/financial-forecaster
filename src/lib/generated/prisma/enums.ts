@@ -9,10 +9,58 @@
 * 🟢 You can import this file directly.
 */
 
-export const UserRole = {
+export const Role = {
   USER: 'USER',
   ADMIN: 'ADMIN',
   PROVIDER: 'PROVIDER'
 } as const
 
-export type UserRole = (typeof UserRole)[keyof typeof UserRole]
+export type Role = (typeof Role)[keyof typeof Role]
+
+
+export const CategoryType = {
+  REVENUE: 'REVENUE',
+  EXPENSE: 'EXPENSE',
+  TRANSFER: 'TRANSFER',
+  UNKNOWN: 'UNKNOWN'
+} as const
+
+export type CategoryType = (typeof CategoryType)[keyof typeof CategoryType]
+
+
+export const ReviewStatus = {
+  PENDING: 'PENDING',
+  REVIEWED: 'REVIEWED',
+  FLAGGED: 'FLAGGED'
+} as const
+
+export type ReviewStatus = (typeof ReviewStatus)[keyof typeof ReviewStatus]
+
+
+export const InvoiceItemType = {
+  TOUR_COMPLETED: 'TOUR_COMPLETED',
+  LOAD_COMPLETED: 'LOAD_COMPLETED',
+  ADJUSTMENT_DISPUTE: 'ADJUSTMENT_DISPUTE',
+  ADJUSTMENT_OTHER: 'ADJUSTMENT_OTHER'
+} as const
+
+export type InvoiceItemType = (typeof InvoiceItemType)[keyof typeof InvoiceItemType]
+
+
+export const TripStage = {
+  UPCOMING: 'UPCOMING',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELED: 'CANCELED'
+} as const
+
+export type TripStage = (typeof TripStage)[keyof typeof TripStage]
+
+
+export const ForecastStatus = {
+  PROJECTED: 'PROJECTED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED'
+} as const
+
+export type ForecastStatus = (typeof ForecastStatus)[keyof typeof ForecastStatus]

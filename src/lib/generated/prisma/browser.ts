@@ -37,3 +37,58 @@ export type Account = Prisma.AccountModel
  * 
  */
 export type Verification = Prisma.VerificationModel
+/**
+ * Model Category
+ * 
+ */
+export type Category = Prisma.CategoryModel
+/**
+ * Model Transaction
+ * 
+ */
+export type Transaction = Prisma.TransactionModel
+/**
+ * Model ImportBatch
+ * 
+ */
+export type ImportBatch = Prisma.ImportBatchModel
+/**
+ * Model CategoryRule
+ * 
+ */
+export type CategoryRule = Prisma.CategoryRuleModel
+/**
+ * Model AmazonInvoice
+ * 
+ */
+export type AmazonInvoice = Prisma.AmazonInvoiceModel
+/**
+ * Model AmazonInvoiceLineItem
+ * 
+ */
+export type AmazonInvoiceLineItem = Prisma.AmazonInvoiceLineItemModel
+/**
+ * Model Trip
+ * 
+ */
+export type Trip = Prisma.TripModel
+/**
+ * Model TripLoad
+ * 
+ */
+export type TripLoad = Prisma.TripLoadModel
+/**
+ * Model ForecastWeek
+ * 
+ */
+export type ForecastWeek = Prisma.ForecastWeekModel
+/**
+ * Model Forecast
+ * 
+ */
+export type Forecast = Prisma.ForecastModel
+/**
+ * Model UserSettings
+ * 
+ */
+export type UserSettings = Prisma.UserSettingsModel

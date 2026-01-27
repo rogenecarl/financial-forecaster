@@ -54,7 +54,18 @@ export const ModelName = {
   User: 'User',
   Session: 'Session',
   Account: 'Account',
-  Verification: 'Verification'
+  Verification: 'Verification',
+  Category: 'Category',
+  Transaction: 'Transaction',
+  ImportBatch: 'ImportBatch',
+  CategoryRule: 'CategoryRule',
+  AmazonInvoice: 'AmazonInvoice',
+  AmazonInvoiceLineItem: 'AmazonInvoiceLineItem',
+  Trip: 'Trip',
+  TripLoad: 'TripLoad',
+  ForecastWeek: 'ForecastWeek',
+  Forecast: 'Forecast',
+  UserSettings: 'UserSettings'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -130,6 +141,257 @@ export const VerificationScalarFieldEnum = {
 } as const
 
 export type VerificationScalarFieldEnum = (typeof VerificationScalarFieldEnum)[keyof typeof VerificationScalarFieldEnum]
+
+
+export const CategoryScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  type: 'type',
+  color: 'color',
+  icon: 'icon',
+  description: 'description',
+  includeInPL: 'includeInPL',
+  isSystem: 'isSystem',
+  sortOrder: 'sortOrder',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CategoryScalarFieldEnum = (typeof CategoryScalarFieldEnum)[keyof typeof CategoryScalarFieldEnum]
+
+
+export const TransactionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  categoryId: 'categoryId',
+  importBatchId: 'importBatchId',
+  details: 'details',
+  postingDate: 'postingDate',
+  description: 'description',
+  amount: 'amount',
+  type: 'type',
+  balance: 'balance',
+  checkOrSlipNum: 'checkOrSlipNum',
+  aiCategorized: 'aiCategorized',
+  aiConfidence: 'aiConfidence',
+  manualOverride: 'manualOverride',
+  reviewStatus: 'reviewStatus',
+  amazonInvoiceId: 'amazonInvoiceId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TransactionScalarFieldEnum = (typeof TransactionScalarFieldEnum)[keyof typeof TransactionScalarFieldEnum]
+
+
+export const ImportBatchScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  fileName: 'fileName',
+  fileType: 'fileType',
+  recordCount: 'recordCount',
+  status: 'status',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt'
+} as const
+
+export type ImportBatchScalarFieldEnum = (typeof ImportBatchScalarFieldEnum)[keyof typeof ImportBatchScalarFieldEnum]
+
+
+export const CategoryRuleScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  categoryId: 'categoryId',
+  pattern: 'pattern',
+  matchType: 'matchType',
+  field: 'field',
+  priority: 'priority',
+  isActive: 'isActive',
+  hitCount: 'hitCount',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CategoryRuleScalarFieldEnum = (typeof CategoryRuleScalarFieldEnum)[keyof typeof CategoryRuleScalarFieldEnum]
+
+
+export const AmazonInvoiceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  invoiceNumber: 'invoiceNumber',
+  routeDomicile: 'routeDomicile',
+  equipment: 'equipment',
+  programType: 'programType',
+  totalTourPay: 'totalTourPay',
+  totalAccessorials: 'totalAccessorials',
+  totalAdjustments: 'totalAdjustments',
+  totalPay: 'totalPay',
+  periodStart: 'periodStart',
+  periodEnd: 'periodEnd',
+  paymentDate: 'paymentDate',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AmazonInvoiceScalarFieldEnum = (typeof AmazonInvoiceScalarFieldEnum)[keyof typeof AmazonInvoiceScalarFieldEnum]
+
+
+export const AmazonInvoiceLineItemScalarFieldEnum = {
+  id: 'id',
+  invoiceId: 'invoiceId',
+  tripId: 'tripId',
+  loadId: 'loadId',
+  startDate: 'startDate',
+  endDate: 'endDate',
+  operator: 'operator',
+  distanceMiles: 'distanceMiles',
+  durationHours: 'durationHours',
+  itemType: 'itemType',
+  baseRate: 'baseRate',
+  fuelSurcharge: 'fuelSurcharge',
+  detention: 'detention',
+  tonu: 'tonu',
+  grossPay: 'grossPay',
+  comments: 'comments',
+  createdAt: 'createdAt'
+} as const
+
+export type AmazonInvoiceLineItemScalarFieldEnum = (typeof AmazonInvoiceLineItemScalarFieldEnum)[keyof typeof AmazonInvoiceLineItemScalarFieldEnum]
+
+
+export const TripScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  weekId: 'weekId',
+  tripId: 'tripId',
+  tripStage: 'tripStage',
+  equipmentType: 'equipmentType',
+  operatorType: 'operatorType',
+  scheduledDate: 'scheduledDate',
+  projectedLoads: 'projectedLoads',
+  actualLoads: 'actualLoads',
+  estimatedAccessorial: 'estimatedAccessorial',
+  projectedRevenue: 'projectedRevenue',
+  actualRevenue: 'actualRevenue',
+  notes: 'notes',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TripScalarFieldEnum = (typeof TripScalarFieldEnum)[keyof typeof TripScalarFieldEnum]
+
+
+export const TripLoadScalarFieldEnum = {
+  id: 'id',
+  tripDbId: 'tripDbId',
+  loadId: 'loadId',
+  facilitySequence: 'facilitySequence',
+  loadExecutionStatus: 'loadExecutionStatus',
+  truckFilter: 'truckFilter',
+  isBobtail: 'isBobtail',
+  estimateDistance: 'estimateDistance',
+  estimatedCost: 'estimatedCost',
+  shipperAccount: 'shipperAccount',
+  stop1: 'stop1',
+  stop1PlannedArr: 'stop1PlannedArr',
+  stop2: 'stop2',
+  stop2PlannedArr: 'stop2PlannedArr',
+  stop3: 'stop3',
+  stop3PlannedArr: 'stop3PlannedArr',
+  stop4: 'stop4',
+  stop4PlannedArr: 'stop4PlannedArr',
+  stop5: 'stop5',
+  stop5PlannedArr: 'stop5PlannedArr',
+  stop6: 'stop6',
+  stop6PlannedArr: 'stop6PlannedArr',
+  stop7: 'stop7',
+  stop7PlannedArr: 'stop7PlannedArr',
+  createdAt: 'createdAt'
+} as const
+
+export type TripLoadScalarFieldEnum = (typeof TripLoadScalarFieldEnum)[keyof typeof TripLoadScalarFieldEnum]
+
+
+export const ForecastWeekScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  weekStart: 'weekStart',
+  weekEnd: 'weekEnd',
+  weekNumber: 'weekNumber',
+  year: 'year',
+  truckCount: 'truckCount',
+  nightsCount: 'nightsCount',
+  projectedTours: 'projectedTours',
+  projectedLoads: 'projectedLoads',
+  projectedTourPay: 'projectedTourPay',
+  projectedAccessorials: 'projectedAccessorials',
+  projectedTotal: 'projectedTotal',
+  actualTours: 'actualTours',
+  actualLoads: 'actualLoads',
+  actualTourPay: 'actualTourPay',
+  actualAccessorials: 'actualAccessorials',
+  actualAdjustments: 'actualAdjustments',
+  actualTotal: 'actualTotal',
+  variance: 'variance',
+  variancePercent: 'variancePercent',
+  amazonInvoiceId: 'amazonInvoiceId',
+  notes: 'notes',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ForecastWeekScalarFieldEnum = (typeof ForecastWeekScalarFieldEnum)[keyof typeof ForecastWeekScalarFieldEnum]
+
+
+export const ForecastScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  description: 'description',
+  isDefault: 'isDefault',
+  truckCount: 'truckCount',
+  nightsPerWeek: 'nightsPerWeek',
+  toursPerTruck: 'toursPerTruck',
+  avgLoadsPerTour: 'avgLoadsPerTour',
+  dtrRate: 'dtrRate',
+  avgAccessorialRate: 'avgAccessorialRate',
+  hourlyWage: 'hourlyWage',
+  hoursPerNight: 'hoursPerNight',
+  overtimeMultiplier: 'overtimeMultiplier',
+  payrollTaxRate: 'payrollTaxRate',
+  workersCompRate: 'workersCompRate',
+  weeklyRevenue: 'weeklyRevenue',
+  weeklyLaborCost: 'weeklyLaborCost',
+  weeklyOverhead: 'weeklyOverhead',
+  weeklyProfit: 'weeklyProfit',
+  contributionMargin: 'contributionMargin',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ForecastScalarFieldEnum = (typeof ForecastScalarFieldEnum)[keyof typeof ForecastScalarFieldEnum]
+
+
+export const UserSettingsScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  dateFormat: 'dateFormat',
+  currencyFormat: 'currencyFormat',
+  timezone: 'timezone',
+  defaultDtrRate: 'defaultDtrRate',
+  defaultAccessorialRate: 'defaultAccessorialRate',
+  defaultHourlyWage: 'defaultHourlyWage',
+  defaultHoursPerNight: 'defaultHoursPerNight',
+  defaultTruckCount: 'defaultTruckCount',
+  excludedAddresses: 'excludedAddresses',
+  aiCategorizationEnabled: 'aiCategorizationEnabled',
+  aiConfidenceThreshold: 'aiConfidenceThreshold',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type UserSettingsScalarFieldEnum = (typeof UserSettingsScalarFieldEnum)[keyof typeof UserSettingsScalarFieldEnum]
 
 
 export const SortOrder = {

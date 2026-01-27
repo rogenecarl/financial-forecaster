@@ -5,7 +5,7 @@ import { z } from 'zod';
 // ============================================================================
 // ENUM
 // ============================================================================
-export const UserRoleSchema = z.enum([
+export const RoleSchema = z.enum([
   'USER',
   'ADMIN',
   'PROVIDER'
@@ -18,7 +18,7 @@ export const UserSchema = z.object({
   id: z.string().uuid({ message: "Invalid UUID" }),
   name: z.string().min(2, { message: "Name must be at least 2 characters long" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
-  role: UserRoleSchema.default('USER'),
+  role: RoleSchema.default('USER'),
   emailVerified: z.boolean().default(false),
   image: z.string().url({ message: "Please enter a valid URL for the image" }).nullable(),
   createdAt: z.date(),
@@ -43,7 +43,7 @@ export const SignUpUserSchema = z
     email: z.string().email({ message: "Please enter a valid email address" }),
     password: z.string().min(8, { message: "Password must be at least 8 characters long" }),
     confirmPassword: z.string(),
-    role: UserRoleSchema.optional(),
+    role: RoleSchema.optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -57,7 +57,7 @@ export const SignUpProviderSchema = z
     email: z.string().email({ message: "Please enter a valid email address" }),
     password: z.string().min(8, { message: "Password must be at least 8 characters long" }),
     confirmPassword: z.string(),
-    role: UserRoleSchema.optional(),
+    role: RoleSchema.optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",

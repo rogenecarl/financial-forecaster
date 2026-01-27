@@ -21,6 +21,12 @@
 11. [Phase 8: Reports Module](#phase-8-reports-module)
 12. [Phase 9: Testing & Optimization](#phase-9-testing--optimization)
 
+**Appendices**
+- [Appendix A: Data Sources Reference](#appendix-a-data-sources-reference)
+- [Appendix B: File Naming Conventions](#appendix-b-file-naming-conventions)
+- [Appendix C: Import Order Convention](#appendix-c-import-order-convention)
+- [Appendix D: Git Commit Convention](#appendix-d-git-commit-convention)
+
 ---
 
 ## 1. Project Overview
@@ -609,23 +615,21 @@ Create all database tables while preserving existing authentication models (User
 // prisma/schema.prisma
 
 generator client {
-  provider        = "prisma-client-js"
-  output          = "../src/lib/generated/prisma"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client"
+  output   = "../src/lib/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ============================================
-// AUTHENTICATION MODELS (DO NOT MODIFY)
+// AUTHENTICATION MODELS (DO NOT MODIFY STRUCTURE)
 // ============================================
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
+  id            String    @id @default(uuid())
+  name          String
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
@@ -642,14 +646,15 @@ model User {
   categoryRules   CategoryRule[]
   amazonInvoices  AmazonInvoice[]
   trips           Trip[]
+  forecastWeeks   ForecastWeek[]
   forecasts       Forecast[]
   settings        UserSettings?
 
-  @@map("users")
+  @@map("user")
 }
 
 model Session {
-  id        String   @id @default(cuid())
+  id        String   @id
   userId    String
   token     String   @unique
   expiresAt DateTime
@@ -660,11 +665,13 @@ model Session {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("sessions")
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("session")
 }
 
 model Account {
-  id                    String    @id @default(cuid())
+  id                    String    @id
   userId                String
   accountId             String
   providerId            String
@@ -680,18 +687,21 @@ model Account {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("accounts")
+  @@index([userId])
+  @@map("account")
 }
 
 model Verification {
-  id         String   @id @default(cuid())
+  id         String   @id
   identifier String
   value      String
   expiresAt  DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@map("verifications")
+  @@index([identifier])
+  @@index([expiresAt])
+  @@map("verification")
 }
 
 enum Role {
@@ -705,7 +715,7 @@ enum Role {
 // ============================================
 
 model Category {
-  id          String       @id @default(cuid())
+  id          String       @id @default(uuid())
   name        String       @unique
   type        CategoryType
   color       String       @default("#6b7280") // Hex color for UI
@@ -721,7 +731,7 @@ model Category {
   transactions  Transaction[]
   categoryRules CategoryRule[]
 
-  @@map("categories")
+  @@map("category")
 }
 
 enum CategoryType {
@@ -732,7 +742,7 @@ enum CategoryType {
 }
 
 model Transaction {
-  id              String            @id @default(cuid())
+  id              String            @id @default(uuid())
   userId          String
   categoryId      String?
   importBatchId   String?
@@ -760,14 +770,14 @@ model Transaction {
 
   // Relations
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category      Category?      @relation(fields: [categoryId], references: [id], onSetNull: SetNull)
+  category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   importBatch   ImportBatch?   @relation(fields: [importBatchId], references: [id])
   amazonInvoice AmazonInvoice? @relation(fields: [amazonInvoiceId], references: [id])
 
   @@index([userId, postingDate])
   @@index([categoryId])
   @@index([importBatchId])
-  @@map("transactions")
+  @@map("transaction")
 }
 
 enum ReviewStatus {
@@ -777,7 +787,7 @@ enum ReviewStatus {
 }
 
 model ImportBatch {
-  id           String   @id @default(cuid())
+  id           String   @id @default(uuid())
   userId       String
   fileName     String
   fileType     String   // CSV, XLSX
@@ -789,11 +799,11 @@ model ImportBatch {
   // Relations
   transactions Transaction[]
 
-  @@map("import_batches")
+  @@map("import_batch")
 }
 
 model CategoryRule {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   userId      String
   categoryId  String
 
@@ -815,7 +825,7 @@ model CategoryRule {
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@index([userId, isActive])
-  @@map("category_rules")
+  @@map("category_rule")
 }
 
 // ============================================
@@ -823,7 +833,7 @@ model CategoryRule {
 // ============================================
 
 model AmazonInvoice {
-  id             String   @id @default(cuid())
+  id             String   @id @default(uuid())
   userId         String
 
   // Invoice header
@@ -852,11 +862,11 @@ model AmazonInvoice {
   transactions Transaction[]
 
   @@index([userId, paymentDate])
-  @@map("amazon_invoices")
+  @@map("amazon_invoice")
 }
 
 model AmazonInvoiceLineItem {
-  id              String   @id @default(cuid())
+  id              String   @id @default(uuid())
   invoiceId       String
 
   // Identifiers
@@ -891,7 +901,7 @@ model AmazonInvoiceLineItem {
 
   @@index([invoiceId])
   @@index([tripId])
-  @@map("amazon_invoice_line_items")
+  @@map("amazon_invoice_line_item")
 }
 
 enum InvoiceItemType {
@@ -902,33 +912,29 @@ enum InvoiceItemType {
 }
 
 model Trip {
-  id              String     @id @default(cuid())
+  id              String     @id @default(uuid())
   userId          String
   weekId          String?    // Group trips by week
 
-  // Identifiers
+  // Identifiers from CSV
   tripId          String     // Amazon Trip ID (T-112YY5BG)
-  status          TripStatus @default(SCHEDULED)
+  tripStage       TripStage  @default(UPCOMING) // From CSV: Upcoming, Canceled
+
+  // Equipment & Operator
+  equipmentType   String?    // "26' Truck"
+  operatorType    String?    // "Single Driver"
 
   // Dates
-  scheduledDate   DateTime
+  scheduledDate   DateTime   // Derived from first load's Stop 1 Planned Arrival
 
-  // Load tracking
-  projectedLoads  Int        @default(0) // Auto-calculated from CSV
-  actualLoads     Int?       // Manually updated nightly
+  // Load tracking (calculated from TripLoad records)
+  projectedLoads  Int        @default(0) // Auto-calculated: count non-bobtail delivery stops
+  actualLoads     Int?       // Manually updated nightly by user
 
-  // Stop details (from CSV)
-  stop1Id         String?
-  stop2Id         String?
-  stop3Id         String?
-  stop4Id         String?
-  stop5Id         String?
-  stop6Id         String?
-  stop7Id         String?
-
-  // Calculated fields
-  projectedRevenue Decimal?  @db.Decimal(10, 2)
-  actualRevenue    Decimal?  @db.Decimal(10, 2)
+  // Revenue tracking
+  estimatedAccessorial Decimal? @db.Decimal(10, 2) // Sum of non-bobtail Estimated Cost
+  projectedRevenue     Decimal? @db.Decimal(10, 2) // $452 + estimatedAccessorial
+  actualRevenue        Decimal? @db.Decimal(10, 2) // From Amazon Invoice
 
   notes           String?
 
@@ -936,43 +942,73 @@ model Trip {
   updatedAt       DateTime   @updatedAt
 
   // Relations
-  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   week  ForecastWeek? @relation(fields: [weekId], references: [id])
   loads TripLoad[]
 
   @@unique([userId, tripId])
   @@index([userId, scheduledDate])
   @@index([weekId])
-  @@map("trips")
+  @@map("trip")
 }
 
-enum TripStatus {
-  SCHEDULED
+enum TripStage {
+  UPCOMING
   IN_PROGRESS
   COMPLETED
-  CANCELLED
+  CANCELED
 }
 
 model TripLoad {
-  id          String   @id @default(cuid())
-  tripId      String
+  id              String   @id @default(uuid())
+  tripDbId        String   // References Trip.id
 
-  loadId      String   // Amazon Load ID
-  stopNumber  Int      // 2, 3, 4, 5, 6, 7
-  address     String?
-  isDelivery  Boolean  @default(true) // False for Bobtail/station stops
+  // Identifiers from CSV
+  loadId          String   // Amazon Load ID (115XL2QFJ)
+  facilitySequence String? // Route: "MSP7->DDU-MSP7-1_0420_01"
 
-  createdAt   DateTime @default(now())
+  // Status
+  loadExecutionStatus String @default("Not Started") // Not Started, Cancelled, Completed
+
+  // Bobtail detection (CRITICAL for load counting)
+  truckFilter     String?  // "DDU-MSP7-1_0420_01" or "BobtailMovementAnnotation"
+  isBobtail       Boolean  @default(false) // TRUE if truckFilter = "BobtailMovementAnnotation"
+
+  // Distance & Cost
+  estimateDistance Decimal  @db.Decimal(10, 2) @default(0) // Miles
+  estimatedCost    Decimal? @db.Decimal(10, 2) // Accessorial for this load segment
+
+  // Shipper info
+  shipperAccount  String?  // "OutboundDDU" or "AZNG"
+
+  // Stop details (up to 7 stops per load row)
+  stop1           String?  // Stop ID (MSP7, PY25793, etc.)
+  stop1PlannedArr DateTime?
+  stop2           String?
+  stop2PlannedArr DateTime?
+  stop3           String?
+  stop3PlannedArr DateTime?
+  stop4           String?
+  stop4PlannedArr DateTime?
+  stop5           String?
+  stop5PlannedArr DateTime?
+  stop6           String?
+  stop6PlannedArr DateTime?
+  stop7           String?
+  stop7PlannedArr DateTime?
+
+  createdAt       DateTime @default(now())
 
   // Relations
-  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip Trip @relation(fields: [tripDbId], references: [id], onDelete: Cascade)
 
-  @@index([tripId])
-  @@map("trip_loads")
+  @@index([tripDbId])
+  @@index([loadId])
+  @@map("trip_load")
 }
 
 model ForecastWeek {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   userId      String
 
   // Week identification
@@ -985,14 +1021,14 @@ model ForecastWeek {
   truckCount  Int      @default(2)
   nightsCount Int      @default(7)
 
-  // Projected (before week)
+  // Projected (before week - calculated from Trips import)
   projectedTours        Int      @default(0)
   projectedLoads        Int      @default(0)
   projectedTourPay      Decimal  @db.Decimal(12, 2) @default(0)
   projectedAccessorials Decimal  @db.Decimal(12, 2) @default(0)
   projectedTotal        Decimal  @db.Decimal(12, 2) @default(0)
 
-  // Actual (after invoice)
+  // Actual (after invoice - calculated from Amazon Invoice import)
   actualTours           Int?
   actualLoads           Int?
   actualTourPay         Decimal? @db.Decimal(12, 2)
@@ -1000,9 +1036,12 @@ model ForecastWeek {
   actualAdjustments     Decimal? @db.Decimal(12, 2)
   actualTotal           Decimal? @db.Decimal(12, 2)
 
-  // Variance
+  // Variance (calculated: actual - projected)
   variance              Decimal? @db.Decimal(12, 2)
   variancePercent       Float?
+
+  // Link to Amazon Invoice for this week
+  amazonInvoiceId       String?
 
   notes       String?
   status      ForecastStatus @default(PROJECTED)
@@ -1011,11 +1050,12 @@ model ForecastWeek {
   updatedAt   DateTime @updatedAt
 
   // Relations
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   trips Trip[]
 
   @@unique([userId, weekStart])
   @@index([userId, year, weekNumber])
-  @@map("forecast_weeks")
+  @@map("forecast_week")
 }
 
 enum ForecastStatus {
@@ -1025,7 +1065,7 @@ enum ForecastStatus {
 }
 
 model Forecast {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   userId      String
 
   // Scenario details
@@ -1064,7 +1104,7 @@ model Forecast {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@map("forecasts")
+  @@map("forecast")
 }
 
 // ============================================
@@ -1072,7 +1112,7 @@ model Forecast {
 // ============================================
 
 model UserSettings {
-  id     String @id @default(cuid())
+  id     String @id @default(uuid())
   userId String @unique
 
   // Display preferences
@@ -1772,9 +1812,141 @@ Build settings page first to establish default values used throughout the app.
 | 6.3 | Implement invoice parsing logic | P0 |
 | 6.4 | Create invoice detail view | P0 |
 | 6.5 | Create Trips page | P0 |
-| 6.6 | Build trips import from scheduler CSV | P0 |
-| 6.7 | Implement load counting (exclude MSP*, Stop 1) | P0 |
+| 6.6 | Build trips import from scheduler CSV (tab-delimited) | P0 |
+| 6.7 | Implement load counting (skip Bobtail, exclude MSP*, Stop 1) | P0 |
 | 6.8 | Build inline actual loads editor | P0 |
+
+### 6.6 Trips CSV Parsing Logic (Critical)
+
+The Trips CSV from Amazon Scheduler is **tab-delimited** with **one row per Load** (not per Trip).
+
+#### 6.6.1 CSV Column Mapping
+
+```typescript
+// Key columns to parse from Trips CSV
+interface TripsCsvRow {
+  'Trip ID': string;           // T-112YYT2WY
+  'Trip Stage': string;        // Upcoming, Canceled
+  'Load ID': string;           // 115XL2QFJ
+  'Facility Sequence': string; // MSP7->DDU-MSP7-1_0420_01
+  'Load Execution Status': string; // Not Started, Cancelled
+  'Transit Operator Type': string; // Single Driver
+  'Equipment Type': string;    // 26' Truck
+  'Estimate Distance': number; // 242.87
+  'Estimated Cost': number;    // 67.99 (Accessorial)
+  'Truck Filter': string;      // DDU-MSP7-1_0420_01 OR BobtailMovementAnnotation
+  'Shipper Account': string;   // OutboundDDU, AZNG
+  'Stop 1': string;            // MSP7
+  'Stop 1 Planned Arrival Date': string;
+  'Stop 1 Planned Arrival Time': string;
+  'Stop 2': string;            // PY25793
+  // ... Stop 3-7 similar
+}
+```
+
+#### 6.6.2 Bobtail Detection (Critical)
+
+```typescript
+// A load row is a BOBTAIL if:
+const isBobtail = row['Truck Filter'] === 'BobtailMovementAnnotation';
+
+// Bobtail types:
+// 1. Station-to-Station: MSP7->MSP8, MSP7->MSP9 (repositioning)
+// 2. Return-to-Base: PY26605->MSP7 (return after last delivery)
+//
+// Bobtail loads do NOT count toward projected loads
+// But they ARE stored in TripLoad for tracking purposes
+```
+
+#### 6.6.3 Load Counting Algorithm
+
+```typescript
+function parseTripsCSV(csvData: TripsCsvRow[], excludedAddresses: string[]) {
+  // Step 1: Group rows by Trip ID
+  const tripMap = new Map<string, TripsCsvRow[]>();
+  for (const row of csvData) {
+    const tripId = row['Trip ID'];
+    if (!tripMap.has(tripId)) {
+      tripMap.set(tripId, []);
+    }
+    tripMap.get(tripId)!.push(row);
+  }
+
+  // Step 2: Process each trip
+  const trips: ParsedTrip[] = [];
+
+  for (const [tripId, loadRows] of tripMap) {
+    let projectedLoads = 0;
+    let estimatedAccessorial = 0;
+    const tripStage = loadRows[0]['Trip Stage']; // Same for all rows in trip
+
+    for (const row of loadRows) {
+      // Skip Bobtail loads entirely for counting
+      if (row['Truck Filter'] === 'BobtailMovementAnnotation') {
+        continue;
+      }
+
+      // Skip cancelled loads
+      if (row['Load Execution Status'] === 'Cancelled') {
+        continue;
+      }
+
+      // Sum estimated cost (accessorial) from non-bobtail loads
+      estimatedAccessorial += parseFloat(row['Estimated Cost'] || '0');
+
+      // Count delivery stops (Stop 2-7, excluding stations)
+      const stops = [
+        row['Stop 2'], row['Stop 3'], row['Stop 4'],
+        row['Stop 5'], row['Stop 6'], row['Stop 7']
+      ];
+
+      for (const stop of stops) {
+        if (stop && !excludedAddresses.includes(stop)) {
+          projectedLoads++;
+        }
+      }
+    }
+
+    trips.push({
+      tripId,
+      tripStage,
+      scheduledDate: parseDateTime(loadRows[0]['Stop 1 Planned Arrival Date'],
+                                   loadRows[0]['Stop 1 Planned Arrival Time']),
+      projectedLoads,
+      estimatedAccessorial,
+      projectedRevenue: 452 + estimatedAccessorial, // DTR + Accessorial
+      loads: loadRows.map(mapToTripLoad),
+    });
+  }
+
+  return trips;
+}
+```
+
+#### 6.6.4 Worked Example
+
+**CSV Data for Trip T-112YYT2WY:**
+| Load ID | Truck Filter | Est. Cost | Stop 2 | Stop 3 | Stop 4 | Stop 5 | Stop 6 |
+|---------|--------------|-----------|--------|--------|--------|--------|--------|
+| 115XL2QFJ | DDU-MSP7-1_0420_01 | $67.99 | PY25793 | PY25494 | 4017879 | PY24811 | PY26605 |
+| 1121CDX4K | BobtailMovementAnnotation | $11.70 | MSP7 | | | | |
+
+**Processing:**
+1. Load 115XL2QFJ (NOT Bobtail):
+   - Est. Cost: $67.99 → Add to accessorial
+   - Stops: PY25793, PY25494, 4017879, PY24811, PY26605 → **5 loads**
+2. Load 1121CDX4K (IS Bobtail):
+   - **SKIP** - Does not count toward loads or accessorial
+
+**Result:**
+```typescript
+{
+  tripId: 'T-112YYT2WY',
+  projectedLoads: 5,
+  estimatedAccessorial: 67.99,
+  projectedRevenue: 519.99 // $452 + $67.99
+}
+```
 | 6.9 | Create Forecasting page with sliders | P0 |
 | 6.10 | Implement forecast calculation engine | P0 |
 | 6.11 | Build scaling scenarios table | P1 |
@@ -1971,7 +2143,199 @@ Build settings page first to establish default values used throughout the app.
 
 ---
 
-## Appendix A: File Naming Conventions
+## Appendix A: Data Sources Reference
+
+### A.1 Bank Transactions CSV
+
+**Source:** Bank export or copy/paste from bank website
+**Format:** CSV (comma-separated)
+**Frequency:** Weekly (Fridays)
+
+#### Column Structure
+
+| Column | Type | Example | Notes |
+|--------|------|---------|-------|
+| Details | String | `DEBIT`, `CREDIT` | Transaction direction |
+| Posting Date | Date | `01/22/2026` | MM/DD/YYYY format |
+| Description | String | `AMAZON.COM SERVICES LLC` | Vendor + location |
+| Amount | Decimal | `-8682.81` | Negative = outflow |
+| Type | String | `ACH_CREDIT`, `DEBIT_CARD` | Transaction type |
+| Balance | Decimal | `9180.57` | Running balance (optional) |
+| Check or Slip # | String | `1001` | Optional reference |
+
+#### Auto-Categorization Patterns
+
+| Pattern | Category | Confidence |
+|---------|----------|------------|
+| `AMAZON.COM SERVICES` | Amazon Payout | 95%+ |
+| `AMAZON EDI PAYMENTS` | Amazon Payout | 95%+ |
+| `ADP WAGE PAY` (debit) | Driver Wages | 95%+ |
+| `ADP Tax` | Payroll Taxes | 95%+ |
+| `AMAZON INSURANCE` | Insurance | 95%+ |
+| `ADP PAYROLL FEES` | Admin/Overhead | 90%+ |
+| `OPENPHONE`, `QUO (OPENPHONE)` | Admin/Overhead | 90%+ |
+| `MARATHON`, `BP#`, `SHELL OIL` | Fuel | 80%+ |
+
+---
+
+### A.2 Trips CSV (Scheduler Export)
+
+**Source:** Amazon Relay Scheduler
+**Format:** Tab-delimited (TSV)
+**Frequency:** Before each week (Sunday/Monday)
+**Structure:** One row per LOAD (not per trip)
+
+#### Key Columns
+
+| Column | Type | Example | Usage |
+|--------|------|---------|-------|
+| Trip ID | String | `T-112YYT2WY` | Group loads into trips |
+| Trip Stage | Enum | `Upcoming`, `Canceled` | Trip status |
+| Load ID | String | `115XL2QFJ` | Unique load identifier |
+| Facility Sequence | String | `MSP7->DDU-MSP7-1_0420_01` | Route description |
+| Load Execution Status | Enum | `Not Started`, `Cancelled` | Load status |
+| Transit Operator Type | String | `Single Driver` | Driver type |
+| Equipment Type | String | `26' Truck` | Vehicle type |
+| Estimate Distance | Decimal | `242.87` | Miles |
+| Estimated Cost | Decimal | `67.99` | **Accessorial (fuel surcharge)** |
+| Truck Filter | String | `DDU-...` or `BobtailMovementAnnotation` | **CRITICAL: Bobtail detection** |
+| Shipper Account | String | `OutboundDDU`, `AZNG` | Delivery type |
+| Stop 1-7 | String | `MSP7`, `PY25793` | Stop IDs |
+| Stop N Planned Arrival Date | Date | `1/26/26` | Scheduled date |
+| Stop N Planned Arrival Time | Time | `0:20` | Scheduled time |
+
+#### Bobtail Detection Rule
+
+```
+IF Truck Filter = "BobtailMovementAnnotation"
+THEN this load is a Bobtail (empty driving)
+     → Do NOT count toward projected loads
+     → Do NOT include Estimated Cost in accessorial sum
+```
+
+#### Load Counting Rule
+
+```
+FOR each non-Bobtail, non-Cancelled load row:
+  Count stops 2-7 WHERE stop_id NOT IN ['MSP7', 'MSP8', 'MSP9']
+```
+
+---
+
+### A.3 Amazon Payment Excel (Invoice)
+
+**Source:** Amazon Relay Portal
+**Format:** Excel (.xlsx)
+**Tab to Use:** "Payment Details" (NOT "Payment Summary")
+**Frequency:** Weekly (Thursdays after payment)
+
+#### Key Columns
+
+| Column | Type | Example | Usage |
+|--------|------|---------|-------|
+| Trip ID | String | `T-111GTV5BG` | Links to Trips data |
+| Load ID | String | `111YQ6DK4` | Null for Tour rows |
+| Start Date | Date | `Jan 14, 2026` | Trip start |
+| End Date | Date | `Jan 14, 2026` | Trip end |
+| Operator | Enum | `Solo`, `Team` | Driver configuration |
+| Distance (Mi) | Decimal | `179.66` | Miles driven |
+| Item Type | Enum | See below | **Row type** |
+| Base Rate | Decimal | `452.00` | DTR for tours |
+| Fuel Surcharge | Decimal | `50.31` | **Accessorial** |
+| Detention | Decimal | `0.00` | Detention pay |
+| TONU | Decimal | `200.00` | Truck Ordered Not Used |
+| Gross Pay | Decimal | `452.10` | Total for line |
+| Comments | String | `DT unused tours` | Notes |
+
+#### Item Types
+
+| Item Type | Meaning | Revenue Source |
+|-----------|---------|----------------|
+| `Tour - Completed` | Fixed $452 per tour | Base Rate |
+| `Load - Completed` | Variable per delivery | Fuel Surcharge |
+| `Adjustments - Dispute` | TONU credits | TONU column |
+
+#### Revenue Calculation
+
+```typescript
+const tourPay = sumWhere(itemType === 'Tour - Completed', 'grossPay');
+const accessorials = sumWhere(itemType === 'Load - Completed', 'grossPay');
+const adjustments = sumWhere(itemType.includes('Adjustment'), 'grossPay');
+const totalRevenue = tourPay + accessorials + adjustments;
+```
+
+---
+
+### A.4 Data Source Relationships
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        DATA SOURCE RELATIONSHIPS                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  TRIPS CSV                         AMAZON INVOICE                           │
+│  ──────────                        ──────────────                           │
+│  Trip ID: T-112YYT2WY     ←───────→ Trip ID: T-112YYT2WY                   │
+│  Load ID: 115XL2QFJ       ←───────→ Load ID: 115XL2QFJ                     │
+│  Estimated Cost: $67.99   ←─ same ─→ Fuel Surcharge: $67.99                │
+│                                                                             │
+│  Projected:                        Actual:                                  │
+│  - 5 loads (counted)               - Tour Pay: $452.10                     │
+│  - $519.99 revenue                 - Accessorials: $79.69                  │
+│                                    - Total: $531.79                        │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  AMAZON INVOICE                    BANK TRANSACTION                         │
+│  ──────────────                    ────────────────                         │
+│  Total Pay: $8,366.41     ←─ matches ─→ Amount: +$8,366.41                 │
+│  Payment Date: Jan 22     ←─ matches ─→ Posting Date: 01/22/2026           │
+│  Invoice #: AZNGA40B...            Description: AMAZON.COM SERVICES        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### A.5 Weekly Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          WEEKLY DATA FLOW                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  SUNDAY/MONDAY                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ Import Trips CSV → Parse → Count Loads → Calculate Projected Revenue │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  MON-SAT (NIGHTLY)                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ User updates Actual Loads for completed trips                        │   │
+│  │ (Amazon may cancel loads at station)                                 │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  THURSDAY                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ Amazon pays → Import Payment Details Excel → Parse Invoice           │   │
+│  │ → Calculate Actual Revenue → Compare Forecast vs Actual              │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  FRIDAY                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ Import Bank Transactions CSV → AI Categorize → Match Invoice to Bank │   │
+│  │ → Update P&L → Reconcile                                             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Appendix B: File Naming Conventions
 
 ```
 Components:    PascalCase.tsx       (MetricCard.tsx)
@@ -1985,7 +2349,7 @@ Schemas:       kebab-case.schema.ts (transaction.schema.ts)
 Stores:        kebab-case.store.ts  (forecast.store.ts)
 ```
 
-## Appendix B: Import Order Convention
+## Appendix C: Import Order Convention
 
 ```typescript
 // 1. React/Next.js
@@ -2009,7 +2373,7 @@ import { formatCurrency } from '@/lib/format-currency';
 import type { Transaction } from '@/types/transaction';
 ```
 
-## Appendix C: Git Commit Convention
+## Appendix D: Git Commit Convention
 
 ```
 feat:     New feature

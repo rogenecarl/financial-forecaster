@@ -47,7 +47,7 @@ Financial Forecaster is an internal web application for Peak Transport LLC that 
 | Styling | Tailwind CSS 4 + shadcn/ui |
 | Database | PostgreSQL + Prisma 7 |
 | Authentication | Better Auth (Completed) |
-| AI | Claude API (Anthropic) |
+| AI | Gemini API (Google) |
 | CSV Parsing | Papa Parse |
 | Excel Parsing | SheetJS (xlsx) |
 | Validation | Zod 4 |
@@ -73,7 +73,7 @@ src/
 │   └── api/
 │       ├── auth/               # Better Auth routes
 │       ├── import/             # Data import endpoints
-│       └── ai/                 # Claude API endpoints
+│       └── ai/                 # Gemini API endpoints
 ├── components/
 │   ├── ui/                     # shadcn/ui components
 │   ├── layout/                 # Layout components
@@ -1115,24 +1115,8 @@ model UserSettings {
   id     String @id @default(uuid())
   userId String @unique
 
-  // Display preferences
-  dateFormat       String @default("MM/dd/yyyy")
-  currencyFormat   String @default("USD")
-  timezone         String @default("America/Chicago")
-
-  // Default values
-  defaultDtrRate           Decimal @db.Decimal(10, 2) @default(452)
-  defaultAccessorialRate   Decimal @db.Decimal(10, 2) @default(77)
-  defaultHourlyWage        Decimal @db.Decimal(10, 2) @default(20)
-  defaultHoursPerNight     Decimal @db.Decimal(4, 2) @default(10)
-  defaultTruckCount        Int     @default(2)
-
-  // Excluded addresses for load counting
+  // Excluded addresses for load counting (used when importing Trips CSV)
   excludedAddresses String[] @default(["MSP7", "MSP8", "MSP9"])
-
-  // AI settings
-  aiCategorizationEnabled  Boolean @default(true)
-  aiConfidenceThreshold    Float   @default(0.8) // Auto-apply above this
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1353,103 +1337,134 @@ const navigationItems = [
 
 ### 4.1 Overview
 
-Build settings page first to establish default values used throughout the app.
+Simplified settings page with only essential configuration. Forecasting parameters are configured directly on the Forecasting page for better UX. AI categorization works automatically with sensible defaults.
 
-### 4.2 Settings Sections
-
-#### 4.2.1 Categories Management
+### 4.2 Settings Page Layout
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Categories                                         + Add    │
+│ Settings                                                    │
 ├─────────────────────────────────────────────────────────────┤
+│ [Categories]  [Load Counting]                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 4.3 Settings Sections
+
+#### 4.3.1 Categories Tab
+
+Manage transaction categories for bookkeeping and P&L generation.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Settings > Categories                                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│ Transaction Categories                             [+ Add]  │
+│                                                             │
 │ ┌─────────────────────────────────────────────────────────┐ │
-│ │ ● Amazon Payout          Revenue    ✓ In P&L    ⋮ Edit │ │
-│ │ ● Driver Wages           Expense    ✓ In P&L    ⋮ Edit │ │
-│ │ ● Payroll Taxes          Expense    ✓ In P&L    ⋮ Edit │ │
-│ │ ● Fuel                   Expense    ✗ Excluded  ⋮ Edit │ │
+│ │ REVENUE                                                 │ │
+│ │ ├── 🟢 Amazon Payout         ✓ In P&L           [Edit] │ │
+│ │ └── 🟢 Other Income          ✓ In P&L           [Edit] │ │
+│ │                                                         │ │
+│ │ EXPENSES                                                │ │
+│ │ ├── 🔵 Driver Wages          ✓ In P&L           [Edit] │ │
+│ │ ├── 🟣 Payroll Taxes         ✓ In P&L           [Edit] │ │
+│ │ ├── 🟣 Workers Comp          ✓ In P&L           [Edit] │ │
+│ │ ├── 🟠 Insurance             ✓ In P&L           [Edit] │ │
+│ │ ├── 🔴 Admin/Overhead        ✓ In P&L           [Edit] │ │
+│ │ ├── ⚫ Bank Fees             ✓ In P&L           [Edit] │ │
+│ │ ├── 🟡 Fuel                  ✗ Excluded         [Edit] │ │
+│ │ └── 🟡 Maintenance           ✗ Excluded         [Edit] │ │
+│ │                                                         │ │
+│ │ TRANSFERS (Never in P&L)                                │ │
+│ │ ├── ⚪ Cash Transfer                             [Edit] │ │
+│ │ └── ⚪ Personal/Excluded                         [Edit] │ │
+│ │                                                         │ │
+│ │ UNCATEGORIZED                                           │ │
+│ │ └── ⚪ Uncategorized         ✗ Excluded    [System]    │ │
 │ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-#### 4.2.2 Auto-Categorization Rules
+#### 4.3.2 Add/Edit Category Modal
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Categorization Rules                               + Add    │
+│ Add Category                                          [×]   │
 ├─────────────────────────────────────────────────────────────┤
-│ Pattern              │ Match    │ Category       │ Hits     │
-│ ─────────────────────┼──────────┼────────────────┼──────────│
-│ AMAZON.COM SERVICES  │ Contains │ Amazon Payout  │ 24       │
-│ ADP WAGE PAY         │ Contains │ Driver Wages   │ 12       │
-│ ADP Tax              │ Contains │ Payroll Taxes  │ 12       │
+│                                                             │
+│ Name                                                        │
+│ [                                                      ]    │
+│                                                             │
+│ Type                                                        │
+│ (●) Revenue   ( ) Expense   ( ) Transfer                    │
+│                                                             │
+│ Color                                                       │
+│ [🟢] [🔵] [🟣] [🟠] [🔴] [🟡] [⚫] [⚪]                      │
+│                                                             │
+│ [✓] Include in P&L Statement                               │
+│     (Transfers are never included in P&L)                   │
+│                                                             │
+│                                     [Cancel]  [Save]        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-#### 4.2.3 Default Values
+#### 4.3.3 Load Counting Tab
+
+Configure excluded addresses for trip load counting (used when importing Trips CSV).
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Forecasting Defaults                                        │
+│ Settings > Load Counting                                    │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│ Daily Tractor Rate (DTR)     [$452.00        ]              │
-│ Average Accessorial Rate     [$77.00         ]              │
-│ Default Truck Count          [2              ]              │
+│ Excluded Station Addresses                                  │
 │                                                             │
-│ Hourly Wage                  [$20.00         ]              │
-│ Hours per Night              [10             ]              │
+│ These addresses are excluded when counting loads from the   │
+│ Trips CSV. Stops at these locations are Amazon stations,    │
+│ not delivery addresses.                                     │
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │  MSP7  [×]    MSP8  [×]    MSP9  [×]                    │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+│ [Add station address...                      ] [+ Add]      │
+│                                                             │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ ℹ️ Load Counting Rules:                                  │ │
+│ │ • Stop 1 is always excluded (starting station)          │ │
+│ │ • Bobtail loads are automatically excluded              │ │
+│ │ • Only stops 2-7 at non-station addresses are counted   │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                             │
+│                                            [Save Changes]   │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-#### 4.2.4 Excluded Addresses
+### 4.4 What's NOT in Settings (By Design)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Excluded Addresses (for load counting)                      │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│ These addresses are excluded when counting loads:           │
-│                                                             │
-│ [MSP7] [×]  [MSP8] [×]  [MSP9] [×]                         │
-│                                                             │
-│ [Add address...                              ] [+ Add]      │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+| Feature | Where It Lives | Reason |
+|---------|----------------|--------|
+| Forecasting Defaults (DTR, Wages, etc.) | Forecasting Page | Better UX - configure where you use it |
+| AI Confidence Threshold | Hardcoded (80%) | No need for user configuration |
+| AI Enable/Disable | Always enabled | Core feature, not optional |
+| Categorization Rules | Auto-learned | Created when user categorizes transactions |
 
-#### 4.2.5 AI Settings
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ AI Categorization                                           │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│ [✓] Enable AI auto-categorization                          │
-│                                                             │
-│ Confidence threshold                                        │
-│ [═══════════════●═══] 80%                                  │
-│                                                             │
-│ Transactions with confidence above this threshold will be   │
-│ automatically categorized. Others will be flagged for       │
-│ manual review.                                              │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 4.3 Tasks
+### 4.5 Tasks
 
 | Task | Description | Priority |
 |------|-------------|----------|
-| 4.1 | Create settings page layout with tabs | P0 |
-| 4.2 | Build Categories CRUD with color picker | P0 |
-| 4.3 | Build Category Rules management | P0 |
-| 4.4 | Build Default Values form | P0 |
-| 4.5 | Build Excluded Addresses tag input | P0 |
-| 4.6 | Build AI Settings with slider | P1 |
-| 4.7 | Create server actions for all settings | P0 |
-| 4.8 | Add validation with Zod schemas | P0 |
+| 4.1 | Create settings page with tab navigation | P0 |
+| 4.2 | Build Categories list grouped by type | P0 |
+| 4.3 | Build Add/Edit Category modal with color picker | P0 |
+| 4.4 | Build Excluded Addresses tag input | P0 |
+| 4.5 | Create server actions for categories CRUD | P0 |
+| 4.6 | Create server actions for excluded addresses | P0 |
+| 4.7 | Add Zod validation schemas | P0 |
+| 4.8 | Seed default categories on first run | P0 |
 
 ---
 
@@ -1614,7 +1629,7 @@ Build settings page first to establish default values used throughout the app.
 | 5.2 | Build Import Modal with file upload | P0 |
 | 5.3 | Implement CSV/Excel parsing | P0 |
 | 5.4 | Build Import Preview with AI categorization | P0 |
-| 5.5 | Integrate Claude API for categorization | P0 |
+| 5.5 | Integrate Gemini API for categorization | P0 |
 | 5.6 | Build inline category editor | P0 |
 | 5.7 | Implement bulk categorization | P1 |
 | 5.8 | Add search and filter functionality | P0 |
@@ -1699,6 +1714,18 @@ Build settings page first to establish default values used throughout the app.
 ```
 
 ### 6.3 Forecasting Page
+
+The Forecasting page provides what-if scenario modeling. All parameters are configured directly on this page (not in Settings) for better UX.
+
+**Default Values (hardcoded, based on client's business):**
+- DTR Rate: $452 (Amazon's fixed rate)
+- Avg Accessorial: $77 (historical average)
+- Hourly Wage: $20
+- Hours per Night: 10
+- Payroll Tax Rate: 7.65%
+- Workers Comp Rate: 5%
+
+**Saved Scenarios:** Users can save named scenarios with custom parameters for comparison.
 
 #### 6.3.1 Page Layout
 

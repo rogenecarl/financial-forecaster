@@ -25,6 +25,7 @@ npx prisma db push    # Push schema changes without migration
 - **TanStack Query** for client-side data fetching
 - **Zod 4** for validation
 - **Tailwind CSS 4** with shadcn/ui components
+- **Gemini API** (Google) for AI-powered transaction categorization
 
 ### Authentication Flow
 - Server auth config: `src/lib/auth.ts` - Better Auth instance with Prisma adapter, rate limiting, and social providers
@@ -76,7 +77,8 @@ src/
 │   ├── auth-client.ts    # Better Auth React client
 │   ├── auth-server.ts    # Server-side auth helpers
 │   ├── auth-rate-limit.ts
-│   └── db.ts         # Prisma singleton
+│   ├── db.ts         # Prisma singleton
+│   └── gemini.ts     # Gemini AI client (model: gemini-2.5-flash)
 ├── schema/           # Zod schemas (user.schema.ts)
 ├── types/            # TypeScript types (ActionResponse, auth types)
 └── proxy.ts          # Route protection (optimistic, Next.js 16+)
@@ -93,5 +95,6 @@ src/
 DATABASE_URL              # PostgreSQL connection string
 GOOGLE_CLIENT_ID          # Google OAuth
 GOOGLE_CLIENT_SECRET      # Google OAuth
+GEMINI_API_KEY            # Gemini AI for transaction categorization
 NEXT_PUBLIC_APP_URL       # App URL (optional, defaults to http://localhost:3000)
 ```

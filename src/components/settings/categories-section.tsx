@@ -13,14 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -41,6 +33,17 @@ import { Plus, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react";
 import { getCategories, deleteCategory } from "@/actions/settings";
 import { CategoryForm } from "./category-form";
 import type { Category } from "@/lib/generated/prisma/client";
+
+type CategoryType = "REVENUE" | "EXPENSE" | "TRANSFER" | "UNKNOWN";
+
+const TYPE_LABELS: Record<CategoryType, string> = {
+  REVENUE: "Revenue",
+  EXPENSE: "Expenses",
+  TRANSFER: "Transfers (Never in P&L)",
+  UNKNOWN: "Uncategorized",
+};
+
+const TYPE_ORDER: CategoryType[] = ["REVENUE", "EXPENSE", "TRANSFER", "UNKNOWN"];
 
 export function CategoriesSection() {
   const queryClient = useQueryClient();
@@ -75,19 +78,14 @@ export function CategoriesSection() {
 
   const categories = categoriesResult?.success ? categoriesResult.data : [];
 
-  const getCategoryTypeBadge = (type: string) => {
-    const variants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-      REVENUE: "default",
-      EXPENSE: "destructive",
-      TRANSFER: "secondary",
-      UNKNOWN: "outline",
-    };
-    return (
-      <Badge variant={variants[type] || "outline"} className="font-normal">
-        {type.charAt(0) + type.slice(1).toLowerCase()}
-      </Badge>
-    );
-  };
+  // Group categories by type
+  const groupedCategories = TYPE_ORDER.reduce(
+    (acc, type) => {
+      acc[type] = categories.filter((c) => c.type === type);
+      return acc;
+    },
+    {} as Record<CategoryType, Category[]>
+  );
 
   const handleEdit = (category: Category) => {
     setEditCategory(category);
@@ -104,14 +102,89 @@ export function CategoriesSection() {
     setEditCategory(null);
   };
 
+  const renderCategoryRow = (category: Category, isLast: boolean) => {
+    const isTransfer = category.type === "TRANSFER";
+
+    return (
+      <div
+        key={category.id}
+        className={`flex items-center justify-between py-2 px-3 ${
+          !isLast ? "border-b border-border/50" : ""
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          {/* Tree connector */}
+          <span className="text-muted-foreground text-sm w-4">
+            {isLast ? "└" : "├"}
+          </span>
+          {/* Color indicator */}
+          <div
+            className="h-3.5 w-3.5 rounded-full border border-border/50"
+            style={{ backgroundColor: category.color }}
+          />
+          {/* Name */}
+          <span className="text-sm font-medium">{category.name}</span>
+          {/* System badge */}
+          {category.isSystem && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+              System
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-4">
+          {/* P&L status - don't show for transfers */}
+          {!isTransfer && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              {category.includeInPL ? (
+                <>
+                  <Check className="h-3 w-3 text-green-600" />
+                  <span>In P&L</span>
+                </>
+              ) : (
+                <>
+                  <X className="h-3 w-3 text-muted-foreground" />
+                  <span>Excluded</span>
+                </>
+              )}
+            </span>
+          )}
+          {/* Actions */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleEdit(category)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleDelete(category)}
+                disabled={category.isSystem}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div>
-            <CardTitle className="text-lg font-semibold">Categories</CardTitle>
+            <CardTitle className="text-lg font-semibold">
+              Transaction Categories
+            </CardTitle>
             <CardDescription>
-              Manage transaction categories for bookkeeping
+              Manage categories for bookkeeping and P&L generation
             </CardDescription>
           </div>
           <Button size="sm" onClick={() => setFormOpen(true)}>
@@ -131,69 +204,31 @@ export function CategoriesSection() {
               No categories found. Add your first category.
             </div>
           ) : (
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-center">In P&L</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {categories.map((category) => (
-                    <TableRow key={category.id}>
-                      <TableCell>
-                        <div
-                          className="h-4 w-4 rounded-full border"
-                          style={{ backgroundColor: category.color }}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {category.name}
-                        {category.isSystem && (
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            System
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{getCategoryTypeBadge(category.type)}</TableCell>
-                      <TableCell className="text-center">
-                        {category.includeInPL ? (
-                          <Check className="h-4 w-4 text-green-600 mx-auto" />
-                        ) : (
-                          <X className="h-4 w-4 text-muted-foreground mx-auto" />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon-sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(category)}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(category)}
-                              disabled={category.isSystem}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="rounded-lg border divide-y">
+              {TYPE_ORDER.map((type) => {
+                const typedCategories = groupedCategories[type];
+                if (typedCategories.length === 0) return null;
+
+                return (
+                  <div key={type} className="py-3">
+                    {/* Section header */}
+                    <div className="px-3 pb-2">
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        {TYPE_LABELS[type]}
+                      </h3>
+                    </div>
+                    {/* Category list */}
+                    <div>
+                      {typedCategories.map((category, index) =>
+                        renderCategoryRow(
+                          category,
+                          index === typedCategories.length - 1
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -213,7 +248,8 @@ export function CategoriesSection() {
             <AlertDialogTitle>Delete Category</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{categoryToDelete?.name}&quot;?
-              This action cannot be undone. Any associated rules will also be deleted.
+              This action cannot be undone. Any transactions using this category
+              will become uncategorized.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

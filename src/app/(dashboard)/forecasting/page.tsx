@@ -1,8 +1,73 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Bookmark, Trash2, Star, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Save, TrendingUp, DollarSign, Users, Calculator } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ForecastCalculator } from "@/components/forecasting";
+import { getForecasts, deleteForecast } from "@/actions/forecasting/forecasts";
+import type { Forecast } from "@/schema/forecasting.schema";
+import { toast } from "sonner";
 
 export default function ForecastingPage() {
+  const [savedScenarios, setSavedScenarios] = useState<Forecast[]>([]);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const fetchScenarios = async () => {
+    try {
+      const result = await getForecasts();
+      if (result.success && result.data) {
+        setSavedScenarios(result.data);
+      }
+    } catch {
+      // Silently fail - scenarios will just be empty
+    }
+  };
+
+  useEffect(() => {
+    fetchScenarios();
+  }, []);
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    setDeleting(true);
+    try {
+      const result = await deleteForecast(deleteId);
+      if (result.success) {
+        toast.success("Scenario deleted");
+        setDeleteId(null);
+        fetchScenarios();
+      } else {
+        toast.error(result.error || "Failed to delete scenario");
+      }
+    } catch {
+      toast.error("Failed to delete scenario");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -13,202 +78,105 @@ export default function ForecastingPage() {
             Predict weekly revenue and model scenarios
           </p>
         </div>
-        <Button>
-          <Save className="mr-2 h-4 w-4" />
-          Save Scenario
-        </Button>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Input Parameters */}
+      {/* Forecast Calculator */}
+      <ForecastCalculator onSave={fetchScenarios} />
+
+      {/* Saved Scenarios */}
+      {savedScenarios.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Input Parameters</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Bookmark className="h-5 w-5" />
+              Saved Scenarios
+            </CardTitle>
             <CardDescription>
-              Adjust values to model different scenarios
+              Your saved forecast configurations for quick reference
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Truck Operations */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium">Operations</h4>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Number of Trucks</label>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-muted rounded-full">
-                      <div className="h-2 w-1/5 bg-primary rounded-full" />
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {savedScenarios.map((scenario) => (
+                <div
+                  key={scenario.id}
+                  className="relative p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  {scenario.isDefault && (
+                    <Star className="absolute top-2 right-2 h-4 w-4 text-amber-500 fill-amber-500" />
+                  )}
+                  <h4 className="font-medium mb-1">{scenario.name}</h4>
+                  {scenario.description && (
+                    <p className="text-xs text-muted-foreground mb-3">{scenario.description}</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Trucks</p>
+                      <p className="font-medium">{scenario.truckCount}</p>
                     </div>
-                    <span className="text-sm font-medium w-8">2</span>
+                    <div>
+                      <p className="text-muted-foreground">Revenue</p>
+                      <p className="font-medium text-emerald-600">
+                        {formatCurrency(scenario.weeklyRevenue)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Costs</p>
+                      <p className="font-medium text-red-600">
+                        {formatCurrency(scenario.weeklyLaborCost + scenario.weeklyOverhead)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Profit</p>
+                      <p className={`font-medium ${scenario.weeklyProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        {formatCurrency(scenario.weeklyProfit)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDeleteId(scenario.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                    </Button>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Nights per Week</label>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-muted rounded-full">
-                      <div className="h-2 w-full bg-primary rounded-full" />
-                    </div>
-                    <span className="text-sm font-medium w-8">7</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Rates */}
-            <div className="space-y-4 pt-4 border-t border-border">
-              <h4 className="text-sm font-medium">Rates</h4>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">DTR Rate</label>
-                  <div className="text-lg font-semibold">$452.00</div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Avg Accessorial</label>
-                  <div className="text-lg font-semibold">$77.00</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Labor Costs */}
-            <div className="space-y-4 pt-4 border-t border-border">
-              <h4 className="text-sm font-medium">Labor Costs</h4>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Hourly Wage</label>
-                  <div className="text-lg font-semibold">$20.00</div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Hours per Night</label>
-                  <div className="text-lg font-semibold">10</div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Payroll Tax Rate</label>
-                  <div className="text-lg font-semibold">7.65%</div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground">Workers Comp Rate</label>
-                  <div className="text-lg font-semibold">5%</div>
-                </div>
-              </div>
+              ))}
             </div>
           </CardContent>
         </Card>
+      )}
 
-        {/* Projected Results */}
-        <div className="space-y-6">
-          {/* Weekly Revenue */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Weekly Revenue
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-emerald-600">$7,406.00</div>
-              <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                <div className="flex justify-between">
-                  <span>Tour Pay</span>
-                  <span>$6,328.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Accessorials</span>
-                  <span>$1,078.00</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Weekly Costs */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Weekly Costs
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-red-600">$5,250.00</div>
-              <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                <div className="flex justify-between">
-                  <span>Labor</span>
-                  <span>$4,200.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Payroll Tax</span>
-                  <span>$321.30</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Workers Comp</span>
-                  <span>$210.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Overhead</span>
-                  <span>$500.00</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Weekly Profit */}
-          <Card className="bg-primary/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Weekly Profit
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">$2,156.00</div>
-              <div className="mt-2 flex items-center gap-2">
-                <Calculator className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Contribution Margin: <span className="font-medium text-foreground">$154/truck/day</span>
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Scaling Scenarios */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Scaling Scenarios</CardTitle>
-          <CardDescription>
-            See how profit scales with additional trucks
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Trucks</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Revenue</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Costs</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Profit</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Margin/Truck/Day</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[2, 4, 6, 10].map((trucks) => (
-                  <tr key={trucks} className="border-b border-border last:border-0 hover:bg-muted/50">
-                    <td className="py-3 px-4 font-medium">{trucks}</td>
-                    <td className="text-right py-3 px-4">${(3703 * trucks).toLocaleString()}</td>
-                    <td className="text-right py-3 px-4">${(2625 * trucks).toLocaleString()}</td>
-                    <td className="text-right py-3 px-4 font-medium text-emerald-600">
-                      ${(1078 * trucks).toLocaleString()}
-                    </td>
-                    <td className="text-right py-3 px-4">$154</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Scenario</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this saved scenario? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -3,6 +3,7 @@ export {
   getTransactionById,
   updateTransaction,
   deleteTransaction,
+  bulkDeleteTransactions,
   bulkUpdateCategory,
   getTransactionStats,
   type TransactionWithCategory,

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { Download, Upload, Receipt, RefreshCw } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Download, Upload, Receipt } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,21 +11,11 @@ import {
   ImportModal,
   ImportPreview,
 } from "@/components/transactions";
-import {
-  getTransactions,
-  updateTransaction,
-  deleteTransaction,
-  bulkUpdateCategory,
-  type TransactionWithCategory,
-} from "@/actions/transactions";
+import { useTransactions } from "@/hooks";
 import type { TransactionFilter, ImportTransactionRow } from "@/schema/transaction.schema";
-import { toast } from "sonner";
 
 export default function TransactionsPage() {
-  // State
-  const [transactions, setTransactions] = useState<TransactionWithCategory[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  // Filters state
   const [filters, setFilters] = useState<Partial<TransactionFilter>>({
     page: 1,
     limit: 50,
@@ -43,27 +33,22 @@ export default function TransactionsPage() {
     fileType: "CSV" | "XLSX";
   } | null>(null);
 
-  // Fetch transactions
-  const fetchTransactions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = await getTransactions(filters);
-      if (result.success && result.data) {
-        setTransactions(result.data.transactions);
-        setTotal(result.data.total);
-      }
-    } catch (error) {
-      console.error("Failed to fetch transactions:", error);
-      toast.error("Failed to load transactions");
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
-  // Fetch on mount and filter changes
-  useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+  // Use TanStack Query hook for transactions
+  const {
+    transactions,
+    total,
+    totalPages,
+    categories,
+    transactionsLoading,
+    categoriesLoading,
+    updateCategory,
+    deleteTransaction,
+    bulkDelete,
+    bulkCategorize,
+    isBulkDeleting,
+    isBulkCategorizing,
+    invalidate,
+  } = useTransactions({ filters });
 
   // Handle filter changes
   const handleFiltersChange = useCallback((newFilters: Partial<TransactionFilter>) => {
@@ -81,119 +66,64 @@ export default function TransactionsPage() {
   }, []);
 
   // Handle category change
-  const handleCategoryChange = useCallback(async (transactionId: string, categoryId: string | null) => {
-    try {
-      const result = await updateTransaction({
-        id: transactionId,
-        categoryId,
-      });
-
-      if (result.success) {
-        // Update local state
-        setTransactions((prev) =>
-          prev.map((t) =>
-            t.id === transactionId
-              ? { ...t, categoryId, category: result.data?.category || null, manualOverride: true, reviewStatus: "REVIEWED" }
-              : t
-          )
-        );
-        toast.success("Category updated");
-      } else {
-        toast.error(result.error || "Failed to update category");
-      }
-    } catch (error) {
-      console.error("Failed to update category:", error);
-      toast.error("Failed to update category");
-    }
-  }, []);
+  const handleCategoryChange = useCallback(
+    (transactionId: string, categoryId: string | null) => {
+      updateCategory(transactionId, categoryId);
+    },
+    [updateCategory]
+  );
 
   // Handle delete
-  const handleDelete = useCallback(async (transactionId: string) => {
-    try {
-      const result = await deleteTransaction(transactionId);
-      if (result.success) {
-        setTransactions((prev) => prev.filter((t) => t.id !== transactionId));
-        setTotal((prev) => prev - 1);
-        toast.success("Transaction deleted");
-      } else {
-        toast.error(result.error || "Failed to delete transaction");
-      }
-    } catch (error) {
-      console.error("Failed to delete transaction:", error);
-      toast.error("Failed to delete transaction");
-    }
-  }, []);
+  const handleDelete = useCallback(
+    (transactionId: string) => {
+      deleteTransaction(transactionId);
+    },
+    [deleteTransaction]
+  );
 
   // Handle bulk categorize
-  const handleBulkCategorize = useCallback(async (
-    categoryId: string,
-    createRule: boolean,
-    rulePattern?: string
-  ) => {
-    try {
-      const result = await bulkUpdateCategory({
-        transactionIds: selectedIds,
-        categoryId,
-        createRule,
-        rulePattern,
-      });
-
-      if (result.success) {
-        toast.success(`Updated ${result.data?.updatedCount} transactions`);
-        setSelectedIds([]);
-        fetchTransactions();
-      } else {
-        toast.error(result.error || "Failed to update transactions");
-      }
-    } catch (error) {
-      console.error("Failed to bulk categorize:", error);
-      toast.error("Failed to update transactions");
-    }
-  }, [selectedIds, fetchTransactions]);
+  const handleBulkCategorize = useCallback(
+    (categoryId: string, createRule: boolean, rulePattern?: string) => {
+      bulkCategorize(selectedIds, categoryId, createRule, rulePattern);
+      setSelectedIds([]); // Clear selection immediately (optimistic)
+    },
+    [selectedIds, bulkCategorize]
+  );
 
   // Handle bulk delete
-  const handleBulkDelete = useCallback(async () => {
-    try {
-      let deletedCount = 0;
-      for (const id of selectedIds) {
-        const result = await deleteTransaction(id);
-        if (result.success) deletedCount++;
-      }
-
-      toast.success(`Deleted ${deletedCount} transactions`);
-      setSelectedIds([]);
-      fetchTransactions();
-    } catch (error) {
-      console.error("Failed to bulk delete:", error);
-      toast.error("Failed to delete transactions");
-    }
-  }, [selectedIds, fetchTransactions]);
+  const handleBulkDelete = useCallback(() => {
+    bulkDelete(selectedIds);
+    setSelectedIds([]); // Clear selection immediately (optimistic)
+  }, [selectedIds, bulkDelete]);
 
   // Handle import
-  const handleImport = useCallback((
-    transactions: ImportTransactionRow[],
-    fileName: string,
-    fileType: "CSV" | "XLSX"
-  ) => {
-    setImportData({ transactions, fileName, fileType });
-    setShowImportModal(false);
-    setShowPreview(true);
-  }, []);
+  const handleImport = useCallback(
+    (
+      txns: ImportTransactionRow[],
+      fileName: string,
+      fileType: "CSV" | "XLSX"
+    ) => {
+      setImportData({ transactions: txns, fileName, fileType });
+      setShowImportModal(false);
+      setShowPreview(true);
+    },
+    []
+  );
 
   // Handle import complete
   const handleImportComplete = useCallback(() => {
     setShowPreview(false);
     setImportData(null);
-    fetchTransactions();
-  }, [fetchTransactions]);
+    invalidate(); // Refresh transactions after import
+  }, [invalidate]);
 
   // Get sample description for bulk actions
-  const sampleDescription = selectedIds.length > 0
-    ? transactions.find((t) => t.id === selectedIds[0])?.description
-    : undefined;
+  const sampleDescription =
+    selectedIds.length > 0
+      ? transactions.find((t) => t.id === selectedIds[0])?.description
+      : undefined;
 
-  const totalPages = Math.ceil(total / (filters.limit || 50));
-  const hasTransactions = total > 0 || loading;
+  const hasTransactions = total > 0 || transactionsLoading;
 
   return (
     <div className="space-y-6">
@@ -206,10 +136,6 @@ export default function TransactionsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchTransactions} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
           <Button variant="outline">
             <Download className="mr-2 h-4 w-4" />
             Export
@@ -230,6 +156,8 @@ export default function TransactionsPage() {
                 filters={filters}
                 onFiltersChange={handleFiltersChange}
                 onSearch={handleSearch}
+                categories={categories}
+                categoriesLoading={categoriesLoading}
               />
             </CardContent>
           </Card>
@@ -241,13 +169,15 @@ export default function TransactionsPage() {
             page={filters.page || 1}
             limit={filters.limit || 50}
             totalPages={totalPages}
-            loading={loading}
+            loading={transactionsLoading}
             filters={filters}
             onFiltersChange={handleFiltersChange}
             onCategoryChange={handleCategoryChange}
             onDelete={handleDelete}
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
+            categories={categories}
+            categoriesLoading={categoriesLoading}
           />
 
           {/* Bulk Actions */}
@@ -257,6 +187,10 @@ export default function TransactionsPage() {
             onBulkCategorize={handleBulkCategorize}
             onBulkDelete={handleBulkDelete}
             sampleDescription={sampleDescription}
+            categories={categories}
+            categoriesLoading={categoriesLoading}
+            isDeleting={isBulkDeleting}
+            isCategorizing={isBulkCategorizing}
           />
         </>
       ) : (

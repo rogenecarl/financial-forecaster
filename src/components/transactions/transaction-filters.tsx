@@ -20,17 +20,22 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { CategorySelect } from "./category-select";
 import type { TransactionFilter } from "@/schema/transaction.schema";
+import type { Category } from "@/lib/generated/prisma/client";
 
 interface TransactionFiltersProps {
   filters: Partial<TransactionFilter>;
   onFiltersChange: (filters: Partial<TransactionFilter>) => void;
   onSearch: (search: string) => void;
+  categories: Category[];
+  categoriesLoading?: boolean;
 }
 
 export function TransactionFilters({
   filters,
   onFiltersChange,
   onSearch,
+  categories,
+  categoriesLoading = false,
 }: TransactionFiltersProps) {
   const [searchValue, setSearchValue] = useState(filters.search || "");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -154,6 +159,8 @@ export function TransactionFilters({
                 <CategorySelect
                   value={filters.categoryId || null}
                   onValueChange={(value) => updateFilter("categoryId", value || undefined)}
+                  categories={categories}
+                  loading={categoriesLoading}
                   className="w-full"
                 />
               </div>

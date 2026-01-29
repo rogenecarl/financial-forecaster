@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Download,
@@ -8,7 +8,6 @@ import {
   AlertCircle,
   Circle,
   ChevronRight,
-  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,41 +20,25 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getPLStatement, getTransactionDateRange } from "@/actions/transactions";
-import type { PLStatement, PLLineItem } from "@/schema/transaction.schema";
-import type { TransactionDateRange } from "@/actions/transactions";
+import { usePLStatement, useTransactionDateRange } from "@/hooks";
+import type { PLLineItem } from "@/schema/transaction.schema";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months";
 
 export default function PLStatementPage() {
-  const [loading, setLoading] = useState(true);
   const [periodOption, setPeriodOption] = useState<PeriodOption>("all");
-  const [statement, setStatement] = useState<PLStatement | null>(null);
-  const [dateRange, setDateRange] = useState<TransactionDateRange | null>(null);
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+  // Store custom dates as ISO strings to avoid Date object comparison issues
+  const [customDateRange, setCustomDateRange] = useState<{
+    start: string | null;
+    end: string | null;
+  }>({ start: null, end: null });
 
-  // Fetch available date range on mount
-  useEffect(() => {
-    async function fetchDateRange() {
-      const result = await getTransactionDateRange();
-      if (result.success && result.data) {
-        setDateRange(result.data);
-        // Set initial custom dates to full range
-        if (result.data.minDate) {
-          setCustomStartDate(new Date(result.data.minDate));
-        }
-        if (result.data.maxDate) {
-          setCustomEndDate(new Date(result.data.maxDate));
-        }
-      }
-    }
-    fetchDateRange();
-  }, []);
+  // Fetch available date range
+  const { dateRange, isLoading: dateRangeLoading } = useTransactionDateRange();
 
-  const getDateRangeForPeriod = useCallback((): { start: Date; end: Date } | null => {
+  // Calculate the effective date range based on period selection
+  const effectiveDateRange = useMemo(() => {
     if (!dateRange?.hasTransactions) return null;
 
     const now = new Date();
@@ -73,69 +56,65 @@ export default function PLStatementPage() {
       case "thisMonth": {
         const start = new Date(now.getFullYear(), now.getMonth(), 1);
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        end.setHours(23, 59, 59, 999);
         return { start, end };
       }
 
       case "lastMonth": {
         const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const end = new Date(now.getFullYear(), now.getMonth(), 0);
-        end.setHours(23, 59, 59, 999);
         return { start, end };
       }
 
       case "last3Months": {
         const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        end.setHours(23, 59, 59, 999);
         return { start, end };
       }
 
-      case "custom":
-        if (customStartDate && customEndDate) {
-          const end = new Date(customEndDate);
-          end.setHours(23, 59, 59, 999);
-          return { start: customStartDate, end };
+      case "custom": {
+        const start = customDateRange.start
+          ? new Date(customDateRange.start)
+          : dateRange.minDate
+            ? new Date(dateRange.minDate)
+            : null;
+        const end = customDateRange.end
+          ? new Date(customDateRange.end)
+          : dateRange.maxDate
+            ? new Date(dateRange.maxDate)
+            : null;
+
+        if (start && end) {
+          return { start, end };
         }
         return null;
+      }
 
       default:
         return null;
     }
-  }, [periodOption, dateRange, customStartDate, customEndDate]);
+  }, [periodOption, dateRange, customDateRange]);
 
-  const fetchStatement = useCallback(async () => {
-    const range = getDateRangeForPeriod();
-    if (!range) {
-      setStatement(null);
-      setLoading(false);
-      return;
-    }
+  // Get display values for date inputs
+  const customStartDate = customDateRange.start
+    ? new Date(customDateRange.start)
+    : dateRange?.minDate
+      ? new Date(dateRange.minDate)
+      : undefined;
 
-    setLoading(true);
-    try {
-      const plResult = await getPLStatement("custom", range.start, range.end);
+  const customEndDate = customDateRange.end
+    ? new Date(customDateRange.end)
+    : dateRange?.maxDate
+      ? new Date(dateRange.maxDate)
+      : undefined;
 
-      if (plResult.success) {
-        setStatement(plResult.data);
-      } else {
-        toast.error(plResult.error || "Failed to load P&L statement");
-      }
-    } catch (error) {
-      console.error("Failed to load P&L:", error);
-      toast.error("Failed to load P&L statement");
-    } finally {
-      setLoading(false);
-    }
-  }, [getDateRangeForPeriod]);
+  // Fetch P&L statement with TanStack Query
+  const { statement, isLoading: statementLoading } = usePLStatement({
+    startDate: effectiveDateRange?.start,
+    endDate: effectiveDateRange?.end,
+    enabled: !!effectiveDateRange,
+  });
 
-  useEffect(() => {
-    if (dateRange?.hasTransactions) {
-      fetchStatement();
-    } else if (dateRange !== null) {
-      setLoading(false);
-    }
-  }, [dateRange, fetchStatement, periodOption, customStartDate, customEndDate]);
+  const loading = dateRangeLoading || statementLoading;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -277,7 +256,12 @@ export default function PLStatementPage() {
                 type="date"
                 className="w-[140px]"
                 value={customStartDate ? customStartDate.toISOString().split("T")[0] : ""}
-                onChange={(e) => setCustomStartDate(e.target.value ? new Date(e.target.value) : undefined)}
+                onChange={(e) =>
+                  setCustomDateRange((prev) => ({
+                    ...prev,
+                    start: e.target.value || null,
+                  }))
+                }
                 max={customEndDate ? customEndDate.toISOString().split("T")[0] : undefined}
               />
               <span className="text-muted-foreground">to</span>
@@ -285,16 +269,17 @@ export default function PLStatementPage() {
                 type="date"
                 className="w-[140px]"
                 value={customEndDate ? customEndDate.toISOString().split("T")[0] : ""}
-                onChange={(e) => setCustomEndDate(e.target.value ? new Date(e.target.value) : undefined)}
+                onChange={(e) =>
+                  setCustomDateRange((prev) => ({
+                    ...prev,
+                    end: e.target.value || null,
+                  }))
+                }
                 min={customStartDate ? customStartDate.toISOString().split("T")[0] : undefined}
               />
             </div>
           )}
 
-          <Button variant="outline" onClick={fetchStatement} disabled={loading}>
-            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
-            Refresh
-          </Button>
           <Button variant="outline">
             <Download className="mr-2 h-4 w-4" />
             Export

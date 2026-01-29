@@ -287,6 +287,38 @@ export async function deleteTransaction(id: string): Promise<ActionResponse<void
 }
 
 // ============================================
+// BULK DELETE TRANSACTIONS
+// ============================================
+
+export async function bulkDeleteTransactions(
+  transactionIds: string[]
+): Promise<ActionResponse<{ deletedCount: number }>> {
+  try {
+    const session = await requireAuth();
+
+    if (!transactionIds || transactionIds.length === 0) {
+      return { success: false, error: "No transactions specified" };
+    }
+
+    // Delete all transactions in a single query (only user's own transactions)
+    const result = await prisma.transaction.deleteMany({
+      where: {
+        id: { in: transactionIds },
+        userId: session.user.id,
+      },
+    });
+
+    revalidatePath("/transactions");
+    revalidatePath("/dashboard");
+
+    return { success: true, data: { deletedCount: result.count } };
+  } catch (error) {
+    console.error("Failed to bulk delete transactions:", error);
+    return { success: false, error: "Failed to delete transactions" };
+  }
+}
+
+// ============================================
 // BULK UPDATE CATEGORY
 // ============================================
 

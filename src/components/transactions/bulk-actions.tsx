@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CategorySelect } from "./category-select";
 import { cn } from "@/lib/utils";
+import type { Category } from "@/lib/generated/prisma/client";
 
 interface BulkActionsProps {
   selectedCount: number;
@@ -23,6 +24,10 @@ interface BulkActionsProps {
   onBulkCategorize: (categoryId: string, createRule: boolean, rulePattern?: string) => void;
   onBulkDelete: () => void;
   sampleDescription?: string;
+  categories: Category[];
+  categoriesLoading?: boolean;
+  isDeleting?: boolean;
+  isCategorizing?: boolean;
 }
 
 export function BulkActions({
@@ -31,6 +36,13 @@ export function BulkActions({
   onBulkCategorize,
   onBulkDelete,
   sampleDescription,
+  categories,
+  categoriesLoading = false,
+  // These are available for future use (e.g., showing spinners in dialogs)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isDeleting: _isDeleting = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isCategorizing: _isCategorizing = false,
 }: BulkActionsProps) {
   const [showCategorizeDialog, setShowCategorizeDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -143,6 +155,8 @@ export function BulkActions({
               <CategorySelect
                 value={categoryId}
                 onValueChange={setCategoryId}
+                categories={categories}
+                loading={categoriesLoading}
                 showUncategorized={false}
                 className="w-full"
               />

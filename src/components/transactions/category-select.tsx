@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Check, ChevronsUpDown, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -10,12 +10,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getCategories } from "@/actions/settings/categories";
 import type { Category } from "@/lib/generated/prisma/client";
 
 interface CategorySelectProps {
   value: string | null;
   onValueChange: (categoryId: string | null) => void;
+  categories: Category[];
+  loading?: boolean;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
@@ -25,25 +26,14 @@ interface CategorySelectProps {
 export function CategorySelect({
   value,
   onValueChange,
+  categories,
+  loading = false,
   disabled = false,
   placeholder = "Select category",
   className,
   showUncategorized = true,
 }: CategorySelectProps) {
   const [open, setOpen] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadCategories() {
-      const result = await getCategories();
-      if (result.success && result.data) {
-        setCategories(result.data);
-      }
-      setLoading(false);
-    }
-    loadCategories();
-  }, []);
 
   const selectedCategory = value
     ? categories.find((c) => c.id === value)

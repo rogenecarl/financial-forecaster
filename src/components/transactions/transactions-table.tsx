@@ -36,6 +36,7 @@ import { CategorySelect } from "./category-select";
 import { cn } from "@/lib/utils";
 import type { TransactionWithCategory } from "@/actions/transactions";
 import type { TransactionFilter } from "@/schema/transaction.schema";
+import type { Category } from "@/lib/generated/prisma/client";
 
 // SortButton component moved outside to avoid recreation during render
 interface SortButtonProps {
@@ -69,6 +70,8 @@ interface TransactionsTableProps {
   onDelete: (transactionId: string) => void;
   selectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
+  categories: Category[];
+  categoriesLoading?: boolean;
 }
 
 export function TransactionsTable({
@@ -84,6 +87,8 @@ export function TransactionsTable({
   onDelete,
   selectedIds,
   onSelectionChange,
+  categories,
+  categoriesLoading = false,
 }: TransactionsTableProps) {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
@@ -286,6 +291,8 @@ export function TransactionsTable({
                             onCategoryChange(transaction.id, categoryId);
                             setEditingCategoryId(null);
                           }}
+                          categories={categories}
+                          loading={categoriesLoading}
                           className="w-full"
                         />
                       ) : (

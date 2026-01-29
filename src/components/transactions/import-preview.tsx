@@ -31,9 +31,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { CategorySelect } from "./category-select";
 import { generateImportPreview, importTransactions } from "@/actions/transactions";
+import { getCategories } from "@/actions/settings/categories";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { ImportTransactionRow, ImportPreviewItem } from "@/schema/transaction.schema";
+import type { Category } from "@/lib/generated/prisma/client";
 
 interface ImportPreviewProps {
   open: boolean;
@@ -53,11 +55,25 @@ export function ImportPreview({
   onComplete,
 }: ImportPreviewProps) {
   const [previewItems, setPreviewItems] = useState<ImportPreviewItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [showDuplicates, setShowDuplicates] = useState(false);
+
+  // Fetch categories once on mount
+  useEffect(() => {
+    async function loadCategories() {
+      const result = await getCategories();
+      if (result.success && result.data) {
+        setCategories(result.data);
+      }
+      setCategoriesLoading(false);
+    }
+    loadCategories();
+  }, []);
 
   // Generate preview on mount
   useEffect(() => {
@@ -395,6 +411,8 @@ export function ImportPreview({
                             onValueChange={(categoryId) =>
                               handleCategoryChange(item.rowIndex, categoryId, null)
                             }
+                            categories={categories}
+                            loading={categoriesLoading}
                             className="w-full h-8 text-xs"
                             placeholder="Select..."
                           />

@@ -109,8 +109,3 @@ export type ForecastWeek = Prisma.ForecastWeekModel
  * 
  */
 export type Forecast = Prisma.ForecastModel
-/**
- * Model UserSettings
- * 
- */
-export type UserSettings = Prisma.UserSettingsModel

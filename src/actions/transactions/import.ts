@@ -366,11 +366,8 @@ export async function importTransactions(
       };
     }
 
-    // Get user's AI settings for confidence threshold
-    const settings = await prisma.userSettings.findUnique({
-      where: { userId },
-    });
-    const confidenceThreshold = settings?.aiConfidenceThreshold || 0.8;
+    // AI confidence threshold (hardcoded default)
+    const confidenceThreshold = 0.8;
 
     // Step 1: Create categories from CSV data if needed
     const categoriesToCreate = new Map<string, { name: string; type: CategoryType; higherCategory: string | null }>();

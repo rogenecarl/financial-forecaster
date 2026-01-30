@@ -146,19 +146,16 @@ function parseNumber(value: string | number | undefined): number {
   return isNaN(num) ? 0 : num;
 }
 
-function countDeliveryStops(
-  load: CreateTripLoad,
-  excludedAddresses: string[]
-): number {
+function countDeliveryStops(load: CreateTripLoad): number {
   // Skip bobtail loads
   if (load.isBobtail) return 0;
 
-  // Count stops 2-7 that are NOT in excluded addresses
+  // Count stops 2-7 that are NOT MSP stations (start with "MSP")
   const stops = [load.stop2, load.stop3, load.stop4, load.stop5, load.stop6, load.stop7];
 
   let count = 0;
   for (const stop of stops) {
-    if (stop && !excludedAddresses.includes(stop.toUpperCase())) {
+    if (stop && !stop.toUpperCase().startsWith("MSP")) {
       count++;
     }
   }
@@ -170,10 +167,7 @@ function countDeliveryStops(
 // MAIN PARSER
 // ============================================
 
-export function parseTripsCSV(
-  content: string,
-  excludedAddresses: string[] = ["MSP7", "MSP8", "MSP9"]
-): TripsParseResult {
+export function parseTripsCSV(content: string): TripsParseResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   const tripMap = new Map<string, { trip: Partial<ImportTrip>; loads: CreateTripLoad[] }>();
@@ -227,9 +221,6 @@ export function parseTripsCSV(
     }
 
     totalRows = result.data.length;
-
-    // Normalize excluded addresses to uppercase
-    const normalizedExcluded = excludedAddresses.map(a => a.toUpperCase());
 
     // Process each row (one row = one load)
     for (let i = 0; i < result.data.length; i++) {
@@ -342,7 +333,7 @@ export function parseTripsCSV(
 
       for (const load of activeLoads) {
         if (!load.isBobtail) {
-          projectedLoads += countDeliveryStops(load, normalizedExcluded);
+          projectedLoads += countDeliveryStops(load);
           estimatedAccessorial += load.estimatedCost || 0;
         }
       }
@@ -404,13 +395,10 @@ export function parseTripsCSV(
 // FILE PARSER
 // ============================================
 
-export async function parseTripsFile(
-  file: File,
-  excludedAddresses: string[] = ["MSP7", "MSP8", "MSP9"]
-): Promise<TripsParseResult> {
+export async function parseTripsFile(file: File): Promise<TripsParseResult> {
   try {
     const content = await file.text();
-    return parseTripsCSV(content, excludedAddresses);
+    return parseTripsCSV(content);
   } catch (err) {
     return {
       success: false,

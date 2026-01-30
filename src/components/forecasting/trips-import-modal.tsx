@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, Truck } from "lucide-react";
 import {
   Dialog,
@@ -15,7 +15,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { parseTripsCSV, parseTripsFile, type TripsParseResult } from "@/lib/parsers/trips-parser";
 import { importTrips } from "@/actions/forecasting";
-import { getUserSettings } from "@/actions/settings";
 import { toast } from "sonner";
 
 interface TripsImportModalProps {
@@ -31,20 +30,6 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
   const [dragActive, setDragActive] = useState(false);
   const [parseResult, setParseResult] = useState<TripsParseResult | null>(null);
   const [pasteData, setPasteData] = useState("");
-  const [excludedAddresses, setExcludedAddresses] = useState<string[]>(["MSP7", "MSP8", "MSP9"]);
-
-  // Load user's excluded addresses
-  useEffect(() => {
-    async function loadSettings() {
-      const result = await getUserSettings();
-      if (result.success && result.data) {
-        setExcludedAddresses(result.data.excludedAddresses);
-      }
-    }
-    if (open) {
-      loadSettings();
-    }
-  }, [open]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -57,7 +42,7 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
   }, []);
 
   const processFile = useCallback(async (file: File) => {
-    const result = await parseTripsFile(file, excludedAddresses);
+    const result = await parseTripsFile(file);
     setParseResult(result);
 
     if (result.success && result.trips.length > 0) {
@@ -65,7 +50,7 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
     } else {
       toast.error(result.errors[0] || "Failed to parse file");
     }
-  }, [excludedAddresses]);
+  }, []);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
@@ -91,7 +76,7 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
       return;
     }
 
-    const result = parseTripsCSV(pasteData, excludedAddresses);
+    const result = parseTripsCSV(pasteData);
     setParseResult(result);
 
     if (result.success && result.trips.length > 0) {

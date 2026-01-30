@@ -33,25 +33,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ results: [], tokensUsed: 0 });
     }
 
-    // Get user's AI settings
-    const settings = await prisma.userSettings.findUnique({
-      where: { userId: session.user.id },
-    });
-
-    // Check if AI categorization is enabled
-    if (settings && !settings.aiCategorizationEnabled) {
-      return NextResponse.json({
-        results: transactions.map(({ rowIndex }) => ({
-          rowIndex,
-          categoryId: null,
-          categoryName: null,
-          confidence: 0,
-          reasoning: "AI categorization is disabled",
-        })),
-        tokensUsed: 0,
-      });
-    }
-
     // Get all categories for the prompt
     const categories = await prisma.category.findMany({
       orderBy: { sortOrder: "asc" },

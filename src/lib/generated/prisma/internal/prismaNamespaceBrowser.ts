@@ -64,8 +64,7 @@ export const ModelName = {
   Trip: 'Trip',
   TripLoad: 'TripLoad',
   ForecastWeek: 'ForecastWeek',
-  Forecast: 'Forecast',
-  UserSettings: 'UserSettings'
+  Forecast: 'Forecast'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -368,27 +367,6 @@ export const ForecastScalarFieldEnum = {
 } as const
 
 export type ForecastScalarFieldEnum = (typeof ForecastScalarFieldEnum)[keyof typeof ForecastScalarFieldEnum]
-
-
-export const UserSettingsScalarFieldEnum = {
-  id: 'id',
-  userId: 'userId',
-  dateFormat: 'dateFormat',
-  currencyFormat: 'currencyFormat',
-  timezone: 'timezone',
-  defaultDtrRate: 'defaultDtrRate',
-  defaultAccessorialRate: 'defaultAccessorialRate',
-  defaultHourlyWage: 'defaultHourlyWage',
-  defaultHoursPerNight: 'defaultHoursPerNight',
-  defaultTruckCount: 'defaultTruckCount',
-  excludedAddresses: 'excludedAddresses',
-  aiCategorizationEnabled: 'aiCategorizationEnabled',
-  aiConfidenceThreshold: 'aiConfidenceThreshold',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type UserSettingsScalarFieldEnum = (typeof UserSettingsScalarFieldEnum)[keyof typeof UserSettingsScalarFieldEnum]
 
 
 export const SortOrder = {

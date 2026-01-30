@@ -8,7 +8,7 @@
 CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN', 'PROVIDER');
 
 -- CreateEnum
-CREATE TYPE "CategoryType" AS ENUM ('REVENUE', 'EXPENSE', 'TRANSFER', 'UNKNOWN');
+CREATE TYPE "CategoryType" AS ENUM ('REVENUE', 'CONTRA_REVENUE', 'COGS', 'OPERATING_EXPENSE', 'EQUITY', 'UNCATEGORIZED');
 
 -- CreateEnum
 CREATE TYPE "ReviewStatus" AS ENUM ('PENDING', 'REVIEWED', 'FLAGGED');
@@ -35,9 +35,6 @@ CREATE TABLE "category" (
     "name" TEXT NOT NULL,
     "type" "CategoryType" NOT NULL,
     "color" TEXT NOT NULL DEFAULT '#6b7280',
-    "icon" TEXT,
-    "description" TEXT,
-    "includeInPL" BOOLEAN NOT NULL DEFAULT true,
     "isSystem" BOOLEAN NOT NULL DEFAULT false,
     "sortOrder" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -259,27 +256,6 @@ CREATE TABLE "forecast" (
     CONSTRAINT "forecast_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "user_settings" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "dateFormat" TEXT NOT NULL DEFAULT 'MM/dd/yyyy',
-    "currencyFormat" TEXT NOT NULL DEFAULT 'USD',
-    "timezone" TEXT NOT NULL DEFAULT 'America/Chicago',
-    "defaultDtrRate" DECIMAL(10,2) NOT NULL DEFAULT 452,
-    "defaultAccessorialRate" DECIMAL(10,2) NOT NULL DEFAULT 77,
-    "defaultHourlyWage" DECIMAL(10,2) NOT NULL DEFAULT 20,
-    "defaultHoursPerNight" DECIMAL(4,2) NOT NULL DEFAULT 10,
-    "defaultTruckCount" INTEGER NOT NULL DEFAULT 2,
-    "excludedAddresses" TEXT[] DEFAULT ARRAY['MSP7', 'MSP8', 'MSP9']::TEXT[],
-    "aiCategorizationEnabled" BOOLEAN NOT NULL DEFAULT true,
-    "aiConfidenceThreshold" DOUBLE PRECISION NOT NULL DEFAULT 0.8,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "user_settings_pkey" PRIMARY KEY ("id")
-);
-
 -- CreateIndex
 CREATE UNIQUE INDEX "category_name_key" ON "category"("name");
 
@@ -331,9 +307,6 @@ CREATE UNIQUE INDEX "forecast_week_userId_weekStart_key" ON "forecast_week"("use
 -- CreateIndex
 CREATE INDEX "forecast_userId_idx" ON "forecast"("userId");
 
--- CreateIndex
-CREATE UNIQUE INDEX "user_settings_userId_key" ON "user_settings"("userId");
-
 -- AddForeignKey
 ALTER TABLE "transaction" ADD CONSTRAINT "transaction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -372,6 +345,3 @@ ALTER TABLE "forecast_week" ADD CONSTRAINT "forecast_week_userId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "forecast" ADD CONSTRAINT "forecast_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "user_settings" ADD CONSTRAINT "user_settings_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;

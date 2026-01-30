@@ -3,7 +3,7 @@
 import prisma from "@/lib/db";
 import { requireAuth } from "@/lib/auth-server";
 import type { ActionResponse } from "@/types/api";
-import type { PLStatement, PLLineItem, PLPeriod } from "@/schema/transaction.schema";
+import type { PLStatement, PLLineItem, PLPeriod, PLSection } from "@/schema/transaction.schema";
 
 // ============================================
 // TYPES
@@ -11,9 +11,10 @@ import type { PLStatement, PLLineItem, PLPeriod } from "@/schema/transaction.sch
 
 export interface PLSummary {
   totalRevenue: number;
-  totalExpenses: number;
-  netProfit: number;
-  profitMargin: number;
+  netRevenue: number;
+  grossProfit: number;
+  operatingIncome: number;
+  operatingMargin: number;
   uncategorizedCount: number;
   uncategorizedAmount: number;
 }
@@ -85,16 +86,16 @@ function getPeriodRange(
       }
       return { start: customStart, end: customEnd };
     default:
-      return getWeekRange();
+      return getMonthRange();
   }
 }
 
 // ============================================
-// P&L STATEMENT
+// P&L STATEMENT - Multi-Tier Structure
 // ============================================
 
 export async function getPLStatement(
-  periodType: PLPeriod["type"] = "week",
+  periodType: PLPeriod["type"] = "month",
   customStart?: Date,
   customEnd?: Date
 ): Promise<ActionResponse<PLStatement>> {
@@ -119,18 +120,18 @@ export async function getPLStatement(
       },
     });
 
-    // Group transactions by category
-    const categoryGroups = new Map<
-      string,
-      {
-        category: typeof transactions[0]["category"];
-        transactions: typeof transactions;
-      }
-    >();
+    // Initialize sections
+    const revenueGroups = new Map<string, { category: NonNullable<typeof transactions[0]["category"]>; transactions: typeof transactions }>();
+    const contraRevenueGroups = new Map<string, { category: NonNullable<typeof transactions[0]["category"]>; transactions: typeof transactions }>();
+    const cogsGroups = new Map<string, { category: NonNullable<typeof transactions[0]["category"]>; transactions: typeof transactions }>();
+    const opexGroups = new Map<string, { category: NonNullable<typeof transactions[0]["category"]>; transactions: typeof transactions }>();
 
     let uncategorizedCount = 0;
     let uncategorizedAmount = 0;
+    let equityCount = 0;
+    let equityAmount = 0;
 
+    // Group transactions by category type
     for (const txn of transactions) {
       if (!txn.categoryId || !txn.category) {
         uncategorizedCount++;
@@ -138,67 +139,102 @@ export async function getPLStatement(
         continue;
       }
 
-      // Skip categories not included in P&L
-      if (!txn.category.includeInPL) {
-        continue;
-      }
-
+      const category = txn.category;
       const key = txn.categoryId;
-      if (!categoryGroups.has(key)) {
-        categoryGroups.set(key, {
-          category: txn.category,
-          transactions: [],
+
+      switch (category.type) {
+        case "REVENUE":
+          if (!revenueGroups.has(key)) {
+            revenueGroups.set(key, { category, transactions: [] });
+          }
+          revenueGroups.get(key)!.transactions.push(txn);
+          break;
+
+        case "CONTRA_REVENUE":
+          if (!contraRevenueGroups.has(key)) {
+            contraRevenueGroups.set(key, { category, transactions: [] });
+          }
+          contraRevenueGroups.get(key)!.transactions.push(txn);
+          break;
+
+        case "COGS":
+          if (!cogsGroups.has(key)) {
+            cogsGroups.set(key, { category, transactions: [] });
+          }
+          cogsGroups.get(key)!.transactions.push(txn);
+          break;
+
+        case "OPERATING_EXPENSE":
+          if (!opexGroups.has(key)) {
+            opexGroups.set(key, { category, transactions: [] });
+          }
+          opexGroups.get(key)!.transactions.push(txn);
+          break;
+
+        case "EQUITY":
+          equityCount++;
+          equityAmount += Number(txn.amount);
+          break;
+
+        case "UNCATEGORIZED":
+          uncategorizedCount++;
+          uncategorizedAmount += Number(txn.amount);
+          break;
+      }
+    }
+
+    // Helper function to convert groups to line items
+    const groupsToSection = (
+      groups: Map<string, { category: NonNullable<typeof transactions[0]["category"]>; transactions: typeof transactions }>
+    ): PLSection => {
+      const items: PLLineItem[] = [];
+      let total = 0;
+
+      for (const [, group] of groups) {
+        const amount = group.transactions.reduce(
+          (sum, t) => sum + Number(t.amount),
+          0
+        );
+        total += amount;
+
+        items.push({
+          categoryId: group.category.id,
+          categoryName: group.category.name,
+          categoryColor: group.category.color,
+          categoryType: group.category.type as PLLineItem["categoryType"],
+          amount,
+          transactionCount: group.transactions.length,
+          percentage: 0, // Calculate after total is known
         });
       }
-      categoryGroups.get(key)!.transactions.push(txn);
-    }
 
-    // Calculate totals
-    const revenueItems: PLLineItem[] = [];
-    const expenseItems: PLLineItem[] = [];
-    let totalRevenue = 0;
-    let totalExpenses = 0;
-
-    for (const [, group] of categoryGroups) {
-      if (!group.category) continue;
-
-      const amount = group.transactions.reduce(
-        (sum, t) => sum + Number(t.amount),
-        0
-      );
-
-      const lineItem: PLLineItem = {
-        categoryId: group.category.id,
-        categoryName: group.category.name,
-        categoryColor: group.category.color,
-        categoryType: group.category.type as PLLineItem["categoryType"],
-        amount,
-        transactionCount: group.transactions.length,
-        percentage: 0, // Calculate after totals are known
-      };
-
-      if (group.category.type === "REVENUE") {
-        revenueItems.push(lineItem);
-        totalRevenue += amount;
-      } else if (group.category.type === "EXPENSE") {
-        expenseItems.push(lineItem);
-        totalExpenses += Math.abs(amount); // Expenses are typically negative
+      // Calculate percentages and sort by absolute amount (descending)
+      for (const item of items) {
+        item.percentage = total !== 0 ? (Math.abs(item.amount) / Math.abs(total)) * 100 : 0;
       }
-    }
+      items.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
 
-    // Calculate percentages
-    for (const item of revenueItems) {
-      item.percentage = totalRevenue > 0 ? (item.amount / totalRevenue) * 100 : 0;
-    }
+      return { items, total };
+    };
 
-    for (const item of expenseItems) {
-      item.percentage =
-        totalExpenses > 0 ? (Math.abs(item.amount) / totalExpenses) * 100 : 0;
-    }
+    // Build sections
+    const revenue = groupsToSection(revenueGroups);
+    const contraRevenue = groupsToSection(contraRevenueGroups);
+    const cogs = groupsToSection(cogsGroups);
+    const operatingExpenses = groupsToSection(opexGroups);
 
-    // Sort by amount (descending)
-    revenueItems.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
-    expenseItems.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+    // Calculate multi-tier P&L totals
+    // Net Revenue = Revenue + Contra-Revenue (contra-revenue items are positive refund amounts that add to revenue)
+    const netRevenue = revenue.total + contraRevenue.total;
+
+    // Gross Profit = Net Revenue - |COGS| (COGS amounts are typically negative)
+    const grossProfit = netRevenue + cogs.total; // cogs.total is negative, so we add
+
+    // Operating Income = Gross Profit - |Operating Expenses| (opex amounts are typically negative)
+    const operatingIncome = grossProfit + operatingExpenses.total; // opex.total is negative, so we add
+
+    // Operating Margin = Operating Income / Net Revenue
+    const operatingMargin = netRevenue !== 0 ? (operatingIncome / netRevenue) * 100 : 0;
 
     const statement: PLStatement = {
       period: {
@@ -206,17 +242,18 @@ export async function getPLStatement(
         startDate: start,
         endDate: end,
       },
-      revenue: {
-        items: revenueItems,
-        total: totalRevenue,
-      },
-      expenses: {
-        items: expenseItems,
-        total: totalExpenses,
-      },
-      netProfit: totalRevenue - totalExpenses,
+      revenue,
+      contraRevenue,
+      netRevenue,
+      cogs,
+      grossProfit,
+      operatingExpenses,
+      operatingIncome,
+      operatingMargin,
       uncategorizedCount,
       uncategorizedAmount,
+      equityCount,
+      equityAmount,
     };
 
     return { success: true, data: statement };
@@ -231,7 +268,7 @@ export async function getPLStatement(
 // ============================================
 
 export async function getPLSummary(
-  periodType: PLPeriod["type"] = "week"
+  periodType: PLPeriod["type"] = "month"
 ): Promise<ActionResponse<PLSummary>> {
   try {
     const result = await getPLStatement(periodType);
@@ -240,23 +277,24 @@ export async function getPLSummary(
       return { success: false, error: result.error };
     }
 
-    if (!result.data) {
-      return { success: false, error: "Failed to get P&L" };
-    }
-
-    const { revenue, expenses, netProfit, uncategorizedCount, uncategorizedAmount } =
-      result.data;
-
-    const profitMargin =
-      revenue.total > 0 ? (netProfit / revenue.total) * 100 : 0;
+    const {
+      revenue,
+      netRevenue,
+      grossProfit,
+      operatingIncome,
+      operatingMargin,
+      uncategorizedCount,
+      uncategorizedAmount,
+    } = result.data;
 
     return {
       success: true,
       data: {
         totalRevenue: revenue.total,
-        totalExpenses: expenses.total,
-        netProfit,
-        profitMargin,
+        netRevenue,
+        grossProfit,
+        operatingIncome,
+        operatingMargin,
         uncategorizedCount,
         uncategorizedAmount,
       },
@@ -272,7 +310,7 @@ export async function getPLSummary(
 // ============================================
 
 export async function comparePeriods(
-  currentPeriodType: PLPeriod["type"] = "week"
+  currentPeriodType: PLPeriod["type"] = "month"
 ): Promise<
   ActionResponse<{
     current: PLSummary;
@@ -280,10 +318,12 @@ export async function comparePeriods(
     changes: {
       revenue: number;
       revenuePercent: number;
-      expenses: number;
-      expensesPercent: number;
-      profit: number;
-      profitPercent: number;
+      netRevenue: number;
+      netRevenuePercent: number;
+      grossProfit: number;
+      grossProfitPercent: number;
+      operatingIncome: number;
+      operatingIncomePercent: number;
     };
   }>
 > {
@@ -292,9 +332,6 @@ export async function comparePeriods(
     const currentResult = await getPLSummary(currentPeriodType);
     if (!currentResult.success) {
       return { success: false, error: currentResult.error };
-    }
-    if (!currentResult.data) {
-      return { success: false, error: "Failed to get current period P&L" };
     }
 
     // Calculate previous period dates
@@ -328,11 +365,11 @@ export async function comparePeriods(
         break;
       }
       default: {
-        const { start } = getWeekRange();
+        const { start } = getMonthRange();
         previousEnd = new Date(start);
         previousEnd.setDate(previousEnd.getDate() - 1);
         previousStart = new Date(previousEnd);
-        previousStart.setDate(previousStart.getDate() - 6);
+        previousStart.setDate(previousStart.getDate() - 30);
       }
     }
 
@@ -341,18 +378,13 @@ export async function comparePeriods(
     if (!previousResult.success) {
       return { success: false, error: previousResult.error };
     }
-    if (!previousResult.data) {
-      return { success: false, error: "Failed to get previous period P&L" };
-    }
 
     const previous: PLSummary = {
       totalRevenue: previousResult.data.revenue.total,
-      totalExpenses: previousResult.data.expenses.total,
-      netProfit: previousResult.data.netProfit,
-      profitMargin:
-        previousResult.data.revenue.total > 0
-          ? (previousResult.data.netProfit / previousResult.data.revenue.total) * 100
-          : 0,
+      netRevenue: previousResult.data.netRevenue,
+      grossProfit: previousResult.data.grossProfit,
+      operatingIncome: previousResult.data.operatingIncome,
+      operatingMargin: previousResult.data.operatingMargin,
       uncategorizedCount: previousResult.data.uncategorizedCount,
       uncategorizedAmount: previousResult.data.uncategorizedAmount,
     };
@@ -370,10 +402,12 @@ export async function comparePeriods(
         changes: {
           revenue: calcChange(currentResult.data.totalRevenue, previous.totalRevenue),
           revenuePercent: calcPercent(currentResult.data.totalRevenue, previous.totalRevenue),
-          expenses: calcChange(currentResult.data.totalExpenses, previous.totalExpenses),
-          expensesPercent: calcPercent(currentResult.data.totalExpenses, previous.totalExpenses),
-          profit: calcChange(currentResult.data.netProfit, previous.netProfit),
-          profitPercent: calcPercent(currentResult.data.netProfit, previous.netProfit),
+          netRevenue: calcChange(currentResult.data.netRevenue, previous.netRevenue),
+          netRevenuePercent: calcPercent(currentResult.data.netRevenue, previous.netRevenue),
+          grossProfit: calcChange(currentResult.data.grossProfit, previous.grossProfit),
+          grossProfitPercent: calcPercent(currentResult.data.grossProfit, previous.grossProfit),
+          operatingIncome: calcChange(currentResult.data.operatingIncome, previous.operatingIncome),
+          operatingIncomePercent: calcPercent(currentResult.data.operatingIncome, previous.operatingIncome),
         },
       },
     };

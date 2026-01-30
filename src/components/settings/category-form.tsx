@@ -16,7 +16,6 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -31,8 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { createCategorySchema, type CategoryFormData } from "@/schema/settings.schema";
 import { createCategory, updateCategory } from "@/actions/settings";
@@ -51,6 +48,15 @@ const PRESET_COLORS = [
   "#64748b", // slate
 ];
 
+const TYPE_OPTIONS = [
+  { value: "REVENUE", label: "Revenue" },
+  { value: "CONTRA_REVENUE", label: "Contra-Revenue (Refunds)" },
+  { value: "COGS", label: "Cost of Goods Sold" },
+  { value: "OPERATING_EXPENSE", label: "Operating Expense" },
+  { value: "EQUITY", label: "Equity (Not in P&L)" },
+  { value: "UNCATEGORIZED", label: "Uncategorized" },
+] as const;
+
 interface CategoryFormProps {
   open: boolean;
   onClose: () => void;
@@ -65,12 +71,9 @@ export function CategoryForm({ open, onClose, category }: CategoryFormProps) {
     resolver: zodResolver(createCategorySchema),
     defaultValues: {
       name: "",
-      type: "EXPENSE",
+      type: "OPERATING_EXPENSE",
       color: "#6b7280",
-      icon: "",
-      description: "",
-      includeInPL: true,
-      sortOrder: 0,
+      sortOrder: 50,
     },
   });
 
@@ -80,20 +83,14 @@ export function CategoryForm({ open, onClose, category }: CategoryFormProps) {
         name: category.name,
         type: category.type,
         color: category.color,
-        icon: category.icon || "",
-        description: category.description || "",
-        includeInPL: category.includeInPL,
         sortOrder: category.sortOrder,
       });
     } else {
       form.reset({
         name: "",
-        type: "EXPENSE",
+        type: "OPERATING_EXPENSE",
         color: "#6b7280",
-        icon: "",
-        description: "",
-        includeInPL: true,
-        sortOrder: 0,
+        sortOrder: 50,
       });
     }
   }, [category, form]);
@@ -167,10 +164,11 @@ export function CategoryForm({ open, onClose, category }: CategoryFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="REVENUE">Revenue</SelectItem>
-                      <SelectItem value="EXPENSE">Expense</SelectItem>
-                      <SelectItem value="TRANSFER">Transfer</SelectItem>
-                      <SelectItem value="UNKNOWN">Unknown</SelectItem>
+                      {TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -224,41 +222,19 @@ export function CategoryForm({ open, onClose, category }: CategoryFormProps) {
 
             <FormField
               control={form.control}
-              name="description"
+              name="sortOrder"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormLabel>Sort Order</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="Brief description of this category"
-                      className="resize-none"
-                      rows={2}
+                    <Input
+                      type="number"
+                      min={0}
                       {...field}
-                      value={field.value || ""}
+                      onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
                     />
                   </FormControl>
                   <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="includeInPL"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-sm">Include in P&L</FormLabel>
-                    <FormDescription className="text-xs">
-                      Include transactions in Profit & Loss statements
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
                 </FormItem>
               )}
             />

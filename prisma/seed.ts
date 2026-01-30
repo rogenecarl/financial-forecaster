@@ -8,125 +8,197 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+// ============================================
+// DEFAULT CATEGORIES
+// Based on new-business-account-transaction-sample.md
+// Category names must match exactly for CSV import matching
+// ============================================
+
 const defaultCategories = [
-  // Revenue
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REVENUE
+  // ═══════════════════════════════════════════════════════════════════════════
   {
-    name: "Amazon Payout",
+    name: "Amazon Relay Payment",
     type: CategoryType.REVENUE,
     color: "#22c55e",
-    icon: "DollarSign",
     isSystem: true,
     sortOrder: 1,
   },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONTRA-REVENUE (reduces revenue - refunds are positive amounts)
+  // ═══════════════════════════════════════════════════════════════════════════
   {
-    name: "Other Income",
-    type: CategoryType.REVENUE,
-    color: "#16a34a",
-    icon: "Plus",
-    sortOrder: 2,
+    name: "Amazon marketplace refunds",
+    type: CategoryType.CONTRA_REVENUE,
+    color: "#f97316",
+    isSystem: false,
+    sortOrder: 5,
   },
 
-  // Expenses - Included in P&L
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COST OF GOODS SOLD (Direct costs)
+  // ═══════════════════════════════════════════════════════════════════════════
   {
     name: "Driver Wages",
-    type: CategoryType.EXPENSE,
-    color: "#3b82f6",
-    icon: "Users",
-    includeInPL: true,
+    type: CategoryType.COGS,
+    color: "#ef4444",
     isSystem: true,
     sortOrder: 10,
   },
   {
     name: "Payroll Taxes",
-    type: CategoryType.EXPENSE,
-    color: "#6366f1",
-    icon: "Receipt",
-    includeInPL: true,
+    type: CategoryType.COGS,
+    color: "#dc2626",
     isSystem: true,
     sortOrder: 11,
   },
-  {
-    name: "Workers Comp",
-    type: CategoryType.EXPENSE,
-    color: "#8b5cf6",
-    icon: "Shield",
-    includeInPL: true,
-    isSystem: true,
-    sortOrder: 12,
-  },
-  {
-    name: "Insurance",
-    type: CategoryType.EXPENSE,
-    color: "#a855f7",
-    icon: "FileCheck",
-    includeInPL: true,
-    isSystem: true,
-    sortOrder: 13,
-  },
-  {
-    name: "Admin/Overhead",
-    type: CategoryType.EXPENSE,
-    color: "#ec4899",
-    icon: "Building",
-    includeInPL: true,
-    sortOrder: 14,
-  },
-  {
-    name: "Bank Fees",
-    type: CategoryType.EXPENSE,
-    color: "#f43f5e",
-    icon: "CreditCard",
-    includeInPL: true,
-    sortOrder: 15,
-  },
 
-  // Expenses - Excluded from P&L (per PRD)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // OPERATING EXPENSES (Indirect costs)
+  // Sorted by total amount from the sample data
+  // ═══════════════════════════════════════════════════════════════════════════
   {
-    name: "Fuel",
-    type: CategoryType.EXPENSE,
-    color: "#f97316",
-    icon: "Fuel",
-    includeInPL: false,
+    name: "Telecom & Mobile Devices",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#3b82f6",
+    isSystem: false,
     sortOrder: 20,
   },
   {
-    name: "Maintenance",
-    type: CategoryType.EXPENSE,
-    color: "#eab308",
-    icon: "Wrench",
-    includeInPL: false,
+    name: "Office Supplies",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#6366f1",
+    isSystem: false,
     sortOrder: 21,
   },
-
-  // Transfers
   {
-    name: "Cash Transfer",
-    type: CategoryType.TRANSFER,
-    color: "#64748b",
-    icon: "ArrowLeftRight",
-    includeInPL: false,
+    name: "Cargo Insurance",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#8b5cf6",
+    isSystem: false,
+    sortOrder: 22,
+  },
+  {
+    name: "Virtual Assistants Contractor fee",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#a855f7",
+    isSystem: false,
+    sortOrder: 23,
+  },
+  {
+    name: "Business Travel",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#d946ef",
+    isSystem: false,
+    sortOrder: 24,
+  },
+  {
+    name: "Payroll Service Fees",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#ec4899",
+    isSystem: false,
+    sortOrder: 25,
+  },
+  {
+    name: "Truck Fuel",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#f43f5e",
+    isSystem: false,
+    sortOrder: 26,
+  },
+  {
+    name: "Recruiting Ads",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#fb7185",
+    isSystem: false,
+    sortOrder: 27,
+  },
+  {
+    name: "DOT Physical Expense",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#f97316",
+    isSystem: false,
+    sortOrder: 28,
+  },
+  {
+    name: "Travel meal per diem",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#fb923c",
+    isSystem: false,
+    sortOrder: 29,
+  },
+  {
+    name: "Office Phone",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#fbbf24",
+    isSystem: false,
     sortOrder: 30,
   },
   {
-    name: "Personal/Excluded",
-    type: CategoryType.TRANSFER,
-    color: "#94a3b8",
-    icon: "UserX",
-    includeInPL: false,
+    name: "Software",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#facc15",
+    isSystem: false,
     sortOrder: 31,
   },
+  {
+    name: "Office Email fee",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#a3e635",
+    isSystem: false,
+    sortOrder: 32,
+  },
+  {
+    name: "Website domain purchase",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#4ade80",
+    isSystem: false,
+    sortOrder: 33,
+  },
+  {
+    name: "Chase Business Account Monthly Fee",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#64748b",
+    isSystem: false,
+    sortOrder: 34,
+  },
+  {
+    name: "Business Check Fee",
+    type: CategoryType.OPERATING_EXPENSE,
+    color: "#475569",
+    isSystem: false,
+    sortOrder: 35,
+  },
 
-  // Unknown
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EQUITY (Not in P&L)
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: "Owner Contribution",
+    type: CategoryType.EQUITY,
+    color: "#8b5cf6",
+    isSystem: false,
+    sortOrder: 90,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UNCATEGORIZED
+  // ═══════════════════════════════════════════════════════════════════════════
   {
     name: "Uncategorized",
-    type: CategoryType.UNKNOWN,
+    type: CategoryType.UNCATEGORIZED,
     color: "#cbd5e1",
-    icon: "HelpCircle",
-    includeInPL: false,
     isSystem: true,
     sortOrder: 99,
   },
 ];
+
+// ============================================
+// DEFAULT CATEGORY RULES
+// Based on transaction sample patterns
+// ============================================
 
 interface CategoryRuleData {
   pattern: string;
@@ -137,168 +209,69 @@ interface CategoryRuleData {
 }
 
 const defaultCategoryRules: CategoryRuleData[] = [
-  // Revenue patterns
-  {
-    pattern: "AMAZON.COM SERVICES",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Amazon Payout",
-    priority: 100,
-  },
-  {
-    pattern: "AMAZON EDI PAYMENTS",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Amazon Payout",
-    priority: 100,
-  },
+  // ─── Revenue ───────────────────────────────────────────────────────────────
+  { pattern: "Amazon Relay Payment", matchType: "contains", field: "description", categoryName: "Amazon Relay Payment", priority: 100 },
+  { pattern: "AMAZON.COM SERVICES", matchType: "contains", field: "description", categoryName: "Amazon Relay Payment", priority: 100 },
+  { pattern: "AMAZON EDI PAYMENTS", matchType: "contains", field: "description", categoryName: "Amazon Relay Payment", priority: 100 },
 
-  // Payroll patterns
-  {
-    pattern: "ADP WAGE PAY",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Driver Wages",
-    priority: 90,
-  },
-  {
-    pattern: "ADP Tax",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Payroll Taxes",
-    priority: 90,
-  },
-  {
-    pattern: "ADP PAYROLL FEES",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Admin/Overhead",
-    priority: 90,
-  },
+  // ─── Contra-Revenue ────────────────────────────────────────────────────────
+  { pattern: "Amazon Marketplace Refund", matchType: "contains", field: "description", categoryName: "Amazon marketplace refunds", priority: 95 },
 
-  // Insurance
-  {
-    pattern: "AMAZON INSURANCE",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Insurance",
-    priority: 90,
-  },
+  // ─── COGS ──────────────────────────────────────────────────────────────────
+  { pattern: "ADP Wage Pay", matchType: "contains", field: "description", categoryName: "Driver Wages", priority: 90 },
+  { pattern: "ADP Tax", matchType: "contains", field: "description", categoryName: "Payroll Taxes", priority: 90 },
+  { pattern: "Check 7720", matchType: "contains", field: "description", categoryName: "Driver Wages", priority: 85 },
 
-  // Workers Comp
-  {
-    pattern: "Wise Inc",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Workers Comp",
-    priority: 80,
-  },
+  // ─── Operating Expenses ────────────────────────────────────────────────────
+  { pattern: "Amazon Insurance", matchType: "contains", field: "description", categoryName: "Cargo Insurance", priority: 90 },
+  { pattern: "ATT Payment", matchType: "contains", field: "description", categoryName: "Telecom & Mobile Devices", priority: 85 },
+  { pattern: "Wise Inc", matchType: "contains", field: "description", categoryName: "Virtual Assistants Contractor fee", priority: 85 },
+  { pattern: "ADP Payroll Fees", matchType: "contains", field: "description", categoryName: "Payroll Service Fees", priority: 85 },
+  { pattern: "OpenPhone", matchType: "contains", field: "description", categoryName: "Office Phone", priority: 80 },
+  { pattern: "Indeed", matchType: "contains", field: "description", categoryName: "Recruiting Ads", priority: 80 },
+  { pattern: "Monday.com", matchType: "contains", field: "description", categoryName: "Software", priority: 80 },
+  { pattern: "OnlineJobsPH", matchType: "contains", field: "description", categoryName: "Software", priority: 80 },
+  { pattern: "Namecheap - Domain", matchType: "contains", field: "description", categoryName: "Website domain purchase", priority: 75 },
+  { pattern: "Namecheap - Email", matchType: "contains", field: "description", categoryName: "Office Email fee", priority: 75 },
+  { pattern: "Namecheap", matchType: "contains", field: "description", categoryName: "Office Email fee", priority: 70 },
 
-  // Admin/Overhead
-  {
-    pattern: "OPENPHONE",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Admin/Overhead",
-    priority: 70,
-  },
-  {
-    pattern: "QUO (OPENPHONE)",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Admin/Overhead",
-    priority: 70,
-  },
-  {
-    pattern: "NAME-CHEAP",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Admin/Overhead",
-    priority: 70,
-  },
-  {
-    pattern: "Monday.com",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Admin/Overhead",
-    priority: 70,
-  },
-  {
-    pattern: "INDEED",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Admin/Overhead",
-    priority: 70,
-  },
-
-  // Bank fees
-  {
-    pattern: "MONTHLY SERVICE FEE",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Bank Fees",
-    priority: 80,
-  },
-  {
-    pattern: "COUNTER CHECK",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Bank Fees",
-    priority: 80,
-  },
+  // Office Supplies (various retailers)
+  { pattern: "Home Depot", matchType: "contains", field: "description", categoryName: "Office Supplies", priority: 70 },
+  { pattern: "Target", matchType: "contains", field: "description", categoryName: "Office Supplies", priority: 70 },
+  { pattern: "Amazon Marketplace", matchType: "contains", field: "description", categoryName: "Office Supplies", priority: 65 },
+  { pattern: "Amazon.com", matchType: "contains", field: "description", categoryName: "Office Supplies", priority: 65 },
+  { pattern: "OfficeMax", matchType: "contains", field: "description", categoryName: "Office Supplies", priority: 70 },
+  { pattern: "O'Reilly", matchType: "contains", field: "description", categoryName: "Office Supplies", priority: 70 },
 
   // Fuel stations
-  {
-    pattern: "MARATHON",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Fuel",
-    priority: 60,
-  },
-  {
-    pattern: "KWIK TRIP",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Fuel",
-    priority: 60,
-  },
-  {
-    pattern: "BP#",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Fuel",
-    priority: 60,
-  },
-  {
-    pattern: "SHELL OIL",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Fuel",
-    priority: 60,
-  },
-  {
-    pattern: "HOLIDAY STATIONS",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Fuel",
-    priority: 60,
-  },
-  {
-    pattern: "EXXON",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Fuel",
-    priority: 60,
-  },
+  { pattern: "Marathon", matchType: "contains", field: "description", categoryName: "Truck Fuel", priority: 75 },
+  { pattern: "Kwik Trip", matchType: "contains", field: "description", categoryName: "Truck Fuel", priority: 75 },
+  { pattern: "BP -", matchType: "contains", field: "description", categoryName: "Truck Fuel", priority: 75 },
+  { pattern: "Shell Oil", matchType: "contains", field: "description", categoryName: "Truck Fuel", priority: 75 },
+  { pattern: "Holiday Stations", matchType: "contains", field: "description", categoryName: "Truck Fuel", priority: 75 },
+  { pattern: "Exxon", matchType: "contains", field: "description", categoryName: "Truck Fuel", priority: 75 },
 
-  // Maintenance
-  {
-    pattern: "O'REILLY",
-    matchType: "contains",
-    field: "description",
-    categoryName: "Maintenance",
-    priority: 60,
-  },
+  // Travel
+  { pattern: "Delta Air", matchType: "contains", field: "description", categoryName: "Business Travel", priority: 70 },
+  { pattern: "Sun Country Air", matchType: "contains", field: "description", categoryName: "Business Travel", priority: 70 },
+  { pattern: "Skiplagged", matchType: "contains", field: "description", categoryName: "Business Travel", priority: 70 },
+
+  // Meals
+  { pattern: "Humbertos", matchType: "contains", field: "description", categoryName: "Travel meal per diem", priority: 65 },
+  { pattern: "In-N-Out", matchType: "contains", field: "description", categoryName: "Travel meal per diem", priority: 65 },
+  { pattern: "Bisbas", matchType: "contains", field: "description", categoryName: "Travel meal per diem", priority: 65 },
+
+  // Medical/DOT
+  { pattern: "CompCare", matchType: "contains", field: "description", categoryName: "DOT Physical Expense", priority: 70 },
+  { pattern: "Back To Health", matchType: "contains", field: "description", categoryName: "DOT Physical Expense", priority: 70 },
+
+  // Bank fees
+  { pattern: "Monthly Service Fee", matchType: "contains", field: "description", categoryName: "Chase Business Account Monthly Fee", priority: 80 },
+  { pattern: "Counter Check", matchType: "contains", field: "description", categoryName: "Business Check Fee", priority: 80 },
+
+  // ─── Equity ────────────────────────────────────────────────────────────────
+  { pattern: "ATM Cash Deposit", matchType: "contains", field: "description", categoryName: "Owner Contribution", priority: 90 },
+  { pattern: "Initial Deposit", matchType: "contains", field: "description", categoryName: "Owner Contribution", priority: 90 },
 ];
 
 async function main() {
@@ -309,34 +282,49 @@ async function main() {
   for (const category of defaultCategories) {
     await prisma.category.upsert({
       where: { name: category.name },
-      update: category,
+      update: {
+        type: category.type,
+        color: category.color,
+        isSystem: category.isSystem,
+        sortOrder: category.sortOrder,
+      },
       create: category,
     });
   }
-  console.log(`   ✓ Created ${defaultCategories.length} categories`);
+  console.log(`   ✓ Created/updated ${defaultCategories.length} categories`);
 
-  // Get all categories for rule creation (for future use)
+  // Get all categories for rule creation
   const categories = await prisma.category.findMany();
-  // Category map available for creating user-specific rules
-  void categories;
+  const categoryMap = new Map(categories.map((c) => [c.name, c.id]));
 
-  // Create a system user for global rules (or skip if no users)
-  // Note: Category rules require a userId. In a real scenario,
-  // you might want to create rules per user or have a system user.
-  // For now, we'll skip creating rules in seed and let them be created
-  // when users are created or via settings.
+  // Note: Category rules require a userId. They will be created when:
+  // 1. A user is created and initializes their settings
+  // 2. An admin creates global rules
+  // For now, we store the rule templates for reference
 
-  console.log(
-    "📋 Category rules template ready (will be created per user in settings)"
-  );
+  console.log("📋 Category rule templates ready for user initialization");
   console.log(`   Template has ${defaultCategoryRules.length} rules`);
+
+  // Verify category mappings
+  const unmappedRules = defaultCategoryRules.filter(
+    (r) => !categoryMap.has(r.categoryName)
+  );
+  if (unmappedRules.length > 0) {
+    console.log("⚠️  Warning: Some rules reference unmapped categories:");
+    unmappedRules.forEach((r) => console.log(`   - ${r.categoryName}`));
+  }
 
   console.log("\n✅ Seed completed successfully!");
   console.log("\nSummary:");
   console.log(`   - ${defaultCategories.length} categories created/updated`);
-  console.log(
-    `   - ${defaultCategoryRules.length} category rule templates available`
-  );
+  console.log(`   - Category types:`);
+  console.log(`     • REVENUE: ${defaultCategories.filter((c) => c.type === CategoryType.REVENUE).length}`);
+  console.log(`     • CONTRA_REVENUE: ${defaultCategories.filter((c) => c.type === CategoryType.CONTRA_REVENUE).length}`);
+  console.log(`     • COGS: ${defaultCategories.filter((c) => c.type === CategoryType.COGS).length}`);
+  console.log(`     • OPERATING_EXPENSE: ${defaultCategories.filter((c) => c.type === CategoryType.OPERATING_EXPENSE).length}`);
+  console.log(`     • EQUITY: ${defaultCategories.filter((c) => c.type === CategoryType.EQUITY).length}`);
+  console.log(`     • UNCATEGORIZED: ${defaultCategories.filter((c) => c.type === CategoryType.UNCATEGORIZED).length}`);
+  console.log(`   - ${defaultCategoryRules.length} category rule templates available`);
 }
 
 main()

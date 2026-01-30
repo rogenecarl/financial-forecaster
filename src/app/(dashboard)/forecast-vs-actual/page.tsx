@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { GitCompare, TrendingUp, TrendingDown, AlertCircle, RefreshCw, Calendar } from "lucide-react";
+import { GitCompare, TrendingUp, TrendingDown, AlertCircle, Calendar } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,49 +22,26 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  getAggregatedVariance,
-  getForecastDateRange,
-  type AggregatedVariance,
-  type ForecastDateRange,
-} from "@/actions/forecasting/forecast-weeks";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { useForecastVariance, useForecastDateRange } from "@/hooks";
 
 type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months" | "thisWeek" | "lastWeek";
 
 export default function ForecastVsActualPage() {
-  const [loading, setLoading] = useState(true);
   const [periodOption, setPeriodOption] = useState<PeriodOption>("all");
-  const [data, setData] = useState<AggregatedVariance | null>(null);
-  const [dateRange, setDateRange] = useState<ForecastDateRange | null>(null);
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+  const [customDateRange, setCustomDateRange] = useState<{
+    start: string | null;
+    end: string | null;
+  }>({ start: null, end: null });
 
-  // Fetch available date range on mount
-  useEffect(() => {
-    async function fetchDateRange() {
-      const result = await getForecastDateRange();
-      if (result.success && result.data) {
-        setDateRange(result.data);
-        // Set initial custom dates to full range
-        if (result.data.minDate) {
-          setCustomStartDate(new Date(result.data.minDate));
-        }
-        if (result.data.maxDate) {
-          setCustomEndDate(new Date(result.data.maxDate));
-        }
-      }
-    }
-    fetchDateRange();
-  }, []);
+  // Fetch available date range
+  const { dateRange } = useForecastDateRange();
 
-  const getDateRangeForPeriod = useCallback((): { start: Date; end: Date } | null => {
+  // Calculate effective date range
+  const effectiveDateRange = useMemo(() => {
     const now = new Date();
 
     switch (periodOption) {
       case "all":
-        // Return null to fetch all data (no date filter)
         return null;
 
       case "thisWeek": {
@@ -114,40 +91,47 @@ export default function ForecastVsActualPage() {
         return { start, end };
       }
 
-      case "custom":
-        if (customStartDate && customEndDate) {
-          const end = new Date(customEndDate);
+      case "custom": {
+        const start = customDateRange.start
+          ? new Date(customDateRange.start)
+          : dateRange?.minDate
+            ? new Date(dateRange.minDate)
+            : null;
+        const end = customDateRange.end
+          ? new Date(customDateRange.end)
+          : dateRange?.maxDate
+            ? new Date(dateRange.maxDate)
+            : null;
+        if (start && end) {
           end.setHours(23, 59, 59, 999);
-          return { start: customStartDate, end };
+          return { start, end };
         }
         return null;
+      }
 
       default:
         return null;
     }
-  }, [periodOption, customStartDate, customEndDate]);
+  }, [periodOption, customDateRange, dateRange]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const range = getDateRangeForPeriod();
-      const result = await getAggregatedVariance(range?.start, range?.end);
+  // Get display values for custom date inputs
+  const customStartDate = customDateRange.start
+    ? new Date(customDateRange.start)
+    : dateRange?.minDate
+      ? new Date(dateRange.minDate)
+      : undefined;
 
-      if (result.success) {
-        setData(result.data);
-      } else {
-        toast.error(result.error || "Failed to load variance data");
-      }
-    } catch {
-      toast.error("Failed to load variance data");
-    } finally {
-      setLoading(false);
-    }
-  }, [getDateRangeForPeriod]);
+  const customEndDate = customDateRange.end
+    ? new Date(customDateRange.end)
+    : dateRange?.maxDate
+      ? new Date(dateRange.maxDate)
+      : undefined;
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // TanStack Query hook for variance data
+  const { data, isLoading: loading } = useForecastVariance(
+    effectiveDateRange?.start,
+    effectiveDateRange?.end
+  );
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -221,7 +205,12 @@ export default function ForecastVsActualPage() {
                 type="date"
                 className="w-[140px]"
                 value={customStartDate ? customStartDate.toISOString().split("T")[0] : ""}
-                onChange={(e) => setCustomStartDate(e.target.value ? new Date(e.target.value) : undefined)}
+                onChange={(e) =>
+                  setCustomDateRange((prev) => ({
+                    ...prev,
+                    start: e.target.value || null,
+                  }))
+                }
                 max={customEndDate ? customEndDate.toISOString().split("T")[0] : undefined}
               />
               <span className="text-muted-foreground">to</span>
@@ -229,16 +218,16 @@ export default function ForecastVsActualPage() {
                 type="date"
                 className="w-[140px]"
                 value={customEndDate ? customEndDate.toISOString().split("T")[0] : ""}
-                onChange={(e) => setCustomEndDate(e.target.value ? new Date(e.target.value) : undefined)}
+                onChange={(e) =>
+                  setCustomDateRange((prev) => ({
+                    ...prev,
+                    end: e.target.value || null,
+                  }))
+                }
                 min={customStartDate ? customStartDate.toISOString().split("T")[0] : undefined}
               />
             </div>
           )}
-
-          <Button variant="outline" onClick={fetchData} disabled={loading}>
-            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
-            Refresh
-          </Button>
         </div>
       </div>
 

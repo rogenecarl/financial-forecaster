@@ -20,9 +20,11 @@ export type Role = (typeof Role)[keyof typeof Role]
 
 export const CategoryType = {
   REVENUE: 'REVENUE',
-  EXPENSE: 'EXPENSE',
-  TRANSFER: 'TRANSFER',
-  UNKNOWN: 'UNKNOWN'
+  CONTRA_REVENUE: 'CONTRA_REVENUE',
+  COGS: 'COGS',
+  OPERATING_EXPENSE: 'OPERATING_EXPENSE',
+  EQUITY: 'EQUITY',
+  UNCATEGORIZED: 'UNCATEGORIZED'
 } as const
 
 export type CategoryType = (typeof CategoryType)[keyof typeof CategoryType]

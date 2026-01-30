@@ -8,8 +8,7 @@ import type { ImportTransactionRow } from "@/schema/transaction.schema";
 export interface CategoryInfo {
   id: string;
   name: string;
-  type: "REVENUE" | "EXPENSE" | "TRANSFER" | "UNKNOWN";
-  description: string | null;
+  type: "REVENUE" | "CONTRA_REVENUE" | "COGS" | "OPERATING_EXPENSE" | "EQUITY" | "UNCATEGORIZED";
 }
 
 export interface CategorizationResult {
@@ -34,7 +33,7 @@ function buildCategorizationPrompt(
   categories: CategoryInfo[]
 ): string {
   const categoryList = categories
-    .map(c => `- "${c.name}" (ID: ${c.id}, Type: ${c.type})${c.description ? `: ${c.description}` : ""}`)
+    .map(c => `- "${c.name}" (ID: ${c.id}, Type: ${c.type})`)
     .join("\n");
 
   const transactionList = transactions
@@ -105,7 +104,7 @@ export async function categorizeTransactions(
 
   // Filter out categories that shouldn't be auto-assigned
   const validCategories = categories.filter(
-    c => c.name !== "Uncategorized" && c.type !== "UNKNOWN"
+    c => c.name !== "Uncategorized" && c.type !== "UNCATEGORIZED"
   );
 
   const prompt = buildCategorizationPrompt(transactions, validCategories);

@@ -69,9 +69,6 @@ export async function createCategory(
         name: validatedData.data.name,
         type: validatedData.data.type,
         color: validatedData.data.color,
-        icon: validatedData.data.icon,
-        description: validatedData.data.description,
-        includeInPL: validatedData.data.includeInPL,
         sortOrder: validatedData.data.sortOrder,
       },
     });

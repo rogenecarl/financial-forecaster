@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Check,
   Copy,
-  Sparkles,
   Loader2,
   ChevronDown,
   ChevronUp,
@@ -59,7 +58,6 @@ export function ImportPreview({
   const [loading, setLoading] = useState(true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [importing, setImporting] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [showDuplicates, setShowDuplicates] = useState(false);
 
@@ -104,63 +102,6 @@ export function ImportPreview({
     generatePreview();
   }, [open, transactions]);
 
-  // Run AI categorization for items without rule matches
-  const runAICategorization = useCallback(async () => {
-    const uncategorized = previewItems.filter(
-      (item) => !item.suggestedCategoryId && !item.isDuplicate
-    );
-
-    if (uncategorized.length === 0) {
-      toast.info("All transactions are already categorized");
-      return;
-    }
-
-    setAiLoading(true);
-    try {
-      const response = await fetch("/api/ai/categorize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transactions: uncategorized.map((item) => ({
-            rowIndex: item.rowIndex,
-            transaction: item.transaction,
-          })),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("AI categorization failed");
-      }
-
-      const data = await response.json();
-
-      // Update preview items with AI results
-      setPreviewItems((prev) =>
-        prev.map((item) => {
-          const aiResult = data.results?.find(
-            (r: { rowIndex: number }) => r.rowIndex === item.rowIndex
-          );
-          if (aiResult && aiResult.categoryId) {
-            return {
-              ...item,
-              suggestedCategoryId: aiResult.categoryId,
-              suggestedCategoryName: aiResult.categoryName,
-              confidence: aiResult.confidence,
-            };
-          }
-          return item;
-        })
-      );
-
-      toast.success(`AI categorized ${data.results?.length || 0} transactions`);
-    } catch (err) {
-      console.error("AI categorization error:", err);
-      toast.error("Failed to run AI categorization");
-    } finally {
-      setAiLoading(false);
-    }
-  }, [previewItems]);
-
   const handleImport = async () => {
     const itemsToImport = previewItems.filter((item) =>
       selectedItems.has(item.rowIndex)
@@ -176,12 +117,14 @@ export function ImportPreview({
       const result = await importTransactions(itemsToImport, fileName, fileType);
 
       if (result.success) {
-        toast.success(
-          `Imported ${result.data.totalImported} transactions` +
-            (result.data.totalSkipped > 0
-              ? ` (${result.data.totalSkipped} duplicates skipped)`
-              : "")
-        );
+        let message = `Imported ${result.data.totalImported} transactions`;
+        if (result.data.categoriesCreated > 0) {
+          message += ` (${result.data.categoriesCreated} new categories created)`;
+        }
+        if (result.data.totalSkipped > 0) {
+          message += ` (${result.data.totalSkipped} duplicates skipped)`;
+        }
+        toast.success(message);
         onComplete();
         onOpenChange(false);
       } else {
@@ -195,15 +138,15 @@ export function ImportPreview({
     }
   };
 
-  const handleCategoryChange = (rowIndex: number, categoryId: string | null, categoryName: string | null) => {
+  const handleCategoryChange = (rowIndex: number, categoryId: string | null) => {
     setPreviewItems((prev) =>
       prev.map((item) =>
         item.rowIndex === rowIndex
           ? {
               ...item,
               suggestedCategoryId: categoryId,
-              suggestedCategoryName: categoryName,
-              confidence: 1, // Manual selection = 100% confidence
+              suggestedCategoryName: categories.find(c => c.id === categoryId)?.name || null,
+              confidence: 1,
             }
           : item
       )
@@ -255,9 +198,12 @@ export function ImportPreview({
     (i) => i.suggestedCategoryId && !i.isDuplicate
   ).length;
   const selectedCount = selectedItems.size;
-  const highConfidenceCount = previewItems.filter(
-    (i) => i.confidence >= 0.8 && !i.isDuplicate
-  ).length;
+  const uncategorizedCount = totalCount - duplicateCount - categorizedCount;
+
+  // Check if CSV has higher category column
+  const hasCsvHigherCategory = previewItems.some(
+    (i) => i.transaction.csvHigherCategory
+  );
 
   const displayItems = showDuplicates
     ? previewItems
@@ -265,7 +211,7 @@ export function ImportPreview({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Preview Import</DialogTitle>
           <DialogDescription>
@@ -296,25 +242,12 @@ export function ImportPreview({
                 <span className="font-medium text-green-600">{categorizedCount}</span>
                 <span className="text-slate-500"> categorized</span>
               </div>
-              <div className="text-sm">
-                <span className="font-medium text-blue-600">{highConfidenceCount}</span>
-                <span className="text-slate-500"> high confidence (≥80%)</span>
-              </div>
-              <div className="flex-1" />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={runAICategorization}
-                disabled={aiLoading}
-                className="gap-2"
-              >
-                {aiLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                AI Categorize
-              </Button>
+              {uncategorizedCount > 0 && (
+                <div className="text-sm">
+                  <span className="font-medium text-orange-600">{uncategorizedCount}</span>
+                  <span className="text-slate-500"> need category</span>
+                </div>
+              )}
             </div>
 
             {/* Controls */}
@@ -350,16 +283,18 @@ export function ImportPreview({
             </div>
 
             {/* Table */}
-            <ScrollArea className="h-[calc(90vh-380px)] min-h-[200px] border rounded-lg">
+            <ScrollArea className="h-[calc(90vh-350px)] min-h-[200px] border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-50">
                     <TableHead className="w-12"></TableHead>
                     <TableHead className="w-20">Date</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead className="w-24 text-right">Amount</TableHead>
-                    <TableHead className="w-[180px]">Category</TableHead>
-                    <TableHead className="w-20">Conf.</TableHead>
+                    <TableHead className="w-28 text-right">Amount</TableHead>
+                    {hasCsvHigherCategory && (
+                      <TableHead className="w-16 text-center">Type</TableHead>
+                    )}
+                    <TableHead className="w-[200px]">Category</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -388,7 +323,7 @@ export function ImportPreview({
                         {formatDate(item.transaction.postingDate)}
                       </TableCell>
                       <TableCell>
-                        <p className="text-sm truncate max-w-[300px]">
+                        <p className="text-sm truncate max-w-[280px]">
                           {item.transaction.description}
                         </p>
                       </TableCell>
@@ -402,51 +337,45 @@ export function ImportPreview({
                       >
                         {formatAmount(item.transaction.amount)}
                       </TableCell>
-                      <TableCell>
+                      {hasCsvHigherCategory && (
+                        <TableCell className="text-center">
+                          {item.transaction.csvHigherCategory ? (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px] px-1.5",
+                                item.transaction.csvHigherCategory === "Revenue" && "border-green-500 text-green-700 bg-green-50",
+                                item.transaction.csvHigherCategory === "Contra-Revenue" && "border-orange-500 text-orange-700 bg-orange-50",
+                                item.transaction.csvHigherCategory === "Cost of Goods Sold" && "border-red-500 text-red-700 bg-red-50",
+                                item.transaction.csvHigherCategory === "Operating Expenses" && "border-blue-500 text-blue-700 bg-blue-50",
+                                item.transaction.csvHigherCategory === "Equity" && "border-purple-500 text-purple-700 bg-purple-50"
+                              )}
+                            >
+                              {item.transaction.csvHigherCategory === "Cost of Goods Sold"
+                                ? "COGS"
+                                : item.transaction.csvHigherCategory === "Operating Expenses"
+                                ? "OpEx"
+                                : item.transaction.csvHigherCategory}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </TableCell>
+                      )}
+                      <TableCell className="overflow-visible">
                         {item.isDuplicate ? (
                           <span className="text-xs text-slate-400">—</span>
                         ) : (
                           <CategorySelect
                             value={item.suggestedCategoryId}
                             onValueChange={(categoryId) =>
-                              handleCategoryChange(item.rowIndex, categoryId, null)
+                              handleCategoryChange(item.rowIndex, categoryId)
                             }
                             categories={categories}
                             loading={categoriesLoading}
                             className="w-full h-8 text-xs"
-                            placeholder="Select..."
+                            placeholder="Select category..."
                           />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {item.isDuplicate ? (
-                          <span className="text-xs text-slate-400">—</span>
-                        ) : item.confidence > 0 ? (
-                          <div className="flex items-center gap-1">
-                            {item.matchedRule ? (
-                              <Badge
-                                variant="secondary"
-                                className="text-xs px-1.5"
-                              >
-                                Rule
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant={
-                                  item.confidence >= 0.8
-                                    ? "default"
-                                    : item.confidence >= 0.5
-                                    ? "secondary"
-                                    : "outline"
-                                }
-                                className="text-xs px-1.5"
-                              >
-                                {Math.round(item.confidence * 100)}%
-                              </Badge>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-400">—</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -456,23 +385,13 @@ export function ImportPreview({
             </ScrollArea>
 
             {/* Info box */}
-            <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm">
-              <Sparkles className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-blue-800">
-                  <strong>{highConfidenceCount}</strong> transactions will be
-                  auto-categorized (≥80% confidence).
-                </p>
-                <p className="text-blue-600">
-                  {totalCount - duplicateCount - highConfidenceCount > 0 && (
-                    <>
-                      <strong>{totalCount - duplicateCount - highConfidenceCount}</strong>{" "}
-                      will need manual review.
-                    </>
-                  )}
+            {uncategorizedCount > 0 && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                <p className="text-amber-800">
+                  <strong>{uncategorizedCount}</strong> transactions need a category assigned before import.
                 </p>
               </div>
-            </div>
+            )}
           </>
         )}
 

@@ -8,6 +8,10 @@ import {
   AlertCircle,
   Circle,
   ChevronRight,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Percent,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePLStatement, useTransactionDateRange } from "@/hooks";
-import type { PLLineItem } from "@/schema/transaction.schema";
+import type { PLLineItem, PLSection } from "@/schema/transaction.schema";
 import { cn } from "@/lib/utils";
 
 type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months";
@@ -136,7 +140,7 @@ export default function PLStatementPage() {
     return `${formatDate(statement.period.startDate)} - ${formatDate(statement.period.endDate)}`;
   };
 
-  const renderLineItem = (item: PLLineItem, isExpense: boolean = false) => (
+  const renderLineItem = (item: PLLineItem, isNegative: boolean = false) => (
     <div
       key={item.categoryId}
       className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
@@ -157,11 +161,10 @@ export default function PLStatementPage() {
         <span
           className={cn(
             "text-sm font-mono font-medium",
-            isExpense ? "text-red-600" : "text-green-600"
+            isNegative ? "text-red-600" : "text-green-600"
           )}
         >
-          {isExpense && item.amount < 0 ? "" : isExpense ? "-" : "+"}
-          {formatCurrency(Math.abs(item.amount))}
+          {formatCurrency(item.amount)}
         </span>
         <span className="text-xs text-slate-500 ml-2">
           ({item.percentage.toFixed(1)}%)
@@ -169,6 +172,65 @@ export default function PLStatementPage() {
       </div>
     </div>
   );
+
+  const renderSection = (
+    title: string,
+    section: PLSection | undefined,
+    isNegative: boolean = false
+  ) => {
+    if (!section || section.items.length === 0) return null;
+
+    return (
+      <div>
+        <h3 className="text-sm font-semibold uppercase text-slate-500 mb-3">
+          {title}
+        </h3>
+        <div className="bg-slate-50 rounded-lg p-4">
+          {section.items.map((item) => renderLineItem(item, isNegative))}
+          <div className="flex items-center justify-between pt-3 mt-3 border-t-2 border-slate-200">
+            <span className="text-sm font-semibold">Total {title}</span>
+            <span
+              className={cn(
+                "text-sm font-mono font-bold",
+                isNegative ? "text-red-600" : "text-green-600"
+              )}
+            >
+              {formatCurrency(section.total)}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSubtotal = (
+    label: string,
+    amount: number,
+    highlight: "primary" | "success" | "warning" = "primary"
+  ) => {
+    const bgClass = {
+      primary: "bg-slate-800",
+      success: "bg-emerald-800",
+      warning: "bg-amber-800",
+    }[highlight];
+
+    const textClass = {
+      primary: amount >= 0 ? "text-emerald-400" : "text-red-400",
+      success: "text-emerald-300",
+      warning: "text-amber-300",
+    }[highlight];
+
+    return (
+      <div className={cn("text-white rounded-lg p-4", bgClass)}>
+        <div className="flex items-center justify-between">
+          <span className="text-base font-semibold">{label}</span>
+          <span className={cn("text-xl font-mono font-bold", textClass)}>
+            {formatCurrency(amount)}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   if (loading && !dateRange) {
     return (
@@ -186,19 +248,15 @@ export default function PLStatementPage() {
         </div>
 
         {/* Summary Cards Skeleton */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card>
-            <CardContent className="pt-6">
-              <Skeleton className="h-4 w-20 mb-2" />
-              <Skeleton className="h-8 w-32" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <Skeleton className="h-4 w-20 mb-2" />
-              <Skeleton className="h-8 w-32" />
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="pt-6">
+                <Skeleton className="h-4 w-20 mb-2" />
+                <Skeleton className="h-8 w-32" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Statement Skeleton */}
@@ -209,7 +267,7 @@ export default function PLStatementPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
+              {Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton key={i} className="h-8 w-full" />
               ))}
             </div>
@@ -221,7 +279,10 @@ export default function PLStatementPage() {
 
   const hasData =
     statement &&
-    (statement.revenue.items.length > 0 || statement.expenses.items.length > 0);
+    (statement.revenue.items.length > 0 ||
+      statement.contraRevenue.items.length > 0 ||
+      statement.cogs.items.length > 0 ||
+      statement.operatingExpenses.items.length > 0);
 
   return (
     <div className="space-y-6">
@@ -294,42 +355,101 @@ export default function PLStatementPage() {
         </div>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* Summary Cards - Multi-tier metrics */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Revenue
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              Net Revenue
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">
-              {formatCurrency(statement?.revenue.total || 0)}
+              {formatCurrency(statement?.netRevenue || 0)}
             </div>
+            {statement && statement.contraRevenue.total !== 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                After {formatCurrency(Math.abs(statement.contraRevenue.total))} refunds
+              </p>
+            )}
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Net Profit
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Gross Profit
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div
               className={cn(
                 "text-2xl font-bold",
-                (statement?.netProfit || 0) >= 0
+                (statement?.grossProfit || 0) >= 0
                   ? "text-emerald-600"
                   : "text-red-600"
               )}
             >
-              {formatCurrency(statement?.netProfit || 0)}
+              {formatCurrency(statement?.grossProfit || 0)}
+            </div>
+            {statement && statement.cogs.total !== 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                After {formatCurrency(Math.abs(statement.cogs.total))} COGS
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              {(statement?.operatingIncome || 0) >= 0 ? (
+                <TrendingUp className="h-4 w-4" />
+              ) : (
+                <TrendingDown className="h-4 w-4" />
+              )}
+              Operating Income
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={cn(
+                "text-2xl font-bold",
+                (statement?.operatingIncome || 0) >= 0
+                  ? "text-emerald-600"
+                  : "text-red-600"
+              )}
+            >
+              {formatCurrency(statement?.operatingIncome || 0)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Percent className="h-4 w-4" />
+              Operating Margin
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={cn(
+                "text-2xl font-bold",
+                (statement?.operatingMargin || 0) >= 0
+                  ? "text-emerald-600"
+                  : "text-red-600"
+              )}
+            >
+              {(statement?.operatingMargin || 0).toFixed(1)}%
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* P&L Statement */}
+      {/* P&L Statement - Multi-tier Structure */}
       {hasData ? (
         <Card>
           <CardHeader>
@@ -338,65 +458,72 @@ export default function PLStatementPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Revenue Section */}
-            <div>
-              <h3 className="text-sm font-semibold uppercase text-slate-500 mb-3">
-                Revenue
-              </h3>
-              <div className="bg-slate-50 rounded-lg p-4">
-                {statement?.revenue.items.map((item) => renderLineItem(item))}
-                {statement?.revenue.items.length === 0 && (
-                  <p className="text-sm text-slate-500 text-center py-2">
-                    No revenue recorded
-                  </p>
-                )}
-                <div className="flex items-center justify-between pt-3 mt-3 border-t-2 border-slate-200">
-                  <span className="text-sm font-semibold">Total Revenue</span>
-                  <span className="text-sm font-mono font-bold text-green-600">
-                    {formatCurrency(statement?.revenue.total || 0)}
-                  </span>
-                </div>
-              </div>
-            </div>
+            {renderSection("Revenue", statement?.revenue, false)}
 
-            {/* Expenses Section */}
-            <div>
-              <h3 className="text-sm font-semibold uppercase text-slate-500 mb-3">
-                Expenses
-              </h3>
-              <div className="bg-slate-50 rounded-lg p-4">
-                {statement?.expenses.items.map((item) =>
-                  renderLineItem(item, true)
-                )}
-                {statement?.expenses.items.length === 0 && (
-                  <p className="text-sm text-slate-500 text-center py-2">
-                    No expenses recorded
-                  </p>
-                )}
-                <div className="flex items-center justify-between pt-3 mt-3 border-t-2 border-slate-200">
-                  <span className="text-sm font-semibold">Total Expenses</span>
-                  <span className="text-sm font-mono font-bold text-red-600">
-                    -{formatCurrency(statement?.expenses.total || 0)}
-                  </span>
-                </div>
-              </div>
-            </div>
+            {/* Contra-Revenue Section (if any) */}
+            {statement?.contraRevenue && statement.contraRevenue.items.length > 0 && (
+              renderSection("Contra-Revenue", statement.contraRevenue, false)
+            )}
 
-            {/* Net Profit */}
-            <div className="bg-slate-900 text-white rounded-lg p-4">
+            {/* Net Revenue Subtotal */}
+            {renderSubtotal("Net Revenue", statement?.netRevenue || 0, "primary")}
+
+            {/* COGS Section */}
+            {renderSection("Cost of Goods Sold", statement?.cogs, true)}
+
+            {/* Gross Profit Subtotal */}
+            <div className="bg-emerald-900 text-white rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <span className="text-lg font-semibold">Net Profit / (Loss)</span>
+                <span className="text-base font-semibold">Gross Profit</span>
+                <span
+                  className={cn(
+                    "text-xl font-mono font-bold",
+                    (statement?.grossProfit || 0) >= 0
+                      ? "text-emerald-300"
+                      : "text-red-400"
+                  )}
+                >
+                  {formatCurrency(statement?.grossProfit || 0)}
+                </span>
+              </div>
+            </div>
+
+            {/* Operating Expenses Section */}
+            {renderSection("Operating Expenses", statement?.operatingExpenses, true)}
+
+            {/* Operating Income - Final Total */}
+            <div className="bg-slate-900 text-white rounded-lg p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-lg font-semibold">Operating Income</span>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Margin: {(statement?.operatingMargin || 0).toFixed(1)}%
+                  </p>
+                </div>
                 <span
                   className={cn(
                     "text-2xl font-mono font-bold",
-                    (statement?.netProfit || 0) >= 0
+                    (statement?.operatingIncome || 0) >= 0
                       ? "text-emerald-400"
                       : "text-red-400"
                   )}
                 >
-                  {formatCurrency(statement?.netProfit || 0)}
+                  {formatCurrency(statement?.operatingIncome || 0)}
                 </span>
               </div>
             </div>
+
+            {/* Equity note (if any) */}
+            {statement && statement.equityCount > 0 && (
+              <div className="bg-slate-100 rounded-lg p-4 text-sm text-slate-600">
+                <p className="font-medium">
+                  Equity transactions excluded from P&L
+                </p>
+                <p className="text-xs mt-1">
+                  {statement.equityCount} transaction{statement.equityCount !== 1 ? "s" : ""} totaling {formatCurrency(statement.equityAmount)} (Owner contributions/draws)
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (

@@ -99,11 +99,21 @@ model Verification {
 // BOOKKEEPING MODELS
 // ============================================
 
+// P&L Inclusion is determined by CategoryType:
+// - REVENUE:           ✅ In P&L (positive)
+// - CONTRA_REVENUE:    ✅ In P&L (reduces revenue)
+// - COGS:              ✅ In P&L (negative - direct costs)
+// - OPERATING_EXPENSE: ✅ In P&L (negative - indirect costs)
+// - EQUITY:            ❌ Not in P&L (owner transactions)
+// - UNCATEGORIZED:     ❌ Not in P&L (needs review)
+
 enum CategoryType {
-  REVENUE
-  EXPENSE
-  TRANSFER
-  UNKNOWN
+  REVENUE           // Amazon Relay Payment
+  CONTRA_REVENUE    // Refunds (reduces revenue)
+  COGS              // Cost of Goods Sold (Driver Wages, Payroll Taxes)
+  OPERATING_EXPENSE // Indirect business costs
+  EQUITY            // Owner Contribution (not in P&L)
+  UNCATEGORIZED     // Not yet categorized
 }
 
 model Category {
@@ -111,9 +121,6 @@ model Category {
   name        String       @unique
   type        CategoryType
   color       String       @default("#6b7280") // Hex color for UI
-  icon        String? // Lucide icon name
-  description String?
-  includeInPL Boolean      @default(true)
   isSystem    Boolean      @default(false) // System categories can't be deleted
   sortOrder   Int          @default(0)
   createdAt   DateTime     @default(now())

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
-import { Upload, FileSpreadsheet, Trash2, ChevronRight, RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, Trash2, ChevronRight, CheckCircle, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,87 +25,31 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { InvoiceImportModal } from "@/components/forecasting";
-import {
-  getAmazonInvoices,
-  getAmazonInvoice,
-  deleteAmazonInvoice,
-  getInvoiceStats,
-  type InvoiceSummary,
-  type InvoiceWithLineItems,
-} from "@/actions/forecasting";
-import { toast } from "sonner";
+import { useAmazonInvoices, useAmazonInvoiceDetail } from "@/hooks";
 
 export default function AmazonInvoicesPage() {
-  const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
-  const [stats, setStats] = useState({ totalInvoices: 0, totalTourPay: 0, totalAccessorials: 0, totalPay: 0 });
-  const [loading, setLoading] = useState(true);
   const [showImport, setShowImport] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithLineItems | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [invoicesResult, statsResult] = await Promise.all([
-        getAmazonInvoices(),
-        getInvoiceStats(),
-      ]);
+  // TanStack Query hooks
+  const {
+    invoices,
+    stats,
+    isLoading: loading,
+    deleteInvoice,
+    isDeleting: deleting,
+    invalidate,
+  } = useAmazonInvoices();
 
-      if (invoicesResult.success && invoicesResult.data) {
-        setInvoices(invoicesResult.data);
-      }
-      if (statsResult.success && statsResult.data) {
-        setStats(statsResult.data);
-      }
-    } catch {
-      toast.error("Failed to load invoices");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { invoice: selectedInvoice, isLoading: loadingDetails } = useAmazonInvoiceDetail(selectedInvoiceId);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleSelectInvoice = async (invoiceId: string) => {
-    setLoadingDetails(true);
-    try {
-      const result = await getAmazonInvoice(invoiceId);
-      if (result.success) {
-        setSelectedInvoice(result.data);
-      } else {
-        toast.error(result.error || "Failed to load invoice details");
-      }
-    } catch {
-      toast.error("Failed to load invoice details");
-    } finally {
-      setLoadingDetails(false);
-    }
-  };
-
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!deleteId) return;
-
-    setDeleting(true);
-    try {
-      const result = await deleteAmazonInvoice(deleteId);
-      if (result.success) {
-        toast.success("Invoice deleted");
-        setDeleteId(null);
-        if (selectedInvoice?.id === deleteId) {
-          setSelectedInvoice(null);
-        }
-        fetchData();
-      } else {
-        toast.error(result.error || "Failed to delete invoice");
-      }
-    } catch {
-      toast.error("Failed to delete invoice");
-    } finally {
-      setDeleting(false);
+    deleteInvoice(deleteId);
+    setDeleteId(null);
+    if (selectedInvoiceId === deleteId) {
+      setSelectedInvoiceId(null);
     }
   };
 
@@ -132,10 +76,6 @@ export default function AmazonInvoicesPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
           <Button onClick={() => setShowImport(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Import Invoice
@@ -232,9 +172,9 @@ export default function AmazonInvoicesPage() {
                       <TableRow
                         key={invoice.id}
                         className={`cursor-pointer hover:bg-muted/50 ${
-                          selectedInvoice?.id === invoice.id ? "bg-muted/50" : ""
+                          selectedInvoiceId === invoice.id ? "bg-muted/50" : ""
                         }`}
-                        onClick={() => handleSelectInvoice(invoice.id)}
+                        onClick={() => setSelectedInvoiceId(invoice.id)}
                       >
                         <TableCell className="font-mono text-sm">
                           {invoice.invoiceNumber.length > 20
@@ -431,7 +371,7 @@ export default function AmazonInvoicesPage() {
       <InvoiceImportModal
         open={showImport}
         onOpenChange={setShowImport}
-        onSuccess={fetchData}
+        onSuccess={invalidate}
       />
 
       {/* Delete Confirmation */}

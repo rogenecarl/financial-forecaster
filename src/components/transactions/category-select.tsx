@@ -41,9 +41,11 @@ export function CategorySelect({
 
   // Group categories by type
   const revenueCategories = categories.filter((c) => c.type === "REVENUE");
-  const expenseCategories = categories.filter((c) => c.type === "EXPENSE");
-  const transferCategories = categories.filter((c) => c.type === "TRANSFER");
-  const unknownCategories = categories.filter((c) => c.type === "UNKNOWN");
+  const contraRevenueCategories = categories.filter((c) => c.type === "CONTRA_REVENUE");
+  const cogsCategories = categories.filter((c) => c.type === "COGS");
+  const opexCategories = categories.filter((c) => c.type === "OPERATING_EXPENSE");
+  const equityCategories = categories.filter((c) => c.type === "EQUITY");
+  const uncategorizedCategories = categories.filter((c) => c.type === "UNCATEGORIZED");
 
   const renderCategory = (category: Category) => (
     <button
@@ -93,23 +95,30 @@ export function CategorySelect({
           )}
         >
           {selectedCategory ? (
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 truncate">
               <Circle
-                className="h-3 w-3"
+                className="h-3 w-3 shrink-0"
                 style={{
                   fill: selectedCategory.color,
                   color: selectedCategory.color,
                 }}
               />
-              {selectedCategory.name}
+              <span className="truncate">{selectedCategory.name}</span>
             </span>
           ) : (
-            placeholder
+            <span className="truncate">{placeholder}</span>
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[250px] p-0" align="start">
+      <PopoverContent
+        className="w-[250px] p-0 z-50"
+        align="end"
+        side="bottom"
+        sideOffset={4}
+        collisionPadding={8}
+        avoidCollisions={true}
+      >
         <ScrollArea className="h-[300px]">
           <div className="p-1 space-y-1">
             {showUncategorized && (
@@ -131,9 +140,11 @@ export function CategorySelect({
               </button>
             )}
             {renderGroup("Revenue", revenueCategories)}
-            {renderGroup("Expenses", expenseCategories)}
-            {renderGroup("Transfers", transferCategories)}
-            {renderGroup("Other", unknownCategories)}
+            {renderGroup("Contra-Revenue", contraRevenueCategories)}
+            {renderGroup("Cost of Goods Sold", cogsCategories)}
+            {renderGroup("Operating Expenses", opexCategories)}
+            {renderGroup("Equity", equityCategories)}
+            {renderGroup("Other", uncategorizedCategories)}
           </div>
         </ScrollArea>
       </PopoverContent>

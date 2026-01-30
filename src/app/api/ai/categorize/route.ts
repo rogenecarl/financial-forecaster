@@ -61,7 +61,6 @@ export async function POST(request: NextRequest) {
       id: c.id,
       name: c.name,
       type: c.type as CategoryInfo["type"],
-      description: c.description,
     }));
 
     // Run AI categorization

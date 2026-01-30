@@ -127,17 +127,21 @@ export async function getDashboardMetrics(): Promise<ActionResponse<DashboardMet
       include: { category: true },
     });
 
-    // Calculate weekly revenue and profit
+    // Calculate weekly revenue and profit using multi-tier P&L categories
+    // REVENUE and CONTRA_REVENUE count towards revenue
+    // COGS and OPERATING_EXPENSE count towards expenses
+    // EQUITY and UNCATEGORIZED are excluded from P&L
     let weeklyRevenue = 0;
     let weeklyExpenses = 0;
     for (const txn of thisWeekTransactions) {
-      if (txn.category?.includeInPL) {
-        const amount = toNumber(txn.amount);
-        if (txn.category.type === "REVENUE") {
-          weeklyRevenue += amount;
-        } else if (txn.category.type === "EXPENSE") {
-          weeklyExpenses += Math.abs(amount);
-        }
+      const amount = toNumber(txn.amount);
+      const type = txn.category?.type;
+      if (type === "REVENUE") {
+        weeklyRevenue += amount;
+      } else if (type === "CONTRA_REVENUE") {
+        weeklyRevenue += amount; // Contra-revenue adds (refunds are positive)
+      } else if (type === "COGS" || type === "OPERATING_EXPENSE") {
+        weeklyExpenses += Math.abs(amount);
       }
     }
     const weeklyProfit = weeklyRevenue - weeklyExpenses;
@@ -146,13 +150,14 @@ export async function getDashboardMetrics(): Promise<ActionResponse<DashboardMet
     let prevRevenue = 0;
     let prevExpenses = 0;
     for (const txn of prevWeekTransactions) {
-      if (txn.category?.includeInPL) {
-        const amount = toNumber(txn.amount);
-        if (txn.category.type === "REVENUE") {
-          prevRevenue += amount;
-        } else if (txn.category.type === "EXPENSE") {
-          prevExpenses += Math.abs(amount);
-        }
+      const amount = toNumber(txn.amount);
+      const type = txn.category?.type;
+      if (type === "REVENUE") {
+        prevRevenue += amount;
+      } else if (type === "CONTRA_REVENUE") {
+        prevRevenue += amount;
+      } else if (type === "COGS" || type === "OPERATING_EXPENSE") {
+        prevExpenses += Math.abs(amount);
       }
     }
     const prevProfit = prevRevenue - prevExpenses;
@@ -459,13 +464,14 @@ export async function getCashFlowTrend(
       let expenses = 0;
 
       for (const txn of transactions) {
-        if (txn.category?.includeInPL) {
-          const amount = toNumber(txn.amount);
-          if (txn.category.type === "REVENUE") {
-            revenue += amount;
-          } else if (txn.category.type === "EXPENSE") {
-            expenses += Math.abs(amount);
-          }
+        const amount = toNumber(txn.amount);
+        const type = txn.category?.type;
+        if (type === "REVENUE") {
+          revenue += amount;
+        } else if (type === "CONTRA_REVENUE") {
+          revenue += amount; // Contra-revenue adds (refunds are positive)
+        } else if (type === "COGS" || type === "OPERATING_EXPENSE") {
+          expenses += Math.abs(amount);
         }
       }
 

@@ -24,17 +24,49 @@ interface RawBankRow {
 
 // Map common column name variations to our schema
 const columnMappings: Record<string, string[]> = {
-  details: ["details", "detail", "type", "transaction type", "trans type"],
+  details: ["details", "detail", "transaction type", "trans type"],
   postingDate: ["posting date", "postingdate", "date", "transaction date", "trans date", "post date"],
   description: ["description", "desc", "memo", "narrative", "transaction description", "payee"],
   amount: ["amount", "transaction amount", "trans amount", "debit/credit", "value"],
-  type: ["type", "category", "transaction category", "method", "payment type"],
+  type: ["type", "method", "payment type"],
   balance: ["balance", "running balance", "account balance", "available balance"],
   checkOrSlipNum: ["check or slip #", "check number", "check #", "slip #", "reference", "ref", "check no"],
+  // New fields for categorized bank statement CSV
+  csvCategory: ["categories", "category", "csv category", "transaction category", "expense category", "cat", "assigned category"],
+  csvHigherCategory: ["higher order category", "higher_order_category", "higher category", "category type", "parent category", "higher cat", "type category"],
 };
 
 function normalizeColumnName(col: string): string {
   return col.toLowerCase().trim().replace(/[_-]/g, " ");
+}
+
+// Normalize higher category to consistent display values
+function normalizeHigherCategory(higherCategory: string | null): string | null {
+  if (!higherCategory) return null;
+
+  const normalized = higherCategory.toLowerCase().trim();
+
+  switch (normalized) {
+    case "revenue":
+      return "Revenue";
+    case "contra-revenue":
+    case "contra revenue":
+    case "contra_revenue":
+      return "Contra-Revenue";
+    case "cost of goods sold":
+    case "cogs":
+    case "cost_of_goods_sold":
+      return "Cost of Goods Sold";
+    case "operating expenses":
+    case "operating expense":
+    case "opex":
+    case "operating_expense":
+      return "Operating Expenses";
+    case "equity":
+      return "Equity";
+    default:
+      return higherCategory;
+  }
 }
 
 function mapColumns(headers: string[]): Record<string, string> {
@@ -172,6 +204,10 @@ function parseRow(
     const balanceRaw = getValue("balance");
     const checkOrSlipNum = getValue("checkOrSlipNum");
 
+    // New categorized fields from CSV
+    const csvCategoryRaw = getValue("csvCategory");
+    const csvHigherCategoryRaw = getValue("csvHigherCategory");
+
     // Parse posting date
     const postingDate = parseDate(postingDateRaw);
     if (!postingDate) {
@@ -201,6 +237,13 @@ function parseRow(
       };
     }
 
+    // Parse CSV category fields (optional)
+    const csvCategory = csvCategoryRaw ? String(csvCategoryRaw).trim() : null;
+    const csvHigherCategoryRawStr = csvHigherCategoryRaw ? String(csvHigherCategoryRaw).trim() : null;
+
+    // Normalize higher category display
+    const csvHigherCategory = normalizeHigherCategory(csvHigherCategoryRawStr);
+
     const transaction: ImportTransactionRow = {
       details: normalizeDetails(details),
       postingDate,
@@ -209,6 +252,8 @@ function parseRow(
       type: normalizeType(type),
       balance,
       checkOrSlipNum: checkOrSlipNum ? String(checkOrSlipNum) : null,
+      csvCategory,
+      csvHigherCategory,
     };
 
     return { transaction, error: null };

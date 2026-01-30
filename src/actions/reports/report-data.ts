@@ -306,7 +306,13 @@ export async function getPLReportData(
     >();
 
     for (const txn of transactions) {
-      if (!txn.categoryId || !txn.category || !txn.category.includeInPL) {
+      if (!txn.categoryId || !txn.category) {
+        continue;
+      }
+
+      // Skip EQUITY and UNCATEGORIZED types - they're not in P&L
+      const categoryType = txn.category.type;
+      if (categoryType === "EQUITY" || categoryType === "UNCATEGORIZED") {
         continue;
       }
 
@@ -314,7 +320,7 @@ export async function getPLReportData(
       if (!categoryGroups.has(key)) {
         categoryGroups.set(key, {
           categoryName: txn.category.name,
-          categoryType: txn.category.type,
+          categoryType: categoryType,
           amount: 0,
           transactionCount: 0,
         });
@@ -325,7 +331,9 @@ export async function getPLReportData(
       group.transactionCount += 1;
     }
 
-    // Separate revenue and expenses
+    // Separate revenue and expenses using multi-tier P&L structure
+    // Revenue: REVENUE + CONTRA_REVENUE
+    // Expenses: COGS + OPERATING_EXPENSE
     const revenueItems: PLReportData["revenue"]["items"] = [];
     const expenseItems: PLReportData["expenses"]["items"] = [];
     let totalRevenue = 0;
@@ -338,10 +346,10 @@ export async function getPLReportData(
         transactionCount: group.transactionCount,
       };
 
-      if (group.categoryType === "REVENUE") {
+      if (group.categoryType === "REVENUE" || group.categoryType === "CONTRA_REVENUE") {
         revenueItems.push(item);
         totalRevenue += group.amount;
-      } else if (group.categoryType === "EXPENSE") {
+      } else if (group.categoryType === "COGS" || group.categoryType === "OPERATING_EXPENSE") {
         expenseItems.push(item);
         totalExpenses += Math.abs(group.amount);
       }

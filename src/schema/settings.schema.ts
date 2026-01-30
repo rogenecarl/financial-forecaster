@@ -4,16 +4,27 @@ import { z } from "zod";
 // CATEGORY SCHEMAS
 // ============================================
 
-export const categoryTypeEnum = z.enum(["REVENUE", "EXPENSE", "TRANSFER", "UNKNOWN"]);
+// Multi-tier P&L category types:
+// - REVENUE:           In P&L (positive)
+// - CONTRA_REVENUE:    In P&L (reduces revenue)
+// - COGS:              In P&L (Cost of Goods Sold - direct costs)
+// - OPERATING_EXPENSE: In P&L (indirect costs)
+// - EQUITY:            Not in P&L (owner transactions)
+// - UNCATEGORIZED:     Not in P&L (needs review)
+export const categoryTypeEnum = z.enum([
+  "REVENUE",
+  "CONTRA_REVENUE",
+  "COGS",
+  "OPERATING_EXPENSE",
+  "EQUITY",
+  "UNCATEGORIZED",
+]);
 
 export const categorySchema = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1, "Name is required").max(50, "Name must be 50 characters or less"),
   type: categoryTypeEnum,
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color"),
-  icon: z.string().max(50).optional().nullable(),
-  description: z.string().max(200).optional().nullable(),
-  includeInPL: z.boolean(),
   isSystem: z.boolean(),
   sortOrder: z.number().int().min(0),
 });
@@ -22,17 +33,15 @@ export const createCategorySchema = z.object({
   name: z.string().min(1, "Name is required").max(50, "Name must be 50 characters or less"),
   type: categoryTypeEnum,
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color"),
-  icon: z.string().max(50).optional().nullable(),
-  description: z.string().max(200).optional().nullable(),
-  includeInPL: z.boolean(),
-  sortOrder: z.number().int().min(0),
+  sortOrder: z.number().int().min(0).default(50),
 });
 
 export const updateCategorySchema = createCategorySchema.partial().extend({
   id: z.string().uuid(),
 });
 
-export type CategoryFormData = z.infer<typeof createCategorySchema>;
+export type CategoryFormData = z.input<typeof createCategorySchema>;
+export type CategoryFormOutput = z.output<typeof createCategorySchema>;
 export type UpdateCategoryFormData = z.infer<typeof updateCategorySchema>;
 
 // ============================================

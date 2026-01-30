@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Upload, Truck, Package, CheckCircle, Clock, RefreshCw } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Upload, Truck, Package, CheckCircle, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,58 +14,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TripsImportModal, TripsTable } from "@/components/forecasting";
-import {
-  getTripsWithStats,
-  getTripDateRange,
-  type TripSummary,
-  type WeekStats,
-  type TripDateRange,
-} from "@/actions/forecasting/trips";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { useTrips, useTripDateRange } from "@/hooks";
 
 type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months" | "thisWeek" | "lastWeek";
 
 export default function TripsPage() {
-  const [loading, setLoading] = useState(true);
   const [periodOption, setPeriodOption] = useState<PeriodOption>("all");
-  const [trips, setTrips] = useState<TripSummary[]>([]);
-  const [stats, setStats] = useState<WeekStats>({
-    totalTrips: 0,
-    projectedLoads: 0,
-    actualLoads: 0,
-    updatedCount: 0,
-    completion: 0,
-  });
-  const [dateRange, setDateRange] = useState<TripDateRange | null>(null);
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+  const [customDateRange, setCustomDateRange] = useState<{
+    start: string | null;
+    end: string | null;
+  }>({ start: null, end: null });
   const [showImport, setShowImport] = useState(false);
 
-  // Fetch available date range on mount
-  useEffect(() => {
-    async function fetchDateRange() {
-      const result = await getTripDateRange();
-      if (result.success && result.data) {
-        setDateRange(result.data);
-        // Set initial custom dates to full range
-        if (result.data.minDate) {
-          setCustomStartDate(new Date(result.data.minDate));
-        }
-        if (result.data.maxDate) {
-          setCustomEndDate(new Date(result.data.maxDate));
-        }
-      }
-    }
-    fetchDateRange();
-  }, []);
+  // Fetch available date range
+  const { dateRange } = useTripDateRange();
 
-  const getDateRangeForPeriod = useCallback((): { start: Date; end: Date } | null => {
+  // Calculate effective date range
+  const effectiveDateRange = useMemo(() => {
     const now = new Date();
 
     switch (periodOption) {
       case "all":
-        // Return null to fetch all data (no date filter)
         return null;
 
       case "thisWeek": {
@@ -115,41 +84,47 @@ export default function TripsPage() {
         return { start, end };
       }
 
-      case "custom":
-        if (customStartDate && customEndDate) {
-          const end = new Date(customEndDate);
+      case "custom": {
+        const start = customDateRange.start
+          ? new Date(customDateRange.start)
+          : dateRange?.minDate
+            ? new Date(dateRange.minDate)
+            : null;
+        const end = customDateRange.end
+          ? new Date(customDateRange.end)
+          : dateRange?.maxDate
+            ? new Date(dateRange.maxDate)
+            : null;
+        if (start && end) {
           end.setHours(23, 59, 59, 999);
-          return { start: customStartDate, end };
+          return { start, end };
         }
         return null;
+      }
 
       default:
         return null;
     }
-  }, [periodOption, customStartDate, customEndDate]);
+  }, [periodOption, customDateRange, dateRange]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const range = getDateRangeForPeriod();
-      const result = await getTripsWithStats(range?.start, range?.end);
+  // Get display values for custom date inputs
+  const customStartDate = customDateRange.start
+    ? new Date(customDateRange.start)
+    : dateRange?.minDate
+      ? new Date(dateRange.minDate)
+      : undefined;
 
-      if (result.success) {
-        setTrips(result.data.trips);
-        setStats(result.data.stats);
-      } else {
-        toast.error(result.error || "Failed to load trips");
-      }
-    } catch {
-      toast.error("Failed to load trips");
-    } finally {
-      setLoading(false);
-    }
-  }, [getDateRangeForPeriod]);
+  const customEndDate = customDateRange.end
+    ? new Date(customDateRange.end)
+    : dateRange?.maxDate
+      ? new Date(dateRange.maxDate)
+      : undefined;
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // TanStack Query hook for trips data
+  const { trips, stats, isLoading: loading, invalidate } = useTrips(
+    effectiveDateRange?.start,
+    effectiveDateRange?.end
+  );
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -206,7 +181,12 @@ export default function TripsPage() {
                 type="date"
                 className="w-[140px]"
                 value={customStartDate ? customStartDate.toISOString().split("T")[0] : ""}
-                onChange={(e) => setCustomStartDate(e.target.value ? new Date(e.target.value) : undefined)}
+                onChange={(e) =>
+                  setCustomDateRange((prev) => ({
+                    ...prev,
+                    start: e.target.value || null,
+                  }))
+                }
                 max={customEndDate ? customEndDate.toISOString().split("T")[0] : undefined}
               />
               <span className="text-muted-foreground">to</span>
@@ -214,16 +194,17 @@ export default function TripsPage() {
                 type="date"
                 className="w-[140px]"
                 value={customEndDate ? customEndDate.toISOString().split("T")[0] : ""}
-                onChange={(e) => setCustomEndDate(e.target.value ? new Date(e.target.value) : undefined)}
+                onChange={(e) =>
+                  setCustomDateRange((prev) => ({
+                    ...prev,
+                    end: e.target.value || null,
+                  }))
+                }
                 min={customStartDate ? customStartDate.toISOString().split("T")[0] : undefined}
               />
             </div>
           )}
 
-          <Button variant="outline" onClick={fetchData} disabled={loading}>
-            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
-            Refresh
-          </Button>
           <Button onClick={() => setShowImport(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Import Trips
@@ -333,7 +314,7 @@ export default function TripsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <TripsTable trips={trips} loading={loading} onUpdate={fetchData} />
+            <TripsTable trips={trips} loading={loading} onUpdate={invalidate} />
           </CardContent>
         </Card>
       ) : (
@@ -403,7 +384,7 @@ export default function TripsPage() {
       <TripsImportModal
         open={showImport}
         onOpenChange={setShowImport}
-        onSuccess={fetchData}
+        onSuccess={invalidate}
       />
     </div>
   );

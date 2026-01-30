@@ -719,9 +719,6 @@ model Category {
   name        String       @unique
   type        CategoryType
   color       String       @default("#6b7280") // Hex color for UI
-  icon        String?      // Lucide icon name
-  description String?
-  includeInPL Boolean      @default(true)
   isSystem    Boolean      @default(false) // System categories can't be deleted
   sortOrder   Int          @default(0)
   createdAt   DateTime     @default(now())
@@ -734,11 +731,21 @@ model Category {
   @@map("category")
 }
 
+// P&L Inclusion is determined by CategoryType:
+// - REVENUE:           ✅ In P&L (positive)
+// - CONTRA_REVENUE:    ✅ In P&L (reduces revenue)
+// - COGS:              ✅ In P&L (negative - direct costs)
+// - OPERATING_EXPENSE: ✅ In P&L (negative - indirect costs)
+// - EQUITY:            ❌ Not in P&L (owner transactions)
+// - UNCATEGORIZED:     ❌ Not in P&L (needs review)
+
 enum CategoryType {
-  REVENUE
-  EXPENSE
-  TRANSFER
-  UNKNOWN
+  REVENUE           // Amazon Relay Payment
+  CONTRA_REVENUE    // Refunds (reduces revenue)
+  COGS              // Cost of Goods Sold (Driver Wages, Payroll Taxes)
+  OPERATING_EXPENSE // Indirect business costs
+  EQUITY            // Owner Contribution (not in P&L)
+  UNCATEGORIZED     // Not yet categorized
 }
 
 model Transaction {
@@ -1134,67 +1141,115 @@ model UserSettings {
 // prisma/seed.ts
 
 const defaultCategories = [
-  // Revenue
-  { name: 'Amazon Payout', type: 'REVENUE', color: '#22c55e', icon: 'DollarSign', isSystem: true, sortOrder: 1 },
-  { name: 'Other Income', type: 'REVENUE', color: '#16a34a', icon: 'Plus', sortOrder: 2 },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // REVENUE
+  // ═══════════════════════════════════════════════════════════════════════════
+  { name: 'Amazon Relay Payment', type: 'REVENUE', color: '#22c55e', isSystem: true, sortOrder: 1 },
 
-  // Expenses - Included in P&L
-  { name: 'Driver Wages', type: 'EXPENSE', color: '#3b82f6', icon: 'Users', includeInPL: true, isSystem: true, sortOrder: 10 },
-  { name: 'Payroll Taxes', type: 'EXPENSE', color: '#6366f1', icon: 'Receipt', includeInPL: true, isSystem: true, sortOrder: 11 },
-  { name: 'Workers Comp', type: 'EXPENSE', color: '#8b5cf6', icon: 'Shield', includeInPL: true, isSystem: true, sortOrder: 12 },
-  { name: 'Insurance', type: 'EXPENSE', color: '#a855f7', icon: 'FileCheck', includeInPL: true, isSystem: true, sortOrder: 13 },
-  { name: 'Admin/Overhead', type: 'EXPENSE', color: '#ec4899', icon: 'Building', includeInPL: true, sortOrder: 14 },
-  { name: 'Bank Fees', type: 'EXPENSE', color: '#f43f5e', icon: 'CreditCard', includeInPL: true, sortOrder: 15 },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONTRA-REVENUE (reduces revenue - refunds are positive amounts)
+  // ═══════════════════════════════════════════════════════════════════════════
+  { name: 'Amazon Marketplace Refunds', type: 'CONTRA_REVENUE', color: '#86efac', sortOrder: 5 },
 
-  // Expenses - Excluded from P&L (per PRD)
-  { name: 'Fuel', type: 'EXPENSE', color: '#f97316', icon: 'Fuel', includeInPL: false, sortOrder: 20 },
-  { name: 'Maintenance', type: 'EXPENSE', color: '#eab308', icon: 'Wrench', includeInPL: false, sortOrder: 21 },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // COST OF GOODS SOLD (Direct costs)
+  // ═══════════════════════════════════════════════════════════════════════════
+  { name: 'Driver Wages', type: 'COGS', color: '#3b82f6', isSystem: true, sortOrder: 10 },
+  { name: 'Payroll Taxes', type: 'COGS', color: '#6366f1', isSystem: true, sortOrder: 11 },
 
-  // Transfers
-  { name: 'Cash Transfer', type: 'TRANSFER', color: '#64748b', icon: 'ArrowLeftRight', includeInPL: false, sortOrder: 30 },
-  { name: 'Personal/Excluded', type: 'TRANSFER', color: '#94a3b8', icon: 'UserX', includeInPL: false, sortOrder: 31 },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // OPERATING EXPENSES (Indirect costs)
+  // ═══════════════════════════════════════════════════════════════════════════
+  { name: 'Cargo Insurance', type: 'OPERATING_EXPENSE', color: '#8b5cf6', sortOrder: 20 },
+  { name: 'Telecom & Mobile Devices', type: 'OPERATING_EXPENSE', color: '#a855f7', sortOrder: 21 },
+  { name: 'Virtual Assistants Contractor Fee', type: 'OPERATING_EXPENSE', color: '#d946ef', sortOrder: 22 },
+  { name: 'Office Supplies', type: 'OPERATING_EXPENSE', color: '#ec4899', sortOrder: 23 },
+  { name: 'Payroll Service Fees', type: 'OPERATING_EXPENSE', color: '#f43f5e', sortOrder: 24 },
+  { name: 'Truck Fuel', type: 'OPERATING_EXPENSE', color: '#f97316', sortOrder: 25 },
+  { name: 'Recruiting Ads', type: 'OPERATING_EXPENSE', color: '#eab308', sortOrder: 26 },
+  { name: 'Office Phone', type: 'OPERATING_EXPENSE', color: '#84cc16', sortOrder: 27 },
+  { name: 'Software', type: 'OPERATING_EXPENSE', color: '#22c55e', sortOrder: 28 },
+  { name: 'Office Email Fee', type: 'OPERATING_EXPENSE', color: '#14b8a6', sortOrder: 29 },
+  { name: 'Website Domain Purchase', type: 'OPERATING_EXPENSE', color: '#06b6d4', sortOrder: 30 },
+  { name: 'Business Travel', type: 'OPERATING_EXPENSE', color: '#0ea5e9', sortOrder: 31 },
+  { name: 'Travel Meal Per Diem', type: 'OPERATING_EXPENSE', color: '#3b82f6', sortOrder: 32 },
+  { name: 'DOT Physical Expense', type: 'OPERATING_EXPENSE', color: '#6366f1', sortOrder: 33 },
+  { name: 'Business Check Fee', type: 'OPERATING_EXPENSE', color: '#64748b', sortOrder: 34 },
+  { name: 'Bank Monthly Fee', type: 'OPERATING_EXPENSE', color: '#475569', sortOrder: 35 },
 
-  // Unknown
-  { name: 'Uncategorized', type: 'UNKNOWN', color: '#cbd5e1', icon: 'HelpCircle', includeInPL: false, isSystem: true, sortOrder: 99 },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EQUITY (Not in P&L)
+  // ═══════════════════════════════════════════════════════════════════════════
+  { name: 'Owner Contribution', type: 'EQUITY', color: '#94a3b8', sortOrder: 90 },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UNCATEGORIZED
+  // ═══════════════════════════════════════════════════════════════════════════
+  { name: 'Uncategorized', type: 'UNCATEGORIZED', color: '#cbd5e1', isSystem: true, sortOrder: 99 },
 ];
 
 const defaultCategoryRules = [
-  // Revenue patterns
-  { pattern: 'AMAZON.COM SERVICES', matchType: 'contains', field: 'description', categoryName: 'Amazon Payout', priority: 100 },
-  { pattern: 'AMAZON EDI PAYMENTS', matchType: 'contains', field: 'description', categoryName: 'Amazon Payout', priority: 100 },
+  // ─── Revenue ───────────────────────────────────────────────────────────────
+  { pattern: 'Amazon Relay', matchType: 'contains', categoryName: 'Amazon Relay Payment', priority: 100 },
+  { pattern: 'AMAZON.COM SERVICES', matchType: 'contains', categoryName: 'Amazon Relay Payment', priority: 100 },
+  { pattern: 'AMAZON EDI PAYMENTS', matchType: 'contains', categoryName: 'Amazon Relay Payment', priority: 100 },
 
-  // Payroll patterns
-  { pattern: 'ADP WAGE PAY', matchType: 'contains', field: 'description', categoryName: 'Driver Wages', priority: 90 },
-  { pattern: 'ADP Tax', matchType: 'contains', field: 'description', categoryName: 'Payroll Taxes', priority: 90 },
-  { pattern: 'ADP PAYROLL FEES', matchType: 'contains', field: 'description', categoryName: 'Admin/Overhead', priority: 90 },
+  // ─── Contra-Revenue ────────────────────────────────────────────────────────
+  { pattern: 'Amazon Marketplace Refund', matchType: 'contains', categoryName: 'Amazon Marketplace Refunds', priority: 95 },
 
-  // Insurance
-  { pattern: 'AMAZON INSURANCE', matchType: 'contains', field: 'description', categoryName: 'Insurance', priority: 90 },
+  // ─── COGS ──────────────────────────────────────────────────────────────────
+  { pattern: 'ADP Wage Pay', matchType: 'contains', categoryName: 'Driver Wages', priority: 90 },
+  { pattern: 'ADP Tax', matchType: 'contains', categoryName: 'Payroll Taxes', priority: 90 },
+  { pattern: 'Check 7720', matchType: 'contains', categoryName: 'Driver Wages', priority: 85 }, // Manual check for wages
 
-  // Workers Comp
-  { pattern: 'Wise Inc', matchType: 'contains', field: 'description', categoryName: 'Workers Comp', priority: 80 },
+  // ─── Operating Expenses ────────────────────────────────────────────────────
+  { pattern: 'Amazon Insurance', matchType: 'contains', categoryName: 'Cargo Insurance', priority: 90 },
+  { pattern: 'ATT Payment', matchType: 'contains', categoryName: 'Telecom & Mobile Devices', priority: 85 },
+  { pattern: 'Wise Inc', matchType: 'contains', categoryName: 'Virtual Assistants Contractor Fee', priority: 85 },
+  { pattern: 'ADP Payroll Fees', matchType: 'contains', categoryName: 'Payroll Service Fees', priority: 85 },
+  { pattern: 'OpenPhone', matchType: 'contains', categoryName: 'Office Phone', priority: 80 },
+  { pattern: 'Indeed', matchType: 'contains', categoryName: 'Recruiting Ads', priority: 80 },
+  { pattern: 'Monday.com', matchType: 'contains', categoryName: 'Software', priority: 80 },
+  { pattern: 'OnlineJobsPH', matchType: 'contains', categoryName: 'Software', priority: 80 },
+  { pattern: 'Namecheap', matchType: 'contains', categoryName: 'Office Email Fee', priority: 75 },
 
-  // Admin/Overhead
-  { pattern: 'OPENPHONE', matchType: 'contains', field: 'description', categoryName: 'Admin/Overhead', priority: 70 },
-  { pattern: 'QUO (OPENPHONE)', matchType: 'contains', field: 'description', categoryName: 'Admin/Overhead', priority: 70 },
-  { pattern: 'NAME-CHEAP', matchType: 'contains', field: 'description', categoryName: 'Admin/Overhead', priority: 70 },
-  { pattern: 'Monday.com', matchType: 'contains', field: 'description', categoryName: 'Admin/Overhead', priority: 70 },
-  { pattern: 'INDEED', matchType: 'contains', field: 'description', categoryName: 'Admin/Overhead', priority: 70 },
-
-  // Bank fees
-  { pattern: 'MONTHLY SERVICE FEE', matchType: 'contains', field: 'description', categoryName: 'Bank Fees', priority: 80 },
-  { pattern: 'COUNTER CHECK', matchType: 'contains', field: 'description', categoryName: 'Bank Fees', priority: 80 },
+  // Office Supplies (various retailers)
+  { pattern: 'Home Depot', matchType: 'contains', categoryName: 'Office Supplies', priority: 70 },
+  { pattern: 'Target', matchType: 'contains', categoryName: 'Office Supplies', priority: 70 },
+  { pattern: 'Amazon Marketplace', matchType: 'contains', categoryName: 'Office Supplies', priority: 70 },
+  { pattern: 'Amazon.com', matchType: 'contains', categoryName: 'Office Supplies', priority: 70 },
+  { pattern: 'OfficeMax', matchType: 'contains', categoryName: 'Office Supplies', priority: 70 },
+  { pattern: "O'Reilly", matchType: 'contains', categoryName: 'Office Supplies', priority: 70 },
 
   // Fuel stations
-  { pattern: 'MARATHON', matchType: 'contains', field: 'description', categoryName: 'Fuel', priority: 60 },
-  { pattern: 'KWIK TRIP', matchType: 'contains', field: 'description', categoryName: 'Fuel', priority: 60 },
-  { pattern: 'BP#', matchType: 'contains', field: 'description', categoryName: 'Fuel', priority: 60 },
-  { pattern: 'SHELL OIL', matchType: 'contains', field: 'description', categoryName: 'Fuel', priority: 60 },
-  { pattern: 'HOLIDAY STATIONS', matchType: 'contains', field: 'description', categoryName: 'Fuel', priority: 60 },
-  { pattern: 'EXXON', matchType: 'contains', field: 'description', categoryName: 'Fuel', priority: 60 },
+  { pattern: 'Marathon', matchType: 'contains', categoryName: 'Truck Fuel', priority: 75 },
+  { pattern: 'Kwik Trip', matchType: 'contains', categoryName: 'Truck Fuel', priority: 75 },
+  { pattern: 'BP', matchType: 'contains', categoryName: 'Truck Fuel', priority: 75 },
+  { pattern: 'Shell Oil', matchType: 'contains', categoryName: 'Truck Fuel', priority: 75 },
+  { pattern: 'Holiday Stations', matchType: 'contains', categoryName: 'Truck Fuel', priority: 75 },
+  { pattern: 'Exxon', matchType: 'contains', categoryName: 'Truck Fuel', priority: 75 },
 
-  // Maintenance
-  { pattern: "O'REILLY", matchType: 'contains', field: 'description', categoryName: 'Maintenance', priority: 60 },
+  // Travel
+  { pattern: 'Delta Air', matchType: 'contains', categoryName: 'Business Travel', priority: 70 },
+  { pattern: 'Sun Country', matchType: 'contains', categoryName: 'Business Travel', priority: 70 },
+  { pattern: 'Skiplagged', matchType: 'contains', categoryName: 'Business Travel', priority: 70 },
+
+  // Meals
+  { pattern: 'Humbertos', matchType: 'contains', categoryName: 'Travel Meal Per Diem', priority: 65 },
+  { pattern: 'In-N-Out', matchType: 'contains', categoryName: 'Travel Meal Per Diem', priority: 65 },
+  { pattern: 'Bisbas', matchType: 'contains', categoryName: 'Travel Meal Per Diem', priority: 65 },
+
+  // Medical/DOT
+  { pattern: 'CompCare', matchType: 'contains', categoryName: 'DOT Physical Expense', priority: 70 },
+  { pattern: 'Back To Health', matchType: 'contains', categoryName: 'DOT Physical Expense', priority: 70 },
+
+  // Bank fees
+  { pattern: 'Monthly Service Fee', matchType: 'contains', categoryName: 'Bank Monthly Fee', priority: 80 },
+  { pattern: 'Counter Check', matchType: 'contains', categoryName: 'Business Check Fee', priority: 80 },
+
+  // ─── Equity ────────────────────────────────────────────────────────────────
+  { pattern: 'ATM Cash Deposit', matchType: 'contains', categoryName: 'Owner Contribution', priority: 90 },
+  { pattern: 'Initial Deposit', matchType: 'contains', categoryName: 'Owner Contribution', priority: 90 },
 ];
 ```
 
@@ -1363,26 +1418,32 @@ Manage transaction categories for bookkeeping and P&L generation.
 │ Transaction Categories                             [+ Add]  │
 │                                                             │
 │ ┌─────────────────────────────────────────────────────────┐ │
-│ │ REVENUE                                                 │ │
-│ │ ├── 🟢 Amazon Payout         ✓ In P&L           [Edit] │ │
-│ │ └── 🟢 Other Income          ✓ In P&L           [Edit] │ │
+│ │ REVENUE                                    ✓ In P&L     │ │
+│ │ └── 🟢 Amazon Relay Payment                      [Edit] │ │
 │ │                                                         │ │
-│ │ EXPENSES                                                │ │
-│ │ ├── 🔵 Driver Wages          ✓ In P&L           [Edit] │ │
-│ │ ├── 🟣 Payroll Taxes         ✓ In P&L           [Edit] │ │
-│ │ ├── 🟣 Workers Comp          ✓ In P&L           [Edit] │ │
-│ │ ├── 🟠 Insurance             ✓ In P&L           [Edit] │ │
-│ │ ├── 🔴 Admin/Overhead        ✓ In P&L           [Edit] │ │
-│ │ ├── ⚫ Bank Fees             ✓ In P&L           [Edit] │ │
-│ │ ├── 🟡 Fuel                  ✗ Excluded         [Edit] │ │
-│ │ └── 🟡 Maintenance           ✗ Excluded         [Edit] │ │
+│ │ CONTRA-REVENUE                             ✓ In P&L     │ │
+│ │ └── 🟢 Amazon Marketplace Refunds                [Edit] │ │
 │ │                                                         │ │
-│ │ TRANSFERS (Never in P&L)                                │ │
-│ │ ├── ⚪ Cash Transfer                             [Edit] │ │
-│ │ └── ⚪ Personal/Excluded                         [Edit] │ │
+│ │ COST OF GOODS SOLD                         ✓ In P&L     │ │
+│ │ ├── 🔵 Driver Wages                        [System]     │ │
+│ │ └── 🟣 Payroll Taxes                       [System]     │ │
 │ │                                                         │ │
-│ │ UNCATEGORIZED                                           │ │
-│ │ └── ⚪ Uncategorized         ✗ Excluded    [System]    │ │
+│ │ OPERATING EXPENSES                         ✓ In P&L     │ │
+│ │ ├── 🟣 Cargo Insurance                           [Edit] │ │
+│ │ ├── 🟠 Telecom & Mobile Devices                  [Edit] │ │
+│ │ ├── 🔴 Virtual Assistants Contractor Fee         [Edit] │ │
+│ │ ├── 🟡 Office Supplies                           [Edit] │ │
+│ │ ├── 🟡 Truck Fuel                                [Edit] │ │
+│ │ ├── 🟢 Payroll Service Fees                      [Edit] │ │
+│ │ ├── 🔵 Office Phone                              [Edit] │ │
+│ │ ├── ⚫ Bank Monthly Fee                          [Edit] │ │
+│ │ └── ... (16 categories total)                           │ │
+│ │                                                         │ │
+│ │ EQUITY                                     ✗ Not in P&L │ │
+│ │ └── ⚪ Owner Contribution                        [Edit] │ │
+│ │                                                         │ │
+│ │ UNCATEGORIZED                              ✗ Not in P&L │ │
+│ │ └── ⚪ Uncategorized                       [System]     │ │
 │ └─────────────────────────────────────────────────────────┘ │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -1399,13 +1460,15 @@ Manage transaction categories for bookkeeping and P&L generation.
 │ [                                                      ]    │
 │                                                             │
 │ Type                                                        │
-│ (●) Revenue   ( ) Expense   ( ) Transfer                    │
+│ ( ) Revenue           ( ) Contra-Revenue                    │
+│ ( ) Cost of Goods Sold                                      │
+│ (●) Operating Expense                                       │
+│ ( ) Equity                                                  │
 │                                                             │
 │ Color                                                       │
 │ [🟢] [🔵] [🟣] [🟠] [🔴] [🟡] [⚫] [⚪]                      │
 │                                                             │
-│ [✓] Include in P&L Statement                               │
-│     (Transfers are never included in P&L)                   │
+│ ℹ️ P&L inclusion is determined by category type             │
 │                                                             │
 │                                     [Cancel]  [Save]        │
 └─────────────────────────────────────────────────────────────┘
@@ -1575,50 +1638,107 @@ Configure excluded addresses for trip load counting (used when importing Trips C
 
 ### 5.2 P&L Statement Page
 
+Multi-tier P&L structure based on client's accounting requirements:
+- Revenue → Net Revenue → Gross Profit → Operating Income
+
 #### 5.2.1 Page Layout
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ Profit & Loss Statement                                                 │
 │ Financial performance summary                                           │
-│                                           [This Week ▼]  [Export PDF]   │
+│                                           [This Month ▼]  [Export PDF]  │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│ ┌───────────────────────────────┐  ┌───────────────────────────────┐   │
-│ │ Revenue                       │  │ Net Profit                    │   │
-│ │ $8,366.41                     │  │ -$2,489.73                    │   │
-│ │ ↑ 12% vs last week            │  │ ↓ 8% vs last week             │   │
-│ └───────────────────────────────┘  └───────────────────────────────┘   │
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐        │
+│ │ Net Revenue │ │ Gross Profit│ │ Op. Income  │ │ Margin      │        │
+│ │ $33,757.14  │ │ $15,521.88  │ │ $5,043.55   │ │ 15.0%       │        │
+│ │ ↑ 8% vs last│ │ ↑ 12% vs    │ │ ↑ 5% vs     │ │             │        │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘        │
 │                                                                         │
 │ ┌─────────────────────────────────────────────────────────────────────┐ │
+│ │                                                                     │ │
 │ │ REVENUE                                                             │ │
 │ │─────────────────────────────────────────────────────────────────────│ │
-│ │ Amazon Payout                                           $8,366.41   │ │
-│ │   └ Tour Pay (15 tours × $452)              $6,780.00               │ │
-│ │   └ Accessorials                            $1,186.41               │ │
-│ │   └ Adjustments (TONU)                        $400.00               │ │
-│ │ Other Income                                                $0.00   │ │
+│ │ Amazon Relay Payment                                    $33,615.30  │ │
 │ │─────────────────────────────────────────────────────────────────────│ │
-│ │ TOTAL REVENUE                                           $8,366.41   │ │
+│ │ Total Revenue                                           $33,615.30  │ │
 │ │                                                                     │ │
-│ │ EXPENSES                                                            │ │
+│ │ CONTRA-REVENUE                                                      │ │
 │ │─────────────────────────────────────────────────────────────────────│ │
-│ │ Driver Wages                                           -$8,682.81   │ │
-│ │ Payroll Taxes                                          -$2,101.39   │ │
-│ │ Workers Comp                                             -$542.17   │ │
-│ │ Insurance                                                  $0.00    │ │
-│ │ Admin/Overhead                                           -$120.04   │ │
-│ │ Bank Fees                                                  $0.00    │ │
+│ │ Amazon Marketplace Refunds                                 $141.84  │ │
 │ │─────────────────────────────────────────────────────────────────────│ │
-│ │ TOTAL EXPENSES                                        -$10,856.14   │ │
+│ │ NET REVENUE                                             $33,757.14  │ │
+│ │                                                                     │ │
+│ │ COST OF GOODS SOLD                                                  │ │
+│ │─────────────────────────────────────────────────────────────────────│ │
+│ │ Driver Wages                                           -$15,171.08  │ │
+│ │ Payroll Taxes                                           -$3,064.18  │ │
+│ │─────────────────────────────────────────────────────────────────────│ │
+│ │ Total COGS                                             -$18,235.26  │ │
 │ │                                                                     │ │
 │ │═════════════════════════════════════════════════════════════════════│ │
-│ │ NET PROFIT/(LOSS)                                     -$2,489.73    │ │
+│ │ GROSS PROFIT                                            $15,521.88  │ │
+│ │═════════════════════════════════════════════════════════════════════│ │
+│ │                                                                     │ │
+│ │ OPERATING EXPENSES                                                  │ │
+│ │─────────────────────────────────────────────────────────────────────│ │
+│ │ Telecom & Mobile Devices                                -$2,390.84  │ │
+│ │ Office Supplies                                         -$1,767.32  │ │
+│ │ Virtual Assistants Contractor Fee                       -$1,519.02  │ │
+│ │ Cargo Insurance                                         -$1,524.47  │ │
+│ │ Business Travel                                           -$953.41  │ │
+│ │ Payroll Service Fees                                      -$733.00  │ │
+│ │ Truck Fuel                                                -$494.21  │ │
+│ │ Recruiting Ads                                            -$466.74  │ │
+│ │ DOT Physical Expense                                      -$258.00  │ │
+│ │ Travel Meal Per Diem                                      -$180.97  │ │
+│ │ Office Phone                                              -$134.52  │ │
+│ │ Software                                                  -$111.00  │ │
+│ │ Office Email Fee                                           -$28.84  │ │
+│ │ Website Domain Purchase                                    -$25.50  │ │
+│ │ Bank Monthly Fee                                           -$15.00  │ │
+│ │ Business Check Fee                                          -$6.00  │ │
+│ │─────────────────────────────────────────────────────────────────────│ │
+│ │ Total Operating Expenses                               -$10,478.33  │ │
+│ │                                                                     │ │
+│ │═════════════════════════════════════════════════════════════════════│ │
+│ │ OPERATING INCOME                                         $5,043.55  │ │
+│ │═════════════════════════════════════════════════════════════════════│ │
+│ │                                                                     │ │
 │ └─────────────────────────────────────────────────────────────────────┘ │
 │                                                                         │
-│ ⚠️ 3 transactions are uncategorized and excluded from this statement    │
+│ ⚠️ 2 transactions are uncategorized and excluded from this statement    │
 │    [Review uncategorized →]                                             │
 └─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 5.2.2 P&L Calculation Logic
+
+```typescript
+// P&L Calculation based on CategoryType
+function calculatePL(transactions: Transaction[]) {
+  const revenue = sumByType(transactions, 'REVENUE');           // Positive
+  const contraRevenue = sumByType(transactions, 'CONTRA_REVENUE'); // Positive (reduces revenue)
+  const cogs = sumByType(transactions, 'COGS');                 // Negative
+  const opex = sumByType(transactions, 'OPERATING_EXPENSE');    // Negative
+  // EQUITY and UNCATEGORIZED are excluded from P&L
+
+  const netRevenue = revenue + contraRevenue;  // Contra-revenue adds (refunds are positive)
+  const grossProfit = netRevenue + cogs;       // COGS is negative
+  const operatingIncome = grossProfit + opex;  // OPEX is negative
+
+  return {
+    revenue,
+    contraRevenue,
+    netRevenue,
+    cogs,
+    grossProfit,
+    opex,
+    operatingIncome,
+    margin: (operatingIncome / netRevenue) * 100,
+  };
+}
 ```
 
 ### 5.3 Tasks

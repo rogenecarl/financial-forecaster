@@ -63,6 +63,18 @@ export const bulkUpdateCategorySchema = z.object({
 // IMPORT SCHEMAS
 // ============================================
 
+// Higher-order category mapping from CSV to CategoryType
+export const higherCategoryMapSchema = z.enum([
+  "Revenue",
+  "Contra-Revenue",
+  "Cost of Goods Sold",
+  "Operating Expenses",
+  "Equity",
+  "Uncategorized",
+]);
+
+export type HigherCategoryMap = z.infer<typeof higherCategoryMapSchema>;
+
 // Schema for a single row from bank CSV
 export const importTransactionRowSchema = z.object({
   details: z.string().min(1),
@@ -72,6 +84,9 @@ export const importTransactionRowSchema = z.object({
   type: z.string().min(1),
   balance: z.coerce.number().nullable().optional(),
   checkOrSlipNum: z.string().nullable().optional(),
+  // New fields from categorized bank statement CSV
+  csvCategory: z.string().nullable().optional(), // Category name from CSV (e.g., "Amazon Relay Payment")
+  csvHigherCategory: z.string().nullable().optional(), // Higher-order category from CSV (e.g., "Revenue")
 });
 
 // Schema for import preview with AI categorization
@@ -84,6 +99,9 @@ export const importPreviewItemSchema = z.object({
   isDuplicate: z.boolean(),
   duplicateId: z.string().uuid().nullable().optional(),
   matchedRule: z.string().nullable().optional(), // Rule pattern that matched
+  // CSV-provided category info
+  csvCategoryMatched: z.boolean().optional(), // True if category was matched/created from CSV
+  csvCategoryCreated: z.boolean().optional(), // True if a new category was created from CSV
 });
 
 export const importBatchSchema = z.object({
@@ -116,6 +134,19 @@ export const transactionFilterSchema = z.object({
 });
 
 // ============================================
+// CATEGORY TYPE ENUM
+// ============================================
+
+export const categoryTypeEnum = z.enum([
+  "REVENUE",           // Amazon Relay Payment
+  "CONTRA_REVENUE",    // Refunds (reduces revenue)
+  "COGS",              // Cost of Goods Sold (Driver Wages, Payroll Taxes)
+  "OPERATING_EXPENSE", // Indirect business costs
+  "EQUITY",            // Owner Contribution (not in P&L)
+  "UNCATEGORIZED",     // Not yet categorized
+]);
+
+// ============================================
 // P&L SCHEMAS
 // ============================================
 
@@ -129,25 +160,53 @@ export const plLineItemSchema = z.object({
   categoryId: z.string().uuid(),
   categoryName: z.string(),
   categoryColor: z.string(),
-  categoryType: z.enum(["REVENUE", "EXPENSE", "TRANSFER", "UNKNOWN"]),
+  categoryType: categoryTypeEnum,
   amount: z.number(),
   transactionCount: z.number(),
-  percentage: z.number(), // Percentage of total revenue or expenses
+  percentage: z.number(), // Percentage of section total
 });
 
+export const plSectionSchema = z.object({
+  items: z.array(plLineItemSchema),
+  total: z.number(),
+});
+
+// Multi-tier P&L structure based on client's accounting requirements
+// Revenue → Net Revenue → Gross Profit → Operating Income
 export const plStatementSchema = z.object({
   period: plPeriodSchema,
-  revenue: z.object({
-    items: z.array(plLineItemSchema),
-    total: z.number(),
-  }),
-  expenses: z.object({
-    items: z.array(plLineItemSchema),
-    total: z.number(),
-  }),
-  netProfit: z.number(),
+
+  // Revenue Section
+  revenue: plSectionSchema,
+
+  // Contra-Revenue Section (refunds - reduces revenue)
+  contraRevenue: plSectionSchema,
+
+  // Net Revenue = Revenue + Contra-Revenue
+  netRevenue: z.number(),
+
+  // Cost of Goods Sold Section (Driver Wages, Payroll Taxes)
+  cogs: plSectionSchema,
+
+  // Gross Profit = Net Revenue - COGS
+  grossProfit: z.number(),
+
+  // Operating Expenses Section
+  operatingExpenses: plSectionSchema,
+
+  // Operating Income = Gross Profit - Operating Expenses
+  operatingIncome: z.number(),
+
+  // Operating Margin = Operating Income / Net Revenue
+  operatingMargin: z.number(),
+
+  // Uncategorized transactions (excluded from P&L)
   uncategorizedCount: z.number(),
   uncategorizedAmount: z.number(),
+
+  // Equity transactions (excluded from P&L, tracked separately)
+  equityCount: z.number(),
+  equityAmount: z.number(),
 });
 
 // ============================================
@@ -164,5 +223,7 @@ export type ImportBatchInput = z.infer<typeof importBatchSchema>;
 export type TransactionFilter = z.infer<typeof transactionFilterSchema>;
 export type PLPeriod = z.infer<typeof plPeriodSchema>;
 export type PLLineItem = z.infer<typeof plLineItemSchema>;
+export type PLSection = z.infer<typeof plSectionSchema>;
 export type PLStatement = z.infer<typeof plStatementSchema>;
+export type CategoryType = z.infer<typeof categoryTypeEnum>;
 export type ReviewStatus = z.infer<typeof reviewStatusEnum>;

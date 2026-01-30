@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/db";
 import { requireAuth } from "@/lib/auth-server";
-import type { ImportTransactionRow, ImportPreviewItem } from "@/schema/transaction.schema";
+import type { ImportTransactionRow, ImportPreviewItem, CategoryType } from "@/schema/transaction.schema";
 import type { ActionResponse } from "@/types/api";
-import type { CategoryRule } from "@/lib/generated/prisma/client";
+import type { CategoryRule, Category } from "@/lib/generated/prisma/client";
 
 // ============================================
 // TYPES
@@ -15,12 +15,64 @@ export interface ImportResult {
   importBatchId: string;
   totalImported: number;
   totalSkipped: number;
+  categoriesCreated: number;
   errors: string[];
 }
 
 export interface DuplicateCheckResult {
   isDuplicate: boolean;
   duplicateId: string | null;
+}
+
+// ============================================
+// HIGHER CATEGORY MAPPING
+// ============================================
+
+// Map CSV higher category strings to CategoryType enum
+function mapHigherCategoryToType(higherCategory: string | null | undefined): CategoryType {
+  if (!higherCategory) return "UNCATEGORIZED";
+
+  const normalized = higherCategory.toLowerCase().trim();
+
+  switch (normalized) {
+    case "revenue":
+      return "REVENUE";
+    case "contra-revenue":
+    case "contra revenue":
+    case "contra_revenue":
+      return "CONTRA_REVENUE";
+    case "cost of goods sold":
+    case "cogs":
+    case "cost_of_goods_sold":
+      return "COGS";
+    case "operating expenses":
+    case "operating expense":
+    case "opex":
+    case "operating_expense":
+      return "OPERATING_EXPENSE";
+    case "equity":
+      return "EQUITY";
+    default:
+      return "UNCATEGORIZED";
+  }
+}
+
+// Default colors for auto-created categories based on type
+function getDefaultColorForType(type: CategoryType): string {
+  switch (type) {
+    case "REVENUE":
+      return "#22c55e"; // green
+    case "CONTRA_REVENUE":
+      return "#f97316"; // orange
+    case "COGS":
+      return "#ef4444"; // red
+    case "OPERATING_EXPENSE":
+      return "#3b82f6"; // blue
+    case "EQUITY":
+      return "#8b5cf6"; // violet
+    default:
+      return "#64748b"; // slate
+  }
 }
 
 // ============================================
@@ -179,6 +231,17 @@ export async function generateImportPreview(
       orderBy: { priority: "desc" },
     });
 
+    // Get all existing categories for CSV category matching
+    const allCategories = await prisma.category.findMany({
+      select: { id: true, name: true, type: true },
+    });
+
+    // Create a map for fast category lookup by name (case-insensitive)
+    const categoryByName = new Map<string, Category>();
+    for (const cat of allCategories) {
+      categoryByName.set(cat.name.toLowerCase(), cat as Category);
+    }
+
     // Batch duplicate check: fetch all existing transactions that could be duplicates
     // Create composite keys for comparison
     const existingTransactions = await prisma.transaction.findMany({
@@ -212,19 +275,42 @@ export async function generateImportPreview(
       const duplicateId = existingKeys.get(key) || null;
       const isDuplicate = !!duplicateId;
 
-      // Apply rules for initial categorization (in-memory, no DB call)
       let categoryId: string | null = null;
       let categoryName: string | null = null;
       let matchedRule: string | null = null;
       let confidence = 0;
+      let csvCategoryMatched = false;
+      let csvCategoryCreated = false;
 
-      for (const rule of rules) {
-        if (matchRule(rule, transaction)) {
-          categoryId = rule.categoryId;
-          categoryName = rule.category.name;
-          matchedRule = rule.pattern;
-          confidence = 0.95; // High confidence for rule matches
-          break;
+      // Priority 1: Use CSV-provided category if available
+      if (transaction.csvCategory) {
+        const lookupKey = transaction.csvCategory.toLowerCase();
+        const existingCategory = categoryByName.get(lookupKey);
+
+        if (existingCategory) {
+          // Category exists, use it
+          categoryId = existingCategory.id;
+          categoryName = existingCategory.name;
+          confidence = 1.0; // 100% confidence for CSV-provided category
+          csvCategoryMatched = true;
+        } else {
+          // Category will be created during import
+          categoryName = transaction.csvCategory;
+          confidence = 1.0; // Will be created during import
+          csvCategoryCreated = true;
+        }
+      }
+
+      // Priority 2: Apply rules if no CSV category matched
+      if (!csvCategoryMatched && !csvCategoryCreated) {
+        for (const rule of rules) {
+          if (matchRule(rule, transaction)) {
+            categoryId = rule.categoryId;
+            categoryName = rule.category.name;
+            matchedRule = rule.pattern;
+            confidence = 0.95; // High confidence for rule matches
+            break;
+          }
         }
       }
 
@@ -237,6 +323,8 @@ export async function generateImportPreview(
         isDuplicate,
         duplicateId,
         matchedRule,
+        csvCategoryMatched,
+        csvCategoryCreated,
       };
     });
 
@@ -276,7 +364,71 @@ export async function importTransactions(
     });
     const confidenceThreshold = settings?.aiConfidenceThreshold || 0.8;
 
-    // Step 1: Create import batch first (outside transaction for speed)
+    // Step 1: Create categories from CSV data if needed
+    const categoriesToCreate = new Map<string, { name: string; type: CategoryType; higherCategory: string | null }>();
+
+    for (const item of itemsToImport) {
+      if (item.csvCategoryCreated && item.transaction.csvCategory) {
+        const categoryName = item.transaction.csvCategory;
+        const categoryKey = categoryName.toLowerCase();
+
+        if (!categoriesToCreate.has(categoryKey)) {
+          const categoryType = mapHigherCategoryToType(item.transaction.csvHigherCategory);
+          categoriesToCreate.set(categoryKey, {
+            name: categoryName,
+            type: categoryType,
+            higherCategory: item.transaction.csvHigherCategory || null,
+          });
+        }
+      }
+    }
+
+    // Create new categories and build a map of name -> id
+    const categoryNameToId = new Map<string, string>();
+    let categoriesCreated = 0;
+
+    // First, fetch existing categories to avoid duplicates
+    const existingCategories = await prisma.category.findMany({
+      where: {
+        name: {
+          in: Array.from(categoriesToCreate.values()).map(c => c.name),
+        },
+      },
+      select: { id: true, name: true },
+    });
+
+    for (const cat of existingCategories) {
+      categoryNameToId.set(cat.name.toLowerCase(), cat.id);
+    }
+
+    // Create categories that don't exist
+    for (const [key, catData] of categoriesToCreate.entries()) {
+      if (!categoryNameToId.has(key)) {
+        const newCategory = await prisma.category.create({
+          data: {
+            name: catData.name,
+            type: catData.type,
+            color: getDefaultColorForType(catData.type),
+            isSystem: false,
+            sortOrder: 50, // Default middle sort order
+          },
+        });
+        categoryNameToId.set(key, newCategory.id);
+        categoriesCreated++;
+      }
+    }
+
+    // Also load all existing categories for matched items
+    const allCategories = await prisma.category.findMany({
+      select: { id: true, name: true },
+    });
+    for (const cat of allCategories) {
+      if (!categoryNameToId.has(cat.name.toLowerCase())) {
+        categoryNameToId.set(cat.name.toLowerCase(), cat.id);
+      }
+    }
+
+    // Step 2: Create import batch
     const importBatch = await prisma.importBatch.create({
       data: {
         userId,
@@ -288,11 +440,35 @@ export async function importTransactions(
     });
 
     try {
-      // Step 2: Prepare all transaction data for batch insert
+      // Step 3: Prepare all transaction data for batch insert
       const transactionData = itemsToImport.map((item) => {
+        let categoryId: string | null = item.suggestedCategoryId;
+
+        // If CSV category was to be created, look up the newly created category
+        if (item.csvCategoryCreated && item.transaction.csvCategory) {
+          const newCatId = categoryNameToId.get(item.transaction.csvCategory.toLowerCase());
+          if (newCatId) {
+            categoryId = newCatId;
+          }
+        }
+
+        // If CSV category was matched (existing), use suggestedCategoryId
+        // which was already set in preview
+
         const shouldAutoApply = Boolean(
-          item.suggestedCategoryId && item.confidence >= confidenceThreshold
+          categoryId && item.confidence >= confidenceThreshold
         );
+
+        // Determine review status
+        let reviewStatus: "REVIEWED" | "FLAGGED" | "PENDING" = "PENDING";
+        if (shouldAutoApply) {
+          // CSV-provided categories and rule matches are auto-reviewed
+          if (item.csvCategoryMatched || item.csvCategoryCreated || item.matchedRule) {
+            reviewStatus = "REVIEWED";
+          }
+        } else if (item.confidence > 0 && item.confidence < confidenceThreshold) {
+          reviewStatus = "FLAGGED";
+        }
 
         return {
           userId,
@@ -304,31 +480,26 @@ export async function importTransactions(
           type: item.transaction.type,
           balance: item.transaction.balance,
           checkOrSlipNum: item.transaction.checkOrSlipNum,
-          categoryId: shouldAutoApply ? item.suggestedCategoryId : null,
-          aiCategorized: shouldAutoApply,
+          categoryId: shouldAutoApply ? categoryId : null,
+          aiCategorized: shouldAutoApply && !item.csvCategoryMatched && !item.csvCategoryCreated,
           aiConfidence: item.confidence > 0 ? item.confidence : null,
-          reviewStatus:
-            shouldAutoApply && item.matchedRule
-              ? "REVIEWED" as const
-              : item.confidence > 0 && item.confidence < confidenceThreshold
-              ? "FLAGGED" as const
-              : "PENDING" as const,
+          reviewStatus,
         };
       });
 
-      // Step 3: Bulk insert all transactions at once
+      // Step 4: Bulk insert all transactions at once
       const createResult = await prisma.transaction.createMany({
         data: transactionData,
         skipDuplicates: true,
       });
 
-      // Step 4: Aggregate and batch update rule hit counts
+      // Step 5: Aggregate and batch update rule hit counts
       const ruleHitCounts = new Map<string, number>();
       for (const item of itemsToImport) {
         const shouldAutoApply = Boolean(
           item.suggestedCategoryId && item.confidence >= confidenceThreshold
         );
-        if (item.matchedRule && shouldAutoApply) {
+        if (item.matchedRule && shouldAutoApply && !item.csvCategoryMatched && !item.csvCategoryCreated) {
           ruleHitCounts.set(
             item.matchedRule,
             (ruleHitCounts.get(item.matchedRule) || 0) + 1
@@ -352,7 +523,7 @@ export async function importTransactions(
       );
       await Promise.all(ruleUpdatePromises);
 
-      // Step 5: Mark import batch as completed
+      // Step 6: Mark import batch as completed
       await prisma.importBatch.update({
         where: { id: importBatch.id },
         data: { status: "completed" },
@@ -360,6 +531,7 @@ export async function importTransactions(
 
       revalidatePath("/transactions");
       revalidatePath("/dashboard");
+      revalidatePath("/settings"); // Categories may have been created
 
       return {
         success: true,
@@ -367,6 +539,7 @@ export async function importTransactions(
           importBatchId: importBatch.id,
           totalImported: createResult.count,
           totalSkipped: items.length - itemsToImport.length,
+          categoriesCreated,
           errors: [],
         },
       };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Bookmark, Trash2, Star, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,48 +15,23 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ForecastCalculator } from "@/components/forecasting";
-import { getForecasts, deleteForecast } from "@/actions/forecasting/forecasts";
-import type { Forecast } from "@/schema/forecasting.schema";
-import { toast } from "sonner";
+import { useForecasts } from "@/hooks";
 
 export default function ForecastingPage() {
-  const [savedScenarios, setSavedScenarios] = useState<Forecast[]>([]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  const fetchScenarios = async () => {
-    try {
-      const result = await getForecasts();
-      if (result.success && result.data) {
-        setSavedScenarios(result.data);
-      }
-    } catch {
-      // Silently fail - scenarios will just be empty
-    }
-  };
+  // TanStack Query hook
+  const {
+    forecasts: savedScenarios,
+    deleteForecast,
+    isDeleting: deleting,
+    invalidate,
+  } = useForecasts();
 
-  useEffect(() => {
-    fetchScenarios();
-  }, []);
-
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!deleteId) return;
-
-    setDeleting(true);
-    try {
-      const result = await deleteForecast(deleteId);
-      if (result.success) {
-        toast.success("Scenario deleted");
-        setDeleteId(null);
-        fetchScenarios();
-      } else {
-        toast.error(result.error || "Failed to delete scenario");
-      }
-    } catch {
-      toast.error("Failed to delete scenario");
-    } finally {
-      setDeleting(false);
-    }
+    deleteForecast(deleteId);
+    setDeleteId(null);
   };
 
   const formatCurrency = (value: number) => {
@@ -81,7 +56,7 @@ export default function ForecastingPage() {
       </div>
 
       {/* Forecast Calculator */}
-      <ForecastCalculator onSave={fetchScenarios} />
+      <ForecastCalculator onSave={invalidate} />
 
       {/* Saved Scenarios */}
       {savedScenarios.length > 0 && (

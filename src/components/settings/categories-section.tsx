@@ -34,16 +34,18 @@ import { getCategories, deleteCategory } from "@/actions/settings";
 import { CategoryForm } from "./category-form";
 import type { Category } from "@/lib/generated/prisma/client";
 
-type CategoryType = "REVENUE" | "EXPENSE" | "TRANSFER" | "UNKNOWN";
+type CategoryType = "REVENUE" | "CONTRA_REVENUE" | "COGS" | "OPERATING_EXPENSE" | "EQUITY" | "UNCATEGORIZED";
 
 const TYPE_LABELS: Record<CategoryType, string> = {
   REVENUE: "Revenue",
-  EXPENSE: "Expenses",
-  TRANSFER: "Transfers (Never in P&L)",
-  UNKNOWN: "Uncategorized",
+  CONTRA_REVENUE: "Contra-Revenue (Refunds)",
+  COGS: "Cost of Goods Sold",
+  OPERATING_EXPENSE: "Operating Expenses",
+  EQUITY: "Equity (Not in P&L)",
+  UNCATEGORIZED: "Uncategorized",
 };
 
-const TYPE_ORDER: CategoryType[] = ["REVENUE", "EXPENSE", "TRANSFER", "UNKNOWN"];
+const TYPE_ORDER: CategoryType[] = ["REVENUE", "CONTRA_REVENUE", "COGS", "OPERATING_EXPENSE", "EQUITY", "UNCATEGORIZED"];
 
 export function CategoriesSection() {
   const queryClient = useQueryClient();
@@ -103,7 +105,8 @@ export function CategoriesSection() {
   };
 
   const renderCategoryRow = (category: Category, isLast: boolean) => {
-    const isTransfer = category.type === "TRANSFER";
+    // EQUITY and UNCATEGORIZED types are excluded from P&L
+    const isExcludedFromPL = category.type === "EQUITY" || category.type === "UNCATEGORIZED";
 
     return (
       <div
@@ -132,22 +135,20 @@ export function CategoriesSection() {
           )}
         </div>
         <div className="flex items-center gap-4">
-          {/* P&L status - don't show for transfers */}
-          {!isTransfer && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              {category.includeInPL ? (
-                <>
-                  <Check className="h-3 w-3 text-green-600" />
-                  <span>In P&L</span>
-                </>
-              ) : (
-                <>
-                  <X className="h-3 w-3 text-muted-foreground" />
-                  <span>Excluded</span>
-                </>
-              )}
-            </span>
-          )}
+          {/* P&L status */}
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            {isExcludedFromPL ? (
+              <>
+                <X className="h-3 w-3 text-muted-foreground" />
+                <span>Not in P&L</span>
+              </>
+            ) : (
+              <>
+                <Check className="h-3 w-3 text-green-600" />
+                <span>In P&L</span>
+              </>
+            )}
+          </span>
           {/* Actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

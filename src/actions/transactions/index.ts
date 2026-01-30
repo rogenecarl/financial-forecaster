@@ -1,6 +1,7 @@
 export {
   getTransactions,
   getTransactionById,
+  createTransaction,
   updateTransaction,
   deleteTransaction,
   bulkDeleteTransactions,

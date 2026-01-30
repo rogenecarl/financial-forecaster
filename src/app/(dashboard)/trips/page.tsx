@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TripsImportModal, TripsTable } from "@/components/forecasting";
-import { useTrips, useTripDateRange } from "@/hooks";
+import { useTripsWithLoads, useTripDateRange } from "@/hooks";
 
 type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months" | "thisWeek" | "lastWeek";
 
@@ -120,8 +120,8 @@ export default function TripsPage() {
       ? new Date(dateRange.maxDate)
       : undefined;
 
-  // TanStack Query hook for trips data
-  const { trips, stats, isLoading: loading, invalidate } = useTrips(
+  // TanStack Query hook for trips data (with loads for detailed view)
+  const { trips, stats, isLoading: loading, invalidate } = useTripsWithLoads(
     effectiveDateRange?.start,
     effectiveDateRange?.end
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Download, Upload, Receipt } from "lucide-react";
+import { Download, Upload, Receipt, Plus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,9 +10,10 @@ import {
   BulkActions,
   ImportModal,
   ImportPreview,
+  AddTransactionModal,
 } from "@/components/transactions";
 import { useTransactions } from "@/hooks";
-import type { TransactionFilter, ImportTransactionRow } from "@/schema/transaction.schema";
+import type { TransactionFilter, ImportTransactionRow, CreateTransactionInput } from "@/schema/transaction.schema";
 
 export default function TransactionsPage() {
   // Filters state
@@ -33,6 +34,9 @@ export default function TransactionsPage() {
     fileType: "CSV" | "XLSX";
   } | null>(null);
 
+  // Add transaction modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+
   // Use TanStack Query hook for transactions
   const {
     transactions,
@@ -41,10 +45,12 @@ export default function TransactionsPage() {
     categories,
     transactionsLoading,
     categoriesLoading,
+    createTransaction,
     updateCategory,
     deleteTransaction,
     bulkDelete,
     bulkCategorize,
+    isCreating,
     isBulkDeleting,
     isBulkCategorizing,
     invalidate,
@@ -117,6 +123,19 @@ export default function TransactionsPage() {
     invalidate(); // Refresh transactions after import
   }, [invalidate]);
 
+  // Handle add transaction
+  const handleAddTransaction = useCallback(
+    async (data: CreateTransactionInput) => {
+      try {
+        await createTransaction(data);
+        setShowAddModal(false);
+      } catch {
+        // Error is handled by the mutation
+      }
+    },
+    [createTransaction]
+  );
+
   // Get sample description for bulk actions
   const sampleDescription =
     selectedIds.length > 0
@@ -140,9 +159,13 @@ export default function TransactionsPage() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button onClick={() => setShowImportModal(true)}>
+          <Button variant="outline" onClick={() => setShowImportModal(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Import
+          </Button>
+          <Button onClick={() => setShowAddModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add
           </Button>
         </div>
       </div>
@@ -211,13 +234,19 @@ export default function TransactionsPage() {
                 No transactions yet
               </h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                Import your bank transactions to get started with bookkeeping.
-                We support CSV and Excel files.
+                Import your bank transactions or add them manually to get started
+                with bookkeeping.
               </p>
-              <Button onClick={() => setShowImportModal(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Import Transactions
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowImportModal(true)}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import
+                </Button>
+                <Button onClick={() => setShowAddModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Manually
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -241,6 +270,16 @@ export default function TransactionsPage() {
           onComplete={handleImportComplete}
         />
       )}
+
+      {/* Add Transaction Modal */}
+      <AddTransactionModal
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        onSubmit={handleAddTransaction}
+        categories={categories}
+        categoriesLoading={categoriesLoading}
+        isSubmitting={isCreating}
+      />
     </div>
   );
 }

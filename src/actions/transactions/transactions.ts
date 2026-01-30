@@ -7,7 +7,9 @@ import {
   transactionFilterSchema,
   updateTransactionSchema,
   bulkUpdateCategorySchema,
+  createTransactionSchema,
   type TransactionFilter,
+  type CreateTransactionInput,
 } from "@/schema/transaction.schema";
 import type { ActionResponse } from "@/types/api";
 import type { Transaction, Category, Prisma } from "@/lib/generated/prisma/client";
@@ -57,6 +59,51 @@ export interface TransactionListResult {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+// ============================================
+// CREATE TRANSACTION
+// ============================================
+
+export async function createTransaction(
+  data: CreateTransactionInput
+): Promise<ActionResponse<TransactionWithCategory>> {
+  try {
+    const session = await requireAuth();
+
+    const validated = createTransactionSchema.safeParse(data);
+    if (!validated.success) {
+      return {
+        success: false,
+        error: validated.error.issues[0]?.message || "Invalid data",
+      };
+    }
+
+    const transaction = await prisma.transaction.create({
+      data: {
+        userId: session.user.id,
+        details: validated.data.details,
+        postingDate: validated.data.postingDate,
+        description: validated.data.description,
+        amount: validated.data.amount,
+        type: validated.data.type,
+        balance: validated.data.balance ?? null,
+        checkOrSlipNum: validated.data.checkOrSlipNum ?? null,
+        categoryId: validated.data.categoryId ?? null,
+        manualOverride: validated.data.categoryId ? true : false,
+        reviewStatus: validated.data.categoryId ? "REVIEWED" : "PENDING",
+      },
+      include: { category: true },
+    });
+
+    revalidatePath("/transactions");
+    revalidatePath("/dashboard");
+
+    return { success: true, data: serializeTransaction(transaction) };
+  } catch (error) {
+    console.error("Failed to create transaction:", error);
+    return { success: false, error: "Failed to create transaction" };
+  }
 }
 
 // ============================================

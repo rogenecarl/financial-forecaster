@@ -6,6 +6,7 @@ export {
   useAmazonInvoices,
   useAmazonInvoiceDetail,
   useTrips,
+  useTripsWithLoads,
   useTripDateRange,
   useForecasts,
   useForecastVariance,

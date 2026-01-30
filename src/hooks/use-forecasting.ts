@@ -10,6 +10,7 @@ import {
 } from "@/actions/forecasting";
 import {
   getTripsWithStats,
+  getTripsWithLoads,
   getTripDateRange,
 } from "@/actions/forecasting/trips";
 import {
@@ -183,6 +184,40 @@ export function useTrips(startDate?: Date, endDate?: Date) {
     queryKey: forecastingKeys.tripsList(startDate, endDate),
     queryFn: async () => {
       const result = await getTripsWithStats(startDate, endDate);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: forecastingKeys.trips });
+  };
+
+  return {
+    trips: data?.trips ?? [],
+    stats: data?.stats ?? {
+      totalTrips: 0,
+      projectedLoads: 0,
+      actualLoads: 0,
+      updatedCount: 0,
+      completion: 0,
+    },
+    isLoading,
+    invalidate,
+  };
+}
+
+export function useTripsWithLoads(startDate?: Date, endDate?: Date) {
+  const queryClient = useQueryClient();
+
+  const {
+    data,
+    isLoading,
+  } = useQuery({
+    queryKey: [...forecastingKeys.tripsList(startDate, endDate), "withLoads"],
+    queryFn: async () => {
+      const result = await getTripsWithLoads(startDate, endDate);
       if (!result.success) throw new Error(result.error);
       return result.data;
     },

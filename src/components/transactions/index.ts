@@ -4,3 +4,4 @@ export { TransactionsTable } from "./transactions-table";
 export { BulkActions } from "./bulk-actions";
 export { ImportModal } from "./import-modal";
 export { ImportPreview } from "./import-preview";
+export { AddTransactionModal } from "./add-transaction-modal";

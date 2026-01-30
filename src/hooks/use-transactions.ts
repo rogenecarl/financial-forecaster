@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getTransactions,
+  createTransaction,
   updateTransaction,
   deleteTransaction,
   bulkDeleteTransactions,
@@ -10,7 +11,7 @@ import {
   type TransactionListResult,
 } from "@/actions/transactions";
 import { getCategories } from "@/actions/settings/categories";
-import type { TransactionFilter } from "@/schema/transaction.schema";
+import type { TransactionFilter, CreateTransactionInput } from "@/schema/transaction.schema";
 import type { Category } from "@/lib/generated/prisma/client";
 import { toast } from "sonner";
 
@@ -62,6 +63,25 @@ export function useTransactions({ filters }: UseTransactionsOptions) {
     if (!categoryId) return null;
     return categories?.find((c) => c.id === categoryId) || null;
   };
+
+  // Create new transaction
+  const createMutation = useMutation({
+    mutationFn: async (data: CreateTransactionInput) => {
+      const result = await createTransaction(data);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create transaction");
+      }
+      return result.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch after successful creation
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
+      toast.success("Transaction added successfully");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Failed to create transaction");
+    },
+  });
 
   // Update single transaction category (optimistic)
   const updateCategoryMutation = useMutation({
@@ -295,6 +315,7 @@ export function useTransactions({ filters }: UseTransactionsOptions) {
     categoriesLoading,
 
     // Actions
+    createTransaction: (data: CreateTransactionInput) => createMutation.mutateAsync(data),
     updateCategory: (transactionId: string, categoryId: string | null) =>
       updateCategoryMutation.mutate({ transactionId, categoryId }),
     deleteTransaction: (transactionId: string) => deleteMutation.mutate(transactionId),
@@ -307,6 +328,7 @@ export function useTransactions({ filters }: UseTransactionsOptions) {
     ) => bulkCategorizeMutation.mutate({ transactionIds, categoryId, createRule, rulePattern }),
 
     // Mutation states
+    isCreating: createMutation.isPending,
     isUpdating: updateCategoryMutation.isPending,
     isDeleting: deleteMutation.isPending,
     isBulkDeleting: bulkDeleteMutation.isPending,

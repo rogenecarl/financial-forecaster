@@ -40,6 +40,14 @@ function normalizeColumnName(col: string): string {
   return col.toLowerCase().trim().replace(/[_-]/g, " ");
 }
 
+// Normalize category name: trim, collapse multiple spaces, preserve case of first occurrence
+function normalizeCategoryName(category: string | null): string | null {
+  if (!category) return null;
+
+  // Trim and collapse multiple whitespace to single space
+  return category.trim().replace(/\s+/g, " ");
+}
+
 // Normalize higher category to consistent display values
 function normalizeHigherCategory(higherCategory: string | null): string | null {
   if (!higherCategory) return null;
@@ -238,7 +246,8 @@ function parseRow(
     }
 
     // Parse CSV category fields (optional)
-    const csvCategory = csvCategoryRaw ? String(csvCategoryRaw).trim() : null;
+    // Normalize category name: trim and collapse multiple spaces
+    const csvCategory = normalizeCategoryName(csvCategoryRaw ? String(csvCategoryRaw) : null);
     const csvHigherCategoryRawStr = csvHigherCategoryRaw ? String(csvHigherCategoryRaw).trim() : null;
 
     // Normalize higher category display

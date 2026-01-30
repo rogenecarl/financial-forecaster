@@ -277,25 +277,65 @@ const defaultCategoryRules: CategoryRuleData[] = [
 async function main() {
   console.log("🌱 Starting database seed...");
 
-  // Create categories
+  // Create categories with case-insensitive matching
   console.log("📁 Creating categories...");
-  for (const category of defaultCategories) {
-    await prisma.category.upsert({
-      where: { name: category.name },
-      update: {
-        type: category.type,
-        color: category.color,
-        isSystem: category.isSystem,
-        sortOrder: category.sortOrder,
-      },
-      create: category,
-    });
-  }
-  console.log(`   ✓ Created/updated ${defaultCategories.length} categories`);
 
-  // Get all categories for rule creation
+  // First, fetch all existing categories for case-insensitive matching
+  const existingCategories = await prisma.category.findMany({
+    select: { id: true, name: true },
+  });
+
+  // Build a case-insensitive lookup map
+  const existingByLowerName = new Map<string, { id: string; name: string }>();
+  for (const cat of existingCategories) {
+    existingByLowerName.set(cat.name.toLowerCase(), cat);
+  }
+
+  let created = 0;
+  let updated = 0;
+
+  for (const category of defaultCategories) {
+    const lowerName = category.name.toLowerCase();
+    const existing = existingByLowerName.get(lowerName);
+
+    if (existing) {
+      // Update existing category (case-insensitive match found)
+      await prisma.category.update({
+        where: { id: existing.id },
+        data: {
+          name: category.name, // Update to new casing if different
+          type: category.type,
+          color: category.color,
+          isSystem: category.isSystem,
+          sortOrder: category.sortOrder,
+        },
+      });
+      updated++;
+    } else {
+      // Create new category
+      try {
+        await prisma.category.create({
+          data: category,
+        });
+        created++;
+        // Add to lookup map to prevent duplicates in same seed run
+        existingByLowerName.set(lowerName, { id: "new", name: category.name });
+      } catch (error: unknown) {
+        // Handle race condition where category was created between findMany and create
+        if (error instanceof Error && error.message.includes("Unique constraint")) {
+          console.log(`   ⚠ Category "${category.name}" already exists (race condition), skipping`);
+        } else {
+          throw error;
+        }
+      }
+    }
+  }
+
+  console.log(`   ✓ Created ${created} new categories, updated ${updated} existing`);
+
+  // Get all categories for rule creation (case-insensitive map)
   const categories = await prisma.category.findMany();
-  const categoryMap = new Map(categories.map((c) => [c.name, c.id]));
+  const categoryMapLower = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
 
   // Note: Category rules require a userId. They will be created when:
   // 1. A user is created and initializes their settings
@@ -305,9 +345,9 @@ async function main() {
   console.log("📋 Category rule templates ready for user initialization");
   console.log(`   Template has ${defaultCategoryRules.length} rules`);
 
-  // Verify category mappings
+  // Verify category mappings (case-insensitive)
   const unmappedRules = defaultCategoryRules.filter(
-    (r) => !categoryMap.has(r.categoryName)
+    (r) => !categoryMapLower.has(r.categoryName.toLowerCase())
   );
   if (unmappedRules.length > 0) {
     console.log("⚠️  Warning: Some rules reference unmapped categories:");
@@ -316,7 +356,7 @@ async function main() {
 
   console.log("\n✅ Seed completed successfully!");
   console.log("\nSummary:");
-  console.log(`   - ${defaultCategories.length} categories created/updated`);
+  console.log(`   - ${created} categories created, ${updated} updated`);
   console.log(`   - Category types:`);
   console.log(`     • REVENUE: ${defaultCategories.filter((c) => c.type === CategoryType.REVENUE).length}`);
   console.log(`     • CONTRA_REVENUE: ${defaultCategories.filter((c) => c.type === CategoryType.CONTRA_REVENUE).length}`);

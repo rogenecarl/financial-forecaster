@@ -57,6 +57,12 @@ function mapHigherCategoryToType(higherCategory: string | null | undefined): Cat
   }
 }
 
+// Normalize category name for consistent storage and matching
+function normalizeCategoryName(name: string): string {
+  // Trim and collapse multiple whitespace to single space
+  return name.trim().replace(/\s+/g, " ");
+}
+
 // Default colors for auto-created categories based on type
 function getDefaultColorForType(type: CategoryType): string {
   switch (type) {
@@ -284,7 +290,9 @@ export async function generateImportPreview(
 
       // Priority 1: Use CSV-provided category if available
       if (transaction.csvCategory) {
-        const lookupKey = transaction.csvCategory.toLowerCase();
+        // Normalize category name for consistent matching
+        const normalizedCsvCategory = transaction.csvCategory.trim().replace(/\s+/g, " ");
+        const lookupKey = normalizedCsvCategory.toLowerCase();
         const existingCategory = categoryByName.get(lookupKey);
 
         if (existingCategory) {
@@ -295,7 +303,7 @@ export async function generateImportPreview(
           csvCategoryMatched = true;
         } else {
           // Category will be created during import
-          categoryName = transaction.csvCategory;
+          categoryName = normalizedCsvCategory;
           confidence = 1.0; // Will be created during import
           csvCategoryCreated = true;
         }
@@ -369,7 +377,8 @@ export async function importTransactions(
 
     for (const item of itemsToImport) {
       if (item.csvCategoryCreated && item.transaction.csvCategory) {
-        const categoryName = item.transaction.csvCategory;
+        // Normalize category name for consistent storage
+        const categoryName = normalizeCategoryName(item.transaction.csvCategory);
         const categoryKey = categoryName.toLowerCase();
 
         if (!categoriesToCreate.has(categoryKey)) {
@@ -387,21 +396,22 @@ export async function importTransactions(
     const categoryNameToId = new Map<string, string>();
     let categoriesCreated = 0;
 
-    // First, fetch existing categories to avoid duplicates
-    const existingCategories = await prisma.category.findMany({
-      where: {
-        name: {
-          in: Array.from(categoriesToCreate.values()).map(c => c.name),
-        },
-      },
+    // First, fetch ALL existing categories to do case-insensitive matching
+    // This prevents creating duplicates like "Software" and "software"
+    const allExistingCategories = await prisma.category.findMany({
       select: { id: true, name: true },
     });
 
-    for (const cat of existingCategories) {
-      categoryNameToId.set(cat.name.toLowerCase(), cat.id);
+    // Build case-insensitive lookup of existing categories
+    for (const cat of allExistingCategories) {
+      const key = cat.name.toLowerCase();
+      // Only store the first occurrence (existing category takes precedence)
+      if (!categoryNameToId.has(key)) {
+        categoryNameToId.set(key, cat.id);
+      }
     }
 
-    // Create categories that don't exist
+    // Create categories that don't exist (case-insensitive check)
     for (const [key, catData] of categoriesToCreate.entries()) {
       if (!categoryNameToId.has(key)) {
         const newCategory = await prisma.category.create({
@@ -418,15 +428,7 @@ export async function importTransactions(
       }
     }
 
-    // Also load all existing categories for matched items
-    const allCategories = await prisma.category.findMany({
-      select: { id: true, name: true },
-    });
-    for (const cat of allCategories) {
-      if (!categoryNameToId.has(cat.name.toLowerCase())) {
-        categoryNameToId.set(cat.name.toLowerCase(), cat.id);
-      }
-    }
+    // Note: allExistingCategories was already loaded above and categoryNameToId is fully populated
 
     // Step 2: Create import batch
     const importBatch = await prisma.importBatch.create({
@@ -446,7 +448,9 @@ export async function importTransactions(
 
         // If CSV category was to be created, look up the newly created category
         if (item.csvCategoryCreated && item.transaction.csvCategory) {
-          const newCatId = categoryNameToId.get(item.transaction.csvCategory.toLowerCase());
+          // Use normalized name for lookup to match how we stored it
+          const normalizedName = normalizeCategoryName(item.transaction.csvCategory).toLowerCase();
+          const newCatId = categoryNameToId.get(normalizedName);
           if (newCatId) {
             categoryId = newCatId;
           }

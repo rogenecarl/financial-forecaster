@@ -20,9 +20,16 @@ export const categoryTypeEnum = z.enum([
   "UNCATEGORIZED",
 ]);
 
+// Normalize category name: trim whitespace and collapse multiple spaces
+const normalizedCategoryName = z
+  .string()
+  .min(1, "Name is required")
+  .max(50, "Name must be 50 characters or less")
+  .transform((val) => val.trim().replace(/\s+/g, " "));
+
 export const categorySchema = z.object({
   id: z.string().uuid().optional(),
-  name: z.string().min(1, "Name is required").max(50, "Name must be 50 characters or less"),
+  name: normalizedCategoryName,
   type: categoryTypeEnum,
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color"),
   isSystem: z.boolean(),
@@ -30,7 +37,7 @@ export const categorySchema = z.object({
 });
 
 export const createCategorySchema = z.object({
-  name: z.string().min(1, "Name is required").max(50, "Name must be 50 characters or less"),
+  name: normalizedCategoryName,
   type: categoryTypeEnum,
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color"),
   sortOrder: z.number().int().min(0).default(50),

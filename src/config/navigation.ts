@@ -7,7 +7,7 @@ import {
   TrendingUp,
   GitCompare,
   BarChart3,
-  Settings,
+  Tags,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,6 +42,11 @@ export const dashboardNavigation: NavElement[] = [
         title: "Transactions",
         href: "/transactions",
         icon: Receipt,
+      },
+      {
+        title: "Categories",
+        href: "/categories",
+        icon: Tags,
       },
       {
         title: "P&L Statement",
@@ -80,11 +85,6 @@ export const dashboardNavigation: NavElement[] = [
     href: "/reports",
     icon: BarChart3,
   },
-  {
-    title: "Settings",
-    href: "/settings",
-    icon: Settings,
-  },
 ];
 
 // Route metadata for breadcrumbs and page titles
@@ -96,6 +96,10 @@ export const routeMeta: Record<string, { title: string; description?: string }> 
   "/transactions": {
     title: "Transactions",
     description: "Track and categorize your bank transactions",
+  },
+  "/categories": {
+    title: "Categories",
+    description: "Manage categories for transaction classification",
   },
   "/pl-statement": {
     title: "P&L Statement",
@@ -120,10 +124,6 @@ export const routeMeta: Record<string, { title: string; description?: string }> 
   "/reports": {
     title: "Reports",
     description: "Generate and export financial reports",
-  },
-  "/settings": {
-    title: "Settings",
-    description: "Configure categories, rules, and preferences",
   },
 };
 

@@ -418,6 +418,61 @@ export async function comparePeriods(
 }
 
 // ============================================
+// GET TRANSACTIONS BY CATEGORY
+// ============================================
+
+export interface CategoryTransaction {
+  id: string;
+  postingDate: Date;
+  description: string;
+  amount: number;
+  type: string;
+  details: string;
+}
+
+export async function getTransactionsByCategory(
+  categoryId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<ActionResponse<CategoryTransaction[]>> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        userId,
+        categoryId,
+        postingDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      select: {
+        id: true,
+        postingDate: true,
+        description: true,
+        amount: true,
+        type: true,
+        details: true,
+      },
+      orderBy: { postingDate: "desc" },
+    });
+
+    return {
+      success: true,
+      data: transactions.map((t) => ({
+        ...t,
+        amount: Number(t.amount),
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to fetch category transactions:", error);
+    return { success: false, error: "Failed to fetch transactions" };
+  }
+}
+
+// ============================================
 // GET AVAILABLE DATE RANGE
 // ============================================
 

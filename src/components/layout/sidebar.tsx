@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -149,14 +148,6 @@ export function Sidebar({ isCollapsed, onCollapsedChange }: SidebarProps) {
     return renderNavItem(element);
   };
 
-  // Separate settings from main navigation
-  const mainNavItems = dashboardNavigation.filter(
-    (item) => !isNavGroup(item) || item.title !== "Settings"
-  );
-  const settingsItem = dashboardNavigation.find(
-    (item) => !isNavGroup(item) && (item as NavItem).title === "Settings"
-  ) as NavItem | undefined;
-
   return (
     <TooltipProvider>
       <aside
@@ -196,17 +187,9 @@ export function Sidebar({ isCollapsed, onCollapsedChange }: SidebarProps) {
         {/* Navigation */}
         <ScrollArea className="flex-1">
           <nav className="p-3 space-y-1">
-            {mainNavItems.map(renderNavElement)}
+            {dashboardNavigation.map(renderNavElement)}
           </nav>
         </ScrollArea>
-
-        {/* Footer with Settings */}
-        {settingsItem && (
-          <>
-            <Separator />
-            <div className="p-3">{renderNavItem(settingsItem)}</div>
-          </>
-        )}
       </aside>
     </TooltipProvider>
   );

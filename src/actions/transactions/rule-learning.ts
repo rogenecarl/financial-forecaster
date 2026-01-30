@@ -298,7 +298,7 @@ export async function createRuleFromSuggestion(
     }
 
     revalidatePath("/transactions");
-    revalidatePath("/settings");
+    revalidatePath("/categories");
 
     return {
       success: true,

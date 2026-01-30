@@ -532,7 +532,7 @@ export async function importTransactions(
 
       revalidatePath("/transactions");
       revalidatePath("/dashboard");
-      revalidatePath("/settings"); // Categories may have been created
+      revalidatePath("/categories"); // Categories may have been created
 
       return {
         success: true,

@@ -78,7 +78,7 @@ export async function createCategory(
       },
     });
 
-    revalidatePath("/settings");
+    revalidatePath("/categories");
     return { success: true, data: category };
   } catch (error) {
     console.error("Failed to create category:", error);
@@ -137,7 +137,7 @@ export async function updateCategory(
       data: updateData,
     });
 
-    revalidatePath("/settings");
+    revalidatePath("/categories");
     return { success: true, data: category };
   } catch (error) {
     console.error("Failed to update category:", error);
@@ -181,7 +181,7 @@ export async function deleteCategory(id: string): Promise<ActionResponse<void>> 
       where: { id },
     });
 
-    revalidatePath("/settings");
+    revalidatePath("/categories");
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Failed to delete category:", error);
@@ -368,7 +368,7 @@ export async function cleanupDuplicateCategories(): Promise<ActionResponse<Clean
       }
     }
 
-    revalidatePath("/settings");
+    revalidatePath("/categories");
     revalidatePath("/transactions");
     revalidatePath("/dashboard");
 
@@ -426,7 +426,7 @@ export async function normalizeAllCategoryNames(): Promise<ActionResponse<{ upda
       details.push("All category names are already normalized");
     }
 
-    revalidatePath("/settings");
+    revalidatePath("/categories");
     return { success: true, data: { updated, details } };
   } catch (error) {
     console.error("Failed to normalize category names:", error);

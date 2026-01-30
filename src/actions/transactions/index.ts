@@ -26,8 +26,10 @@ export {
   getPLSummary,
   comparePeriods,
   getTransactionDateRange,
+  getTransactionsByCategory,
   type PLSummary,
   type TransactionDateRange,
+  type CategoryTransaction,
 } from "./pl-statement";
 
 export {

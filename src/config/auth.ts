@@ -27,7 +27,9 @@ export const PROTECTED_ROUTES = [
     "/admin",
     "/provider",
     "/dashboard",
-    "/settings",
+    "/categories",
+    "/transactions",
+    "/pl-statement",
     "/profile",
 ] as const
 

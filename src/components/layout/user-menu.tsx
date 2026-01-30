@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   User,
-  Settings,
   LogOut,
   Loader2,
   ChevronDown,
@@ -80,15 +79,9 @@ export function UserMenu({ showName = true }: UserMenuProps) {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/settings" className="cursor-pointer">
+            <Link href="/dashboard" className="cursor-pointer">
               <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href="/settings" className="cursor-pointer">
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
+              <span>Dashboard</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>

@@ -107,7 +107,7 @@ export async function createCategoryRule(
       include: { category: true },
     });
 
-    revalidatePath("/settings");
+    revalidatePath("/categories");
     return { success: true, data: rule };
   } catch (error) {
     console.error("Failed to create category rule:", error);
@@ -174,7 +174,7 @@ export async function updateCategoryRule(
       include: { category: true },
     });
 
-    revalidatePath("/settings");
+    revalidatePath("/categories");
     return { success: true, data: rule };
   } catch (error) {
     console.error("Failed to update category rule:", error);
@@ -199,7 +199,7 @@ export async function deleteCategoryRule(id: string): Promise<ActionResponse<voi
       where: { id },
     });
 
-    revalidatePath("/settings");
+    revalidatePath("/categories");
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Failed to delete category rule:", error);
@@ -227,7 +227,7 @@ export async function toggleCategoryRuleActive(
       include: { category: true },
     });
 
-    revalidatePath("/settings");
+    revalidatePath("/categories");
     return { success: true, data: updated };
   } catch (error) {
     console.error("Failed to toggle category rule:", error);
@@ -297,7 +297,7 @@ export async function seedDefaultCategoryRules(): Promise<ActionResponse<number>
       data: rulesToCreate,
     });
 
-    revalidatePath("/settings");
+    revalidatePath("/categories");
     return { success: true, data: rulesToCreate.length };
   } catch (error) {
     console.error("Failed to seed default rules:", error);

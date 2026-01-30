@@ -6,7 +6,6 @@ import {
   Download,
   FileText,
   AlertCircle,
-  Circle,
   ChevronRight,
   TrendingUp,
   TrendingDown,
@@ -25,7 +24,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePLStatement, useTransactionDateRange } from "@/hooks";
-import type { PLLineItem, PLSection } from "@/schema/transaction.schema";
+import type { PLSection } from "@/schema/transaction.schema";
+import { PLLineItemRow } from "@/components/pl";
 import { cn } from "@/lib/utils";
 
 type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months";
@@ -140,39 +140,6 @@ export default function PLStatementPage() {
     return `${formatDate(statement.period.startDate)} - ${formatDate(statement.period.endDate)}`;
   };
 
-  const renderLineItem = (item: PLLineItem, isNegative: boolean = false) => (
-    <div
-      key={item.categoryId}
-      className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
-    >
-      <div className="flex items-center gap-3">
-        <Circle
-          className="h-3 w-3 flex-shrink-0"
-          style={{ fill: item.categoryColor, color: item.categoryColor }}
-        />
-        <div>
-          <span className="text-sm font-medium">{item.categoryName}</span>
-          <span className="text-xs text-slate-500 ml-2">
-            ({item.transactionCount} txn{item.transactionCount !== 1 ? "s" : ""})
-          </span>
-        </div>
-      </div>
-      <div className="text-right">
-        <span
-          className={cn(
-            "text-sm font-mono font-medium",
-            isNegative ? "text-red-600" : "text-green-600"
-          )}
-        >
-          {formatCurrency(item.amount)}
-        </span>
-        <span className="text-xs text-slate-500 ml-2">
-          ({item.percentage.toFixed(1)}%)
-        </span>
-      </div>
-    </div>
-  );
-
   const renderSection = (
     title: string,
     section: PLSection | undefined,
@@ -186,7 +153,15 @@ export default function PLStatementPage() {
           {title}
         </h3>
         <div className="bg-slate-50 rounded-lg p-4">
-          {section.items.map((item) => renderLineItem(item, isNegative))}
+          {section.items.map((item) => (
+            <PLLineItemRow
+              key={item.categoryId}
+              item={item}
+              isNegative={isNegative}
+              startDate={effectiveDateRange!.start}
+              endDate={effectiveDateRange!.end}
+            />
+          ))}
           <div className="flex items-center justify-between pt-3 mt-3 border-t-2 border-slate-200">
             <span className="text-sm font-semibold">Total {title}</span>
             <span

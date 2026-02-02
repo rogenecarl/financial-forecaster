@@ -207,7 +207,7 @@ async function main() {
               data: { name: normalized },
             });
             normalizedCount++;
-          } catch (error) {
+          } catch {
             console.log(`   ⚠️  Skipped (conflict with existing category)`);
           }
         }

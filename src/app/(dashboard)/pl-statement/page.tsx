@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { endOfWeek } from "date-fns";
 import {
   Download,
   FileText,
@@ -23,7 +24,9 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePLStatement, useTransactionDateRange } from "@/hooks";
+import { WeekSelector } from "@/components/filters";
+import { usePLStatement, useTransactionDateRange, useWeekOptions } from "@/hooks";
+import { getWeekStartFromId } from "@/lib/week-utils";
 import type { PLSection } from "@/schema/transaction.schema";
 import { PLLineItemRow } from "@/components/pl";
 import { cn } from "@/lib/utils";
@@ -38,11 +41,28 @@ export default function PLStatementPage() {
     end: string | null;
   }>({ start: null, end: null });
 
+  // Phase 3 filter state
+  const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
+
+  // Filter hooks
+  const { weeks, isLoading: weeksLoading } = useWeekOptions();
+
   // Fetch available date range
   const { dateRange, isLoading: dateRangeLoading } = useTransactionDateRange();
 
+  // Get selected week info for display
+  const selectedWeek = weeks.find((w) => w.id === selectedWeekId);
+
   // Calculate the effective date range based on period selection
+  // Week selection takes priority over period dropdown
   const effectiveDateRange = useMemo(() => {
+    // Week selection takes priority
+    if (selectedWeekId) {
+      const weekStart = getWeekStartFromId(selectedWeekId);
+      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+      return { start: weekStart, end: weekEnd };
+    }
+
     if (!dateRange?.hasTransactions) return null;
 
     const now = new Date();
@@ -96,7 +116,7 @@ export default function PLStatementPage() {
       default:
         return null;
     }
-  }, [periodOption, dateRange, customDateRange]);
+  }, [selectedWeekId, periodOption, dateRange, customDateRange]);
 
   // Get display values for date inputs
   const customStartDate = customDateRange.start
@@ -119,6 +139,19 @@ export default function PLStatementPage() {
   });
 
   const loading = dateRangeLoading || statementLoading;
+
+  // Handle week selection - clear period option when week is selected
+  const handleWeekChange = (weekId: string | null) => {
+    setSelectedWeekId(weekId);
+    // When selecting a specific week, don't change period option
+    // When clearing week selection, keep existing period option
+  };
+
+  // Handle period option change - clear week selection when period changes
+  const handlePeriodChange = (value: string) => {
+    setPeriodOption(value as PeriodOption);
+    setSelectedWeekId(null); // Clear week selection when period changes
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -259,6 +292,8 @@ export default function PLStatementPage() {
       statement.cogs.items.length > 0 ||
       statement.operatingExpenses.items.length > 0);
 
+  const hasActiveFilters = selectedWeekId !== null;
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -269,62 +304,90 @@ export default function PLStatementPage() {
             Financial performance summary
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Select
-            value={periodOption}
-            onValueChange={(value) => setPeriodOption(value as PeriodOption)}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Data</SelectItem>
-              <SelectItem value="thisMonth">This Month</SelectItem>
-              <SelectItem value="lastMonth">Last Month</SelectItem>
-              <SelectItem value="last3Months">Last 3 Months</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {periodOption === "custom" && (
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                className="w-[140px]"
-                value={customStartDate ? customStartDate.toISOString().split("T")[0] : ""}
-                onChange={(e) =>
-                  setCustomDateRange((prev) => ({
-                    ...prev,
-                    start: e.target.value || null,
-                  }))
-                }
-                max={customEndDate ? customEndDate.toISOString().split("T")[0] : undefined}
-              />
-              <span className="text-muted-foreground">to</span>
-              <Input
-                type="date"
-                className="w-[140px]"
-                value={customEndDate ? customEndDate.toISOString().split("T")[0] : ""}
-                onChange={(e) =>
-                  setCustomDateRange((prev) => ({
-                    ...prev,
-                    end: e.target.value || null,
-                  }))
-                }
-                min={customStartDate ? customStartDate.toISOString().split("T")[0] : undefined}
-              />
-            </div>
-          )}
-
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-        </div>
+        <Button variant="outline">
+          <Download className="mr-2 h-4 w-4" />
+          Export
+        </Button>
       </div>
 
+      {/* Phase 3 Filters */}
+      <div className="flex flex-wrap gap-2">
+        <WeekSelector
+          weeks={weeks}
+          selectedWeekId={selectedWeekId}
+          onWeekChange={handleWeekChange}
+          loading={weeksLoading}
+        />
+        <Select
+          value={selectedWeekId ? "week" : periodOption}
+          onValueChange={handlePeriodChange}
+          disabled={selectedWeekId !== null}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder={selectedWeekId ? "Week Selected" : undefined} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Data</SelectItem>
+            <SelectItem value="thisMonth">This Month</SelectItem>
+            <SelectItem value="lastMonth">Last Month</SelectItem>
+            <SelectItem value="last3Months">Last 3 Months</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {periodOption === "custom" && !selectedWeekId && (
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              className="w-[140px]"
+              value={customStartDate ? customStartDate.toISOString().split("T")[0] : ""}
+              onChange={(e) =>
+                setCustomDateRange((prev) => ({
+                  ...prev,
+                  start: e.target.value || null,
+                }))
+              }
+              max={customEndDate ? customEndDate.toISOString().split("T")[0] : undefined}
+            />
+            <span className="text-muted-foreground">to</span>
+            <Input
+              type="date"
+              className="w-[140px]"
+              value={customEndDate ? customEndDate.toISOString().split("T")[0] : ""}
+              onChange={(e) =>
+                setCustomDateRange((prev) => ({
+                  ...prev,
+                  end: e.target.value || null,
+                }))
+              }
+              min={customStartDate ? customStartDate.toISOString().split("T")[0] : undefined}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Active filter indicator */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Filtering by:</span>
+          {selectedWeek && (
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">
+              Week {selectedWeek.weekNumber}: {selectedWeek.label}
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => setSelectedWeekId(null)}
+          >
+            Clear
+          </Button>
+        </div>
+      )}
+
       {/* Data range info */}
-      {dateRange?.hasTransactions && (
+      {dateRange?.hasTransactions && !selectedWeekId && (
         <div className="text-sm text-muted-foreground">
           Available data: {formatDate(new Date(dateRange.minDate!))} - {formatDate(new Date(dateRange.maxDate!))}
         </div>
@@ -516,16 +579,24 @@ export default function PLStatementPage() {
                 No financial data
               </h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                {dateRange?.hasTransactions
+                {hasActiveFilters
+                  ? "No categorized transactions found for the selected week. Try selecting a different week or clear the filter."
+                  : dateRange?.hasTransactions
                   ? "No categorized transactions found for the selected period."
                   : "Import and categorize transactions to generate your P&L statement."}
               </p>
-              <Button variant="outline" asChild>
-                <Link href="/transactions">
-                  Go to Transactions
-                  <ChevronRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
+              {hasActiveFilters ? (
+                <Button variant="outline" onClick={() => setSelectedWeekId(null)}>
+                  Clear Filter
+                </Button>
+              ) : (
+                <Button variant="outline" asChild>
+                  <Link href="/transactions">
+                    Go to Transactions
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

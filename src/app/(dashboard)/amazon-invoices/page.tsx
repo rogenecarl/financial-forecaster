@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { format } from "date-fns";
+import { useState, useMemo } from "react";
+import { format, endOfWeek } from "date-fns";
 import { Upload, FileSpreadsheet, Trash2, ChevronRight, CheckCircle, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,12 +25,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { InvoiceImportModal, InvoiceDetailsTable } from "@/components/forecasting";
-import { useAmazonInvoices, useAmazonInvoiceDetail } from "@/hooks";
+import { WeekSelector } from "@/components/filters";
+import { useAmazonInvoices, useAmazonInvoiceDetail, useWeekOptions } from "@/hooks";
+import { getWeekStartFromId } from "@/lib/week-utils";
 
 export default function AmazonInvoicesPage() {
   const [showImport, setShowImport] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Phase 3 filter state
+  const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
+
+  // Filter hooks
+  const { weeks, isLoading: weeksLoading } = useWeekOptions();
 
   // TanStack Query hooks
   const {
@@ -43,6 +51,39 @@ export default function AmazonInvoicesPage() {
   } = useAmazonInvoices();
 
   const { invoice: selectedInvoice, isLoading: loadingDetails } = useAmazonInvoiceDetail(selectedInvoiceId);
+
+  // Get selected week info for display
+  const selectedWeek = weeks.find((w) => w.id === selectedWeekId);
+
+  // Filter invoices by week (client-side filtering)
+  const filteredInvoices = useMemo(() => {
+    if (!selectedWeekId) return invoices;
+
+    const weekStart = getWeekStartFromId(selectedWeekId);
+    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+
+    // Filter invoices that overlap with the selected week
+    return invoices.filter((invoice) => {
+      if (!invoice.periodStart || !invoice.periodEnd) return true;
+      const invoiceStart = new Date(invoice.periodStart);
+      const invoiceEnd = new Date(invoice.periodEnd);
+      // Check for overlap: invoice period overlaps with week if:
+      // invoiceStart <= weekEnd AND invoiceEnd >= weekStart
+      return invoiceStart <= weekEnd && invoiceEnd >= weekStart;
+    });
+  }, [invoices, selectedWeekId]);
+
+  // Calculate filtered stats
+  const filteredStats = useMemo(() => {
+    if (!selectedWeekId) return stats;
+
+    return {
+      totalInvoices: filteredInvoices.length,
+      totalTourPay: filteredInvoices.reduce((sum, inv) => sum + inv.totalTourPay, 0),
+      totalAccessorials: filteredInvoices.reduce((sum, inv) => sum + inv.totalAccessorials, 0),
+      totalPay: filteredInvoices.reduce((sum, inv) => sum + inv.totalPay, 0),
+    };
+  }, [filteredInvoices, stats, selectedWeekId]);
 
   const handleDelete = () => {
     if (!deleteId) return;
@@ -65,6 +106,8 @@ export default function AmazonInvoicesPage() {
     return `${format(new Date(start), "MMM d")} - ${format(new Date(end), "MMM d")}`;
   };
 
+  const hasActiveFilters = selectedWeekId !== null;
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -83,17 +126,47 @@ export default function AmazonInvoicesPage() {
         </div>
       </div>
 
+      {/* Phase 3 Filters */}
+      <div className="flex flex-wrap gap-2">
+        <WeekSelector
+          weeks={weeks}
+          selectedWeekId={selectedWeekId}
+          onWeekChange={setSelectedWeekId}
+          loading={weeksLoading}
+        />
+      </div>
+
+      {/* Active filter indicator */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Filtering by:</span>
+          {selectedWeek && (
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">
+              Week {selectedWeek.weekNumber}: {selectedWeek.label}
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => setSelectedWeekId(null)}
+          >
+            Clear
+          </Button>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Invoices
+              {hasActiveFilters ? "Filtered Invoices" : "Total Invoices"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-16" /> : stats.totalInvoices}
+              {loading ? <Skeleton className="h-8 w-16" /> : filteredStats.totalInvoices}
             </div>
           </CardContent>
         </Card>
@@ -105,7 +178,7 @@ export default function AmazonInvoicesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(stats.totalTourPay)}
+              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(filteredStats.totalTourPay)}
             </div>
           </CardContent>
         </Card>
@@ -117,7 +190,7 @@ export default function AmazonInvoicesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(stats.totalAccessorials)}
+              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(filteredStats.totalAccessorials)}
             </div>
           </CardContent>
         </Card>
@@ -129,18 +202,22 @@ export default function AmazonInvoicesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">
-              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(stats.totalPay)}
+              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(filteredStats.totalPay)}
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Invoice List */}
-      {invoices.length > 0 || loading ? (
+      {filteredInvoices.length > 0 || loading ? (
         <Card>
           <CardHeader>
             <CardTitle>Invoice History</CardTitle>
-            <CardDescription>View and manage imported Amazon invoices</CardDescription>
+            <CardDescription>
+              {hasActiveFilters
+                ? `Showing ${filteredInvoices.length} invoice${filteredInvoices.length !== 1 ? "s" : ""} overlapping with selected week`
+                : "View and manage imported Amazon invoices"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="rounded-lg border">
@@ -168,7 +245,7 @@ export default function AmazonInvoicesPage() {
                       </TableRow>
                     ))
                   ) : (
-                    invoices.map((invoice) => (
+                    filteredInvoices.map((invoice) => (
                       <TableRow
                         key={invoice.id}
                         className={`cursor-pointer hover:bg-muted/50 ${
@@ -240,15 +317,23 @@ export default function AmazonInvoicesPage() {
                 <FileSpreadsheet className="h-8 w-8 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-1">
-                No invoices imported
+                {hasActiveFilters ? "No invoices for selected week" : "No invoices imported"}
               </h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                Import your Amazon Payment Details to track actual earnings and compare with forecasts.
+                {hasActiveFilters
+                  ? "No invoices found that overlap with the selected week. Try selecting a different week or clear the filter."
+                  : "Import your Amazon Payment Details to track actual earnings and compare with forecasts."}
               </p>
-              <Button onClick={() => setShowImport(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Import Invoice
-              </Button>
+              {hasActiveFilters ? (
+                <Button variant="outline" onClick={() => setSelectedWeekId(null)}>
+                  Clear Filter
+                </Button>
+              ) : (
+                <Button onClick={() => setShowImport(true)}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import Invoice
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

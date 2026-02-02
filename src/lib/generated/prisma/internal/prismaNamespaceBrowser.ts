@@ -58,6 +58,8 @@ export const ModelName = {
   Category: 'Category',
   Transaction: 'Transaction',
   ImportBatch: 'ImportBatch',
+  TripImportBatch: 'TripImportBatch',
+  InvoiceImportBatch: 'InvoiceImportBatch',
   CategoryRule: 'CategoryRule',
   AmazonInvoice: 'AmazonInvoice',
   AmazonInvoiceLineItem: 'AmazonInvoiceLineItem',
@@ -194,6 +196,47 @@ export const ImportBatchScalarFieldEnum = {
 export type ImportBatchScalarFieldEnum = (typeof ImportBatchScalarFieldEnum)[keyof typeof ImportBatchScalarFieldEnum]
 
 
+export const TripImportBatchScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  fileName: 'fileName',
+  fileHash: 'fileHash',
+  importedAt: 'importedAt',
+  periodStart: 'periodStart',
+  periodEnd: 'periodEnd',
+  tripCount: 'tripCount',
+  newTripsCount: 'newTripsCount',
+  skippedCount: 'skippedCount',
+  loadCount: 'loadCount',
+  canceledCount: 'canceledCount',
+  projectedTours: 'projectedTours',
+  projectedLoads: 'projectedLoads',
+  projectedTourPay: 'projectedTourPay',
+  projectedAccessorials: 'projectedAccessorials',
+  projectedTotal: 'projectedTotal',
+  status: 'status',
+  errorMessage: 'errorMessage'
+} as const
+
+export type TripImportBatchScalarFieldEnum = (typeof TripImportBatchScalarFieldEnum)[keyof typeof TripImportBatchScalarFieldEnum]
+
+
+export const InvoiceImportBatchScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  fileName: 'fileName',
+  fileHash: 'fileHash',
+  importedAt: 'importedAt',
+  invoiceCount: 'invoiceCount',
+  lineItemCount: 'lineItemCount',
+  matchedTrips: 'matchedTrips',
+  unmatchedTrips: 'unmatchedTrips',
+  status: 'status'
+} as const
+
+export type InvoiceImportBatchScalarFieldEnum = (typeof InvoiceImportBatchScalarFieldEnum)[keyof typeof InvoiceImportBatchScalarFieldEnum]
+
+
 export const CategoryRuleScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -214,6 +257,7 @@ export type CategoryRuleScalarFieldEnum = (typeof CategoryRuleScalarFieldEnum)[k
 export const AmazonInvoiceScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
+  importBatchId: 'importBatchId',
   invoiceNumber: 'invoiceNumber',
   routeDomicile: 'routeDomicile',
   equipment: 'equipment',
@@ -259,6 +303,7 @@ export const TripScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   weekId: 'weekId',
+  importBatchId: 'importBatchId',
   tripId: 'tripId',
   tripStage: 'tripStage',
   equipmentType: 'equipmentType',
@@ -266,6 +311,8 @@ export const TripScalarFieldEnum = {
   scheduledDate: 'scheduledDate',
   projectedLoads: 'projectedLoads',
   actualLoads: 'actualLoads',
+  originalProjectedLoads: 'originalProjectedLoads',
+  originalProjectedRevenue: 'originalProjectedRevenue',
   estimatedAccessorial: 'estimatedAccessorial',
   projectedRevenue: 'projectedRevenue',
   actualRevenue: 'actualRevenue',
@@ -331,6 +378,7 @@ export const ForecastWeekScalarFieldEnum = {
   variance: 'variance',
   variancePercent: 'variancePercent',
   amazonInvoiceId: 'amazonInvoiceId',
+  projectionLockedAt: 'projectionLockedAt',
   notes: 'notes',
   status: 'status',
   createdAt: 'createdAt',

@@ -75,6 +75,16 @@ export type Transaction = Prisma.TransactionModel
  */
 export type ImportBatch = Prisma.ImportBatchModel
 /**
+ * Model TripImportBatch
+ * 
+ */
+export type TripImportBatch = Prisma.TripImportBatchModel
+/**
+ * Model InvoiceImportBatch
+ * 
+ */
+export type InvoiceImportBatch = Prisma.InvoiceImportBatchModel
+/**
  * Model CategoryRule
  * 
  */

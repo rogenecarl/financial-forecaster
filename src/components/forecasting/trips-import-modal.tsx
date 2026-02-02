@@ -36,10 +36,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { parseTripsFile, type TripsParseResult } from "@/lib/parsers/trips-parser";
-import { importTrips } from "@/actions/forecasting";
+import { importTrips, checkDuplicateTripFile, type TripImportResult } from "@/actions/forecasting";
 import { toast } from "sonner";
 import type { CreateTripLoad } from "@/schema/forecasting.schema";
 import { FORECASTING_CONSTANTS } from "@/config/forecasting";
+import { calculateFileHash } from "@/lib/utils";
+import { TripImportResultDialog } from "./trip-import-result-dialog";
+import { DuplicateFileWarningDialog, type PreviousImportInfo } from "./duplicate-file-warning-dialog";
 
 interface TripsImportModalProps {
   open: boolean;
@@ -127,6 +130,15 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
   const [dragActive, setDragActive] = useState(false);
   const [parseResult, setParseResult] = useState<TripsParseResult | null>(null);
   const [importProgress, setImportProgress] = useState(0);
+  const [fileName, setFileName] = useState<string>("trips.csv");
+  const [fileHash, setFileHash] = useState<string | undefined>(undefined);
+
+  // Dialog states
+  const [showResultDialog, setShowResultDialog] = useState(false);
+  const [importResult, setImportResult] = useState<TripImportResult | null>(null);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [previousImportInfo, setPreviousImportInfo] = useState<PreviousImportInfo | null>(null);
+  const [skipDuplicateCheck, setSkipDuplicateCheck] = useState(false);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -139,6 +151,29 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
   }, []);
 
   const processFile = useCallback(async (file: File) => {
+    setFileName(file.name);
+
+    // Calculate file hash for duplicate detection
+    try {
+      const hash = await calculateFileHash(file);
+      setFileHash(hash);
+
+      // Check for duplicate file
+      const duplicateCheck = await checkDuplicateTripFile(hash);
+      if (duplicateCheck.success && duplicateCheck.data?.isDuplicate && duplicateCheck.data.previousImport) {
+        setPreviousImportInfo({
+          importedAt: duplicateCheck.data.previousImport.importedAt,
+          fileName: duplicateCheck.data.previousImport.fileName,
+          itemCount: duplicateCheck.data.previousImport.newTripsCount,
+          itemType: "trips",
+        });
+        setShowDuplicateWarning(true);
+      }
+    } catch {
+      // If hash calculation fails, continue without it
+      console.warn("Failed to calculate file hash");
+    }
+
     const result = await parseTripsFile(file);
     setParseResult(result);
 
@@ -174,15 +209,21 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
     setImportProgress(0);
 
     try {
-      const result = await importTrips(parseResult.trips);
+      // Pass file hash only if we haven't already confirmed duplicate warning
+      const hashToPass = skipDuplicateCheck ? undefined : fileHash;
+      const result = await importTrips(parseResult.trips, fileName, hashToPass);
 
       if (result.success) {
-        const { imported, updated } = result.data!;
-        toast.success(`Imported ${imported} trips, updated ${updated} existing trips`);
+        setImportResult(result.data!);
+        setShowResultDialog(true);
         onSuccess();
-        handleClose();
       } else {
-        toast.error(result.error || "Failed to import trips");
+        // Handle duplicate file error specially
+        if (result.error?.startsWith("DUPLICATE_FILE:")) {
+          toast.error(result.error.replace("DUPLICATE_FILE: ", ""));
+        } else {
+          toast.error(result.error || "Failed to import trips");
+        }
         setStep("preview");
       }
     } catch {
@@ -191,10 +232,30 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
     }
   };
 
+  const handleDuplicateWarningContinue = () => {
+    setSkipDuplicateCheck(true);
+    setShowDuplicateWarning(false);
+  };
+
+  const handleDuplicateWarningCancel = () => {
+    setShowDuplicateWarning(false);
+    handleClose();
+  };
+
+  const handleResultDialogClose = () => {
+    setShowResultDialog(false);
+    setImportResult(null);
+    handleClose();
+  };
+
   const handleClose = () => {
     setStep("upload");
     setParseResult(null);
     setImportProgress(0);
+    setFileName("trips.csv");
+    setFileHash(undefined);
+    setSkipDuplicateCheck(false);
+    setPreviousImportInfo(null);
     onOpenChange(false);
   };
 
@@ -409,7 +470,7 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
               </Button>
               <Button onClick={handleImport}>
                 <Truck className="mr-2 h-4 w-4" />
-                Import {stats.totalTripsRaw} Trips
+                Import {stats.activeTrips} Trips
               </Button>
             </div>
           </div>
@@ -427,6 +488,27 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
           </div>
         )}
       </DialogContent>
+
+      {/* Import Result Dialog */}
+      {importResult && (
+        <TripImportResultDialog
+          open={showResultDialog}
+          onOpenChange={handleResultDialogClose}
+          result={importResult}
+          fileName={fileName}
+        />
+      )}
+
+      {/* Duplicate File Warning Dialog */}
+      {previousImportInfo && (
+        <DuplicateFileWarningDialog
+          open={showDuplicateWarning}
+          onOpenChange={setShowDuplicateWarning}
+          previousImport={previousImportInfo}
+          onContinue={handleDuplicateWarningContinue}
+          onCancel={handleDuplicateWarningCancel}
+        />
+      )}
     </Dialog>
   );
 }

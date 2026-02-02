@@ -1,19 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { format } from "date-fns";
+import { format, endOfWeek } from "date-fns";
 import { GitCompare, TrendingUp, TrendingDown, AlertCircle, Calendar } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -22,110 +14,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useForecastVariance, useForecastDateRange, useInvoiceMatchingStats } from "@/hooks";
-
-type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months" | "thisWeek" | "lastWeek";
+import { WeekSelector, ImportBatchSelector } from "@/components/filters";
+import {
+  useForecastVariance,
+  useForecastDateRange,
+  useInvoiceMatchingStats,
+  useWeekOptions,
+  useImportBatchOptions,
+} from "@/hooks";
+import { getWeekStartFromId } from "@/lib/week-utils";
 
 export default function ForecastVsActualPage() {
-  const [periodOption, setPeriodOption] = useState<PeriodOption>("all");
-  const [customDateRange, setCustomDateRange] = useState<{
-    start: string | null;
-    end: string | null;
-  }>({ start: null, end: null });
+  // Phase 3 filter state
+  const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
+  const [selectedImportBatchId, setSelectedImportBatchId] = useState<string | null>(null);
 
-  // Fetch available date range
+  // Filter hooks
+  const { weeks, isLoading: weeksLoading } = useWeekOptions();
+  const { batches, isLoading: batchesLoading } = useImportBatchOptions();
+
+  // Fetch available date range (for empty state messaging)
   const { dateRange } = useForecastDateRange();
 
-  // Calculate effective date range
+  // Calculate effective date range from week selection
   const effectiveDateRange = useMemo(() => {
-    const now = new Date();
+    if (!selectedWeekId) return null; // All weeks mode
 
-    switch (periodOption) {
-      case "all":
-        return null;
+    const weekStart = getWeekStartFromId(selectedWeekId);
+    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+    return { start: weekStart, end: weekEnd };
+  }, [selectedWeekId]);
 
-      case "thisWeek": {
-        const dayOfWeek = now.getDay();
-        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-        const start = new Date(now);
-        start.setDate(now.getDate() + diffToMonday);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        end.setHours(23, 59, 59, 999);
-        return { start, end };
-      }
-
-      case "lastWeek": {
-        const dayOfWeek = now.getDay();
-        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-        const thisMonday = new Date(now);
-        thisMonday.setDate(now.getDate() + diffToMonday);
-        const start = new Date(thisMonday);
-        start.setDate(thisMonday.getDate() - 7);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        end.setHours(23, 59, 59, 999);
-        return { start, end };
-      }
-
-      case "thisMonth": {
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        end.setHours(23, 59, 59, 999);
-        return { start, end };
-      }
-
-      case "lastMonth": {
-        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const end = new Date(now.getFullYear(), now.getMonth(), 0);
-        end.setHours(23, 59, 59, 999);
-        return { start, end };
-      }
-
-      case "last3Months": {
-        const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        end.setHours(23, 59, 59, 999);
-        return { start, end };
-      }
-
-      case "custom": {
-        const start = customDateRange.start
-          ? new Date(customDateRange.start)
-          : dateRange?.minDate
-            ? new Date(dateRange.minDate)
-            : null;
-        const end = customDateRange.end
-          ? new Date(customDateRange.end)
-          : dateRange?.maxDate
-            ? new Date(dateRange.maxDate)
-            : null;
-        if (start && end) {
-          end.setHours(23, 59, 59, 999);
-          return { start, end };
-        }
-        return null;
-      }
-
-      default:
-        return null;
-    }
-  }, [periodOption, customDateRange, dateRange]);
-
-  // Get display values for custom date inputs
-  const customStartDate = customDateRange.start
-    ? new Date(customDateRange.start)
-    : dateRange?.minDate
-      ? new Date(dateRange.minDate)
-      : undefined;
-
-  const customEndDate = customDateRange.end
-    ? new Date(customDateRange.end)
-    : dateRange?.maxDate
-      ? new Date(dateRange.maxDate)
-      : undefined;
+  // Get selected week info for display
+  const selectedWeek = weeks.find((w) => w.id === selectedWeekId);
 
   // TanStack Query hook for variance data
   const { data, isLoading: loading } = useForecastVariance(
@@ -172,6 +93,7 @@ export default function ForecastVsActualPage() {
   };
 
   const hasData = data && data.summary.projectedTotal > 0;
+  const hasActiveFilters = selectedWeekId !== null || selectedImportBatchId !== null;
 
   return (
     <div className="space-y-6">
@@ -183,59 +105,54 @@ export default function ForecastVsActualPage() {
             Compare predictions with actual Amazon payments
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Select
-            value={periodOption}
-            onValueChange={(value) => setPeriodOption(value as PeriodOption)}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Data</SelectItem>
-              <SelectItem value="thisWeek">This Week</SelectItem>
-              <SelectItem value="lastWeek">Last Week</SelectItem>
-              <SelectItem value="thisMonth">This Month</SelectItem>
-              <SelectItem value="lastMonth">Last Month</SelectItem>
-              <SelectItem value="last3Months">Last 3 Months</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {periodOption === "custom" && (
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                className="w-[140px]"
-                value={customStartDate ? customStartDate.toISOString().split("T")[0] : ""}
-                onChange={(e) =>
-                  setCustomDateRange((prev) => ({
-                    ...prev,
-                    start: e.target.value || null,
-                  }))
-                }
-                max={customEndDate ? customEndDate.toISOString().split("T")[0] : undefined}
-              />
-              <span className="text-muted-foreground">to</span>
-              <Input
-                type="date"
-                className="w-[140px]"
-                value={customEndDate ? customEndDate.toISOString().split("T")[0] : ""}
-                onChange={(e) =>
-                  setCustomDateRange((prev) => ({
-                    ...prev,
-                    end: e.target.value || null,
-                  }))
-                }
-                min={customStartDate ? customStartDate.toISOString().split("T")[0] : undefined}
-              />
-            </div>
-          )}
-        </div>
       </div>
 
+      {/* Phase 3 Filters */}
+      <div className="flex flex-wrap gap-2">
+        <WeekSelector
+          weeks={weeks}
+          selectedWeekId={selectedWeekId}
+          onWeekChange={setSelectedWeekId}
+          loading={weeksLoading}
+        />
+        <ImportBatchSelector
+          batches={batches}
+          selectedBatchId={selectedImportBatchId}
+          onBatchChange={setSelectedImportBatchId}
+          loading={batchesLoading}
+        />
+      </div>
+
+      {/* Active filter indicator */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Filtering by:</span>
+          {selectedWeek && (
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">
+              Week {selectedWeek.weekNumber}: {selectedWeek.label}
+            </span>
+          )}
+          {selectedImportBatchId && (
+            <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md text-xs font-medium">
+              Import Batch
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => {
+              setSelectedWeekId(null);
+              setSelectedImportBatchId(null);
+            }}
+          >
+            Clear all
+          </Button>
+        </div>
+      )}
+
       {/* Data range info */}
-      {dateRange?.hasData && (
+      {dateRange?.hasData && !selectedWeekId && (
         <div className="text-sm text-muted-foreground">
           Available data: {formatDate(new Date(dateRange.minDate!))} - {formatDate(new Date(dateRange.maxDate!))}
         </div>
@@ -573,18 +490,32 @@ export default function ForecastVsActualPage() {
                 No comparison data
               </h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                {dateRange?.hasData
-                  ? "No data found for the selected period. Try changing the date filter."
+                {hasActiveFilters
+                  ? "No data found for the selected filters. Try changing or clearing the filters."
+                  : dateRange?.hasData
+                  ? "Select a week to view variance analysis."
                   : "Import trips for forecasting and Amazon invoices for actuals to see variance analysis."}
               </p>
-              <div className="flex gap-2">
-                <Button variant="outline" asChild>
-                  <a href="/trips">Import Trips</a>
+              {hasActiveFilters ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedWeekId(null);
+                    setSelectedImportBatchId(null);
+                  }}
+                >
+                  Clear Filters
                 </Button>
-                <Button variant="outline" asChild>
-                  <a href="/amazon-invoices">Import Invoices</a>
-                </Button>
-              </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Button variant="outline" asChild>
+                    <a href="/trips">Import Trips</a>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <a href="/amazon-invoices">Import Invoices</a>
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

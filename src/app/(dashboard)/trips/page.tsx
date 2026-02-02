@@ -5,133 +5,78 @@ import { Upload, Truck, Package, CheckCircle, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { TripsImportModal, TripsTable, TripsBulkActions } from "@/components/forecasting";
-import { useTripsWithLoads, useTripDateRange } from "@/hooks";
-
-type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months" | "thisWeek" | "lastWeek";
+import {
+  WeekSelector,
+  ImportBatchSelector,
+  TripStatusFilter,
+  type TripStatusValue,
+} from "@/components/filters";
+import {
+  useTripsWithLoads,
+  useWeekOptions,
+  useImportBatchOptions,
+  useTripStatusCounts,
+} from "@/hooks";
+import type { TripsFilterParams } from "@/actions/forecasting/trips";
 
 export default function TripsPage() {
-  const [periodOption, setPeriodOption] = useState<PeriodOption>("all");
-  const [customDateRange, setCustomDateRange] = useState<{
-    start: string | null;
-    end: string | null;
-  }>({ start: null, end: null });
+  // Filter state
+  const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
+  const [selectedImportBatchId, setSelectedImportBatchId] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<TripStatusValue>("all");
   const [showImport, setShowImport] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Fetch available date range
-  const { dateRange } = useTripDateRange();
+  // Fetch filter options
+  const { weeks, isLoading: weeksLoading, invalidate: invalidateWeeks } = useWeekOptions();
+  const { batches, isLoading: batchesLoading, invalidate: invalidateBatches } = useImportBatchOptions();
+  const { statusCounts, isLoading: statusCountsLoading } = useTripStatusCounts(
+    selectedWeekId ?? undefined,
+    selectedImportBatchId ?? undefined
+  );
 
-  // Calculate effective date range
-  const effectiveDateRange = useMemo(() => {
-    const now = new Date();
+  // Build filter params
+  const filterParams = useMemo<TripsFilterParams>(() => {
+    const params: TripsFilterParams = {};
 
-    switch (periodOption) {
-      case "all":
-        return null;
-
-      case "thisWeek": {
-        const dayOfWeek = now.getDay();
-        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-        const start = new Date(now);
-        start.setDate(now.getDate() + diffToMonday);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        end.setHours(23, 59, 59, 999);
-        return { start, end };
-      }
-
-      case "lastWeek": {
-        const dayOfWeek = now.getDay();
-        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-        const thisMonday = new Date(now);
-        thisMonday.setDate(now.getDate() + diffToMonday);
-        const start = new Date(thisMonday);
-        start.setDate(thisMonday.getDate() - 7);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        end.setHours(23, 59, 59, 999);
-        return { start, end };
-      }
-
-      case "thisMonth": {
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        end.setHours(23, 59, 59, 999);
-        return { start, end };
-      }
-
-      case "lastMonth": {
-        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const end = new Date(now.getFullYear(), now.getMonth(), 0);
-        end.setHours(23, 59, 59, 999);
-        return { start, end };
-      }
-
-      case "last3Months": {
-        const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        end.setHours(23, 59, 59, 999);
-        return { start, end };
-      }
-
-      case "custom": {
-        const start = customDateRange.start
-          ? new Date(customDateRange.start)
-          : dateRange?.minDate
-            ? new Date(dateRange.minDate)
-            : null;
-        const end = customDateRange.end
-          ? new Date(customDateRange.end)
-          : dateRange?.maxDate
-            ? new Date(dateRange.maxDate)
-            : null;
-        if (start && end) {
-          end.setHours(23, 59, 59, 999);
-          return { start, end };
-        }
-        return null;
-      }
-
-      default:
-        return null;
+    if (selectedWeekId) {
+      params.weekId = selectedWeekId;
     }
-  }, [periodOption, customDateRange, dateRange]);
 
-  // Get display values for custom date inputs
-  const customStartDate = customDateRange.start
-    ? new Date(customDateRange.start)
-    : dateRange?.minDate
-      ? new Date(dateRange.minDate)
-      : undefined;
+    if (selectedImportBatchId) {
+      params.importBatchId = selectedImportBatchId;
+    }
 
-  const customEndDate = customDateRange.end
-    ? new Date(customDateRange.end)
-    : dateRange?.maxDate
-      ? new Date(dateRange.maxDate)
-      : undefined;
+    if (selectedStatus !== "all") {
+      params.tripStage = selectedStatus;
+    }
+
+    return params;
+  }, [selectedWeekId, selectedImportBatchId, selectedStatus]);
 
   // TanStack Query hook for trips data (with loads for detailed view)
-  const { trips, stats, isLoading: loading, invalidate, bulkDelete, isBulkDeleting } = useTripsWithLoads(
-    effectiveDateRange?.start,
-    effectiveDateRange?.end
-  );
+  const {
+    trips,
+    stats,
+    isLoading: loading,
+    invalidate,
+    bulkDelete,
+    isBulkDeleting,
+  } = useTripsWithLoads(filterParams);
 
   // Handle bulk delete
   const handleBulkDelete = useCallback(() => {
     bulkDelete(selectedIds);
     setSelectedIds([]); // Clear selection immediately (optimistic)
   }, [selectedIds, bulkDelete]);
+
+  // Handle import success - invalidate filters as well
+  const handleImportSuccess = useCallback(() => {
+    invalidate();
+    invalidateWeeks();
+    invalidateBatches();
+  }, [invalidate, invalidateWeeks, invalidateBatches]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -140,14 +85,6 @@ export default function TripsPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
-  };
-
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
   };
 
   // Calculate canceled and active trips
@@ -160,6 +97,9 @@ export default function TripsPage() {
   const projectedRevenue = activeTrips.reduce((sum, t) => sum + (t.projectedRevenue || 0), 0);
   const actualRevenue = trips.reduce((sum, t) => sum + (t.actualRevenue || 0), 0);
 
+  // Get selected week info for display
+  const selectedWeek = weeks.find((w) => w.id === selectedWeekId);
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -170,71 +110,70 @@ export default function TripsPage() {
             Manage scheduled trips and track actual loads
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Select
-            value={periodOption}
-            onValueChange={(value) => setPeriodOption(value as PeriodOption)}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Data</SelectItem>
-              <SelectItem value="thisWeek">This Week</SelectItem>
-              <SelectItem value="lastWeek">Last Week</SelectItem>
-              <SelectItem value="thisMonth">This Month</SelectItem>
-              <SelectItem value="lastMonth">Last Month</SelectItem>
-              <SelectItem value="last3Months">Last 3 Months</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {periodOption === "custom" && (
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                className="w-[140px]"
-                value={customStartDate ? customStartDate.toISOString().split("T")[0] : ""}
-                onChange={(e) =>
-                  setCustomDateRange((prev) => ({
-                    ...prev,
-                    start: e.target.value || null,
-                  }))
-                }
-                max={customEndDate ? customEndDate.toISOString().split("T")[0] : undefined}
-              />
-              <span className="text-muted-foreground">to</span>
-              <Input
-                type="date"
-                className="w-[140px]"
-                value={customEndDate ? customEndDate.toISOString().split("T")[0] : ""}
-                onChange={(e) =>
-                  setCustomDateRange((prev) => ({
-                    ...prev,
-                    end: e.target.value || null,
-                  }))
-                }
-                min={customStartDate ? customStartDate.toISOString().split("T")[0] : undefined}
-              />
-            </div>
-          )}
-
-          <Button onClick={() => setShowImport(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import Trips
-          </Button>
-        </div>
+        <Button onClick={() => setShowImport(true)}>
+          <Upload className="mr-2 h-4 w-4" />
+          Import Trips
+        </Button>
       </div>
 
-      {/* Data range info */}
-      {dateRange?.hasTrips && (
-        <div className="text-sm text-muted-foreground">
-          Available data: {formatDate(new Date(dateRange.minDate!))} - {formatDate(new Date(dateRange.maxDate!))}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2">
+        <WeekSelector
+          weeks={weeks}
+          selectedWeekId={selectedWeekId}
+          onWeekChange={setSelectedWeekId}
+          loading={weeksLoading}
+        />
+        <ImportBatchSelector
+          batches={batches}
+          selectedBatchId={selectedImportBatchId}
+          onBatchChange={setSelectedImportBatchId}
+          loading={batchesLoading}
+        />
+        <TripStatusFilter
+          statusCounts={statusCounts}
+          selectedStatus={selectedStatus}
+          onStatusChange={setSelectedStatus}
+          loading={statusCountsLoading}
+        />
+      </div>
+
+      {/* Active filter indicator */}
+      {(selectedWeekId || selectedImportBatchId || selectedStatus !== "all") && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Filtering by:</span>
+          {selectedWeek && (
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">
+              Week {selectedWeek.weekNumber}: {selectedWeek.label}
+            </span>
+          )}
+          {selectedImportBatchId && (
+            <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md text-xs font-medium">
+              Import Batch
+            </span>
+          )}
+          {selectedStatus !== "all" && (
+            <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded-md text-xs font-medium">
+              {selectedStatus.replace("_", " ")}
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => {
+              setSelectedWeekId(null);
+              setSelectedImportBatchId(null);
+              setSelectedStatus("all");
+            }}
+          >
+            Clear all
+          </Button>
         </div>
       )}
 
       {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -269,21 +208,6 @@ export default function TripsPage() {
             <div className="text-2xl font-bold">
               {loading ? <Skeleton className="h-8 w-12" /> : stats.actualLoads}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Completion
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-16" /> : `${stats.completion}%`}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.updatedCount} of {activeTripsCount} trips updated
-            </p>
           </CardContent>
         </Card>
         <Card className="bg-red-50/50 border-red-200">
@@ -370,14 +294,27 @@ export default function TripsPage() {
                 No trips found
               </h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                {dateRange?.hasTrips
-                  ? "No trips found for the selected period. Try changing the date filter."
+                {(selectedWeekId || selectedImportBatchId || selectedStatus !== "all")
+                  ? "No trips found for the selected filters. Try changing or clearing the filters."
                   : "Import your trip schedule from Amazon Scheduler CSV to track projected vs actual loads."}
               </p>
-              <Button onClick={() => setShowImport(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Import Trips
-              </Button>
+              {(selectedWeekId || selectedImportBatchId || selectedStatus !== "all") ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedWeekId(null);
+                    setSelectedImportBatchId(null);
+                    setSelectedStatus("all");
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              ) : (
+                <Button onClick={() => setShowImport(true)}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import Trips
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -421,7 +358,7 @@ export default function TripsPage() {
       <TripsImportModal
         open={showImport}
         onOpenChange={setShowImport}
-        onSuccess={invalidate}
+        onSuccess={handleImportSuccess}
       />
 
       {/* Bulk Actions */}

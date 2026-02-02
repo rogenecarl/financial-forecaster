@@ -15,6 +15,7 @@ import {
   getTripDateRange,
   bulkDeleteTrips,
   type TripWithLoadsForTable,
+  type TripsFilterParams,
 } from "@/actions/forecasting/trips";
 import {
   getForecasts,
@@ -41,8 +42,16 @@ export const forecastingKeys = {
 
   // Trips
   trips: ["trips"] as const,
-  tripsList: (startDate?: Date, endDate?: Date) =>
-    [...forecastingKeys.trips, "list", startDate?.toISOString(), endDate?.toISOString()] as const,
+  tripsList: (params?: TripsFilterParams) =>
+    [
+      ...forecastingKeys.trips,
+      "list",
+      params?.startDate?.toISOString(),
+      params?.endDate?.toISOString(),
+      params?.weekId,
+      params?.importBatchId,
+      params?.tripStage,
+    ] as const,
   tripDateRange: () => [...forecastingKeys.trips, "dateRange"] as const,
 
   // Forecasts (scenarios)
@@ -180,12 +189,13 @@ export function useTripDateRange() {
 
 export function useTrips(startDate?: Date, endDate?: Date) {
   const queryClient = useQueryClient();
+  const params: TripsFilterParams = { startDate, endDate };
 
   const {
     data,
     isLoading,
   } = useQuery({
-    queryKey: forecastingKeys.tripsList(startDate, endDate),
+    queryKey: forecastingKeys.tripsList(params),
     queryFn: async () => {
       const result = await getTripsWithStats(startDate, endDate);
       if (!result.success) throw new Error(result.error);
@@ -212,10 +222,10 @@ export function useTrips(startDate?: Date, endDate?: Date) {
   };
 }
 
-export function useTripsWithLoads(startDate?: Date, endDate?: Date) {
+export function useTripsWithLoads(params?: TripsFilterParams) {
   const queryClient = useQueryClient();
 
-  const queryKey = [...forecastingKeys.tripsList(startDate, endDate), "withLoads"];
+  const queryKey = [...forecastingKeys.tripsList(params), "withLoads"];
 
   const {
     data,
@@ -223,7 +233,7 @@ export function useTripsWithLoads(startDate?: Date, endDate?: Date) {
   } = useQuery({
     queryKey,
     queryFn: async () => {
-      const result = await getTripsWithLoads(startDate, endDate);
+      const result = await getTripsWithLoads(params);
       if (!result.success) throw new Error(result.error);
       return result.data;
     },
@@ -421,6 +431,93 @@ export function useInvoiceMatchingStats(invoiceId?: string) {
 
   return {
     matchingStats: data ?? null,
+    isLoading,
+  };
+}
+
+// ============================================
+// FILTER HOOKS
+// ============================================
+
+import {
+  getWeekOptions,
+  getImportBatchOptions,
+  getTripStatusCounts,
+} from "@/actions/filters";
+
+export const filterKeys = {
+  weeks: ["filters", "weeks"] as const,
+  weekOptions: () => [...filterKeys.weeks, "options"] as const,
+  importBatches: ["filters", "importBatches"] as const,
+  importBatchOptions: () => [...filterKeys.importBatches, "options"] as const,
+  statusCounts: (weekId?: string, importBatchId?: string) =>
+    ["filters", "statusCounts", weekId, importBatchId] as const,
+};
+
+export function useWeekOptions() {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: filterKeys.weekOptions(),
+    queryFn: async () => {
+      const result = await getWeekOptions();
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - weeks don't change often
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: filterKeys.weeks });
+  };
+
+  return {
+    weeks: data ?? [],
+    isLoading,
+    invalidate,
+  };
+}
+
+export function useImportBatchOptions() {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: filterKeys.importBatchOptions(),
+    queryFn: async () => {
+      const result = await getImportBatchOptions();
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    staleTime: 60 * 1000, // 1 minute - changes on import
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: filterKeys.importBatches });
+  };
+
+  return {
+    batches: data ?? [],
+    isLoading,
+    invalidate,
+  };
+}
+
+export function useTripStatusCounts(weekId?: string, importBatchId?: string) {
+  const { data, isLoading } = useQuery({
+    queryKey: filterKeys.statusCounts(weekId ?? undefined, importBatchId ?? undefined),
+    queryFn: async () => {
+      const result = await getTripStatusCounts(
+        weekId ?? undefined,
+        importBatchId ?? undefined
+      );
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  return {
+    statusCounts: data ?? [],
     isLoading,
   };
 }

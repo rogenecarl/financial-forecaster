@@ -12,8 +12,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { parseInvoiceFile, type InvoiceParseResult } from "@/lib/parsers/invoice-parser";
-import { importAmazonInvoice } from "@/actions/forecasting";
+import { importAmazonInvoice, checkDuplicateInvoiceFile, type InvoiceImportResult } from "@/actions/forecasting";
 import { toast } from "sonner";
+import { calculateFileHash } from "@/lib/utils";
+import { InvoiceImportResultDialog } from "./invoice-import-result-dialog";
+import { DuplicateFileWarningDialog, type PreviousImportInfo } from "./duplicate-file-warning-dialog";
 
 interface InvoiceImportModalProps {
   open: boolean;
@@ -27,6 +30,15 @@ export function InvoiceImportModal({ open, onOpenChange, onSuccess }: InvoiceImp
   const [step, setStep] = useState<Step>("upload");
   const [dragActive, setDragActive] = useState(false);
   const [parseResult, setParseResult] = useState<InvoiceParseResult | null>(null);
+  const [fileName, setFileName] = useState<string>("invoice.xlsx");
+  const [fileHash, setFileHash] = useState<string | undefined>(undefined);
+
+  // Dialog states
+  const [showResultDialog, setShowResultDialog] = useState(false);
+  const [importResult, setImportResult] = useState<InvoiceImportResult | null>(null);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [previousImportInfo, setPreviousImportInfo] = useState<PreviousImportInfo | null>(null);
+  const [skipDuplicateCheck, setSkipDuplicateCheck] = useState(false);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -39,6 +51,29 @@ export function InvoiceImportModal({ open, onOpenChange, onSuccess }: InvoiceImp
   }, []);
 
   const processFile = useCallback(async (file: File) => {
+    setFileName(file.name);
+
+    // Calculate file hash for duplicate detection
+    try {
+      const hash = await calculateFileHash(file);
+      setFileHash(hash);
+
+      // Check for duplicate file
+      const duplicateCheck = await checkDuplicateInvoiceFile(hash);
+      if (duplicateCheck.success && duplicateCheck.data?.isDuplicate && duplicateCheck.data.previousImport) {
+        setPreviousImportInfo({
+          importedAt: duplicateCheck.data.previousImport.importedAt,
+          fileName: duplicateCheck.data.previousImport.fileName,
+          itemCount: duplicateCheck.data.previousImport.invoiceCount,
+          itemType: "invoices",
+        });
+        setShowDuplicateWarning(true);
+      }
+    } catch {
+      // If hash calculation fails, continue without it
+      console.warn("Failed to calculate file hash");
+    }
+
     const result = await parseInvoiceFile(file);
     setParseResult(result);
 
@@ -73,14 +108,21 @@ export function InvoiceImportModal({ open, onOpenChange, onSuccess }: InvoiceImp
     setStep("importing");
 
     try {
-      const result = await importAmazonInvoice(parseResult.invoice);
+      // Pass file hash only if we haven't already confirmed duplicate warning
+      const hashToPass = skipDuplicateCheck ? undefined : fileHash;
+      const result = await importAmazonInvoice(parseResult.invoice, fileName, hashToPass);
 
       if (result.success) {
-        toast.success(`Imported invoice with ${result.data?.lineItemCount} line items`);
+        setImportResult(result.data!);
+        setShowResultDialog(true);
         onSuccess();
-        handleClose();
       } else {
-        toast.error(result.error || "Failed to import invoice");
+        // Handle duplicate file error specially
+        if (result.error?.startsWith("DUPLICATE_FILE:")) {
+          toast.error(result.error.replace("DUPLICATE_FILE: ", ""));
+        } else {
+          toast.error(result.error || "Failed to import invoice");
+        }
         setStep("preview");
       }
     } catch {
@@ -89,9 +131,29 @@ export function InvoiceImportModal({ open, onOpenChange, onSuccess }: InvoiceImp
     }
   };
 
+  const handleDuplicateWarningContinue = () => {
+    setSkipDuplicateCheck(true);
+    setShowDuplicateWarning(false);
+  };
+
+  const handleDuplicateWarningCancel = () => {
+    setShowDuplicateWarning(false);
+    handleClose();
+  };
+
+  const handleResultDialogClose = () => {
+    setShowResultDialog(false);
+    setImportResult(null);
+    handleClose();
+  };
+
   const handleClose = () => {
     setStep("upload");
     setParseResult(null);
+    setFileName("invoice.xlsx");
+    setFileHash(undefined);
+    setSkipDuplicateCheck(false);
+    setPreviousImportInfo(null);
     onOpenChange(false);
   };
 
@@ -233,6 +295,27 @@ export function InvoiceImportModal({ open, onOpenChange, onSuccess }: InvoiceImp
           </div>
         )}
       </DialogContent>
+
+      {/* Import Result Dialog */}
+      {importResult && (
+        <InvoiceImportResultDialog
+          open={showResultDialog}
+          onOpenChange={handleResultDialogClose}
+          result={importResult}
+          fileName={fileName}
+        />
+      )}
+
+      {/* Duplicate File Warning Dialog */}
+      {previousImportInfo && (
+        <DuplicateFileWarningDialog
+          open={showDuplicateWarning}
+          onOpenChange={setShowDuplicateWarning}
+          previousImport={previousImportInfo}
+          onContinue={handleDuplicateWarningContinue}
+          onCancel={handleDuplicateWarningCancel}
+        />
+      )}
     </Dialog>
   );
 }

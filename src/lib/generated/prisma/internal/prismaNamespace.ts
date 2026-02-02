@@ -391,6 +391,8 @@ export const ModelName = {
   Category: 'Category',
   Transaction: 'Transaction',
   ImportBatch: 'ImportBatch',
+  TripImportBatch: 'TripImportBatch',
+  InvoiceImportBatch: 'InvoiceImportBatch',
   CategoryRule: 'CategoryRule',
   AmazonInvoice: 'AmazonInvoice',
   AmazonInvoiceLineItem: 'AmazonInvoiceLineItem',
@@ -413,7 +415,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "category" | "transaction" | "importBatch" | "categoryRule" | "amazonInvoice" | "amazonInvoiceLineItem" | "trip" | "tripLoad" | "forecastWeek" | "forecast"
+    modelProps: "user" | "session" | "account" | "verification" | "category" | "transaction" | "importBatch" | "tripImportBatch" | "invoiceImportBatch" | "categoryRule" | "amazonInvoice" | "amazonInvoiceLineItem" | "trip" | "tripLoad" | "forecastWeek" | "forecast"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -932,6 +934,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.ImportBatchCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.ImportBatchCountAggregateOutputType> | number
+        }
+      }
+    }
+    TripImportBatch: {
+      payload: Prisma.$TripImportBatchPayload<ExtArgs>
+      fields: Prisma.TripImportBatchFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TripImportBatchFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TripImportBatchFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload>
+        }
+        findFirst: {
+          args: Prisma.TripImportBatchFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TripImportBatchFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload>
+        }
+        findMany: {
+          args: Prisma.TripImportBatchFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload>[]
+        }
+        create: {
+          args: Prisma.TripImportBatchCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload>
+        }
+        createMany: {
+          args: Prisma.TripImportBatchCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TripImportBatchCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload>[]
+        }
+        delete: {
+          args: Prisma.TripImportBatchDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload>
+        }
+        update: {
+          args: Prisma.TripImportBatchUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload>
+        }
+        deleteMany: {
+          args: Prisma.TripImportBatchDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TripImportBatchUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TripImportBatchUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload>[]
+        }
+        upsert: {
+          args: Prisma.TripImportBatchUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TripImportBatchPayload>
+        }
+        aggregate: {
+          args: Prisma.TripImportBatchAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTripImportBatch>
+        }
+        groupBy: {
+          args: Prisma.TripImportBatchGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TripImportBatchGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TripImportBatchCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TripImportBatchCountAggregateOutputType> | number
+        }
+      }
+    }
+    InvoiceImportBatch: {
+      payload: Prisma.$InvoiceImportBatchPayload<ExtArgs>
+      fields: Prisma.InvoiceImportBatchFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.InvoiceImportBatchFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.InvoiceImportBatchFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload>
+        }
+        findFirst: {
+          args: Prisma.InvoiceImportBatchFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.InvoiceImportBatchFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload>
+        }
+        findMany: {
+          args: Prisma.InvoiceImportBatchFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload>[]
+        }
+        create: {
+          args: Prisma.InvoiceImportBatchCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload>
+        }
+        createMany: {
+          args: Prisma.InvoiceImportBatchCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.InvoiceImportBatchCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload>[]
+        }
+        delete: {
+          args: Prisma.InvoiceImportBatchDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload>
+        }
+        update: {
+          args: Prisma.InvoiceImportBatchUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload>
+        }
+        deleteMany: {
+          args: Prisma.InvoiceImportBatchDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.InvoiceImportBatchUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.InvoiceImportBatchUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload>[]
+        }
+        upsert: {
+          args: Prisma.InvoiceImportBatchUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InvoiceImportBatchPayload>
+        }
+        aggregate: {
+          args: Prisma.InvoiceImportBatchAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateInvoiceImportBatch>
+        }
+        groupBy: {
+          args: Prisma.InvoiceImportBatchGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.InvoiceImportBatchGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.InvoiceImportBatchCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.InvoiceImportBatchCountAggregateOutputType> | number
         }
       }
     }
@@ -1603,6 +1753,47 @@ export const ImportBatchScalarFieldEnum = {
 export type ImportBatchScalarFieldEnum = (typeof ImportBatchScalarFieldEnum)[keyof typeof ImportBatchScalarFieldEnum]
 
 
+export const TripImportBatchScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  fileName: 'fileName',
+  fileHash: 'fileHash',
+  importedAt: 'importedAt',
+  periodStart: 'periodStart',
+  periodEnd: 'periodEnd',
+  tripCount: 'tripCount',
+  newTripsCount: 'newTripsCount',
+  skippedCount: 'skippedCount',
+  loadCount: 'loadCount',
+  canceledCount: 'canceledCount',
+  projectedTours: 'projectedTours',
+  projectedLoads: 'projectedLoads',
+  projectedTourPay: 'projectedTourPay',
+  projectedAccessorials: 'projectedAccessorials',
+  projectedTotal: 'projectedTotal',
+  status: 'status',
+  errorMessage: 'errorMessage'
+} as const
+
+export type TripImportBatchScalarFieldEnum = (typeof TripImportBatchScalarFieldEnum)[keyof typeof TripImportBatchScalarFieldEnum]
+
+
+export const InvoiceImportBatchScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  fileName: 'fileName',
+  fileHash: 'fileHash',
+  importedAt: 'importedAt',
+  invoiceCount: 'invoiceCount',
+  lineItemCount: 'lineItemCount',
+  matchedTrips: 'matchedTrips',
+  unmatchedTrips: 'unmatchedTrips',
+  status: 'status'
+} as const
+
+export type InvoiceImportBatchScalarFieldEnum = (typeof InvoiceImportBatchScalarFieldEnum)[keyof typeof InvoiceImportBatchScalarFieldEnum]
+
+
 export const CategoryRuleScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -1623,6 +1814,7 @@ export type CategoryRuleScalarFieldEnum = (typeof CategoryRuleScalarFieldEnum)[k
 export const AmazonInvoiceScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
+  importBatchId: 'importBatchId',
   invoiceNumber: 'invoiceNumber',
   routeDomicile: 'routeDomicile',
   equipment: 'equipment',
@@ -1668,6 +1860,7 @@ export const TripScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   weekId: 'weekId',
+  importBatchId: 'importBatchId',
   tripId: 'tripId',
   tripStage: 'tripStage',
   equipmentType: 'equipmentType',
@@ -1675,6 +1868,8 @@ export const TripScalarFieldEnum = {
   scheduledDate: 'scheduledDate',
   projectedLoads: 'projectedLoads',
   actualLoads: 'actualLoads',
+  originalProjectedLoads: 'originalProjectedLoads',
+  originalProjectedRevenue: 'originalProjectedRevenue',
   estimatedAccessorial: 'estimatedAccessorial',
   projectedRevenue: 'projectedRevenue',
   actualRevenue: 'actualRevenue',
@@ -1740,6 +1935,7 @@ export const ForecastWeekScalarFieldEnum = {
   variance: 'variance',
   variancePercent: 'variancePercent',
   amazonInvoiceId: 'amazonInvoiceId',
+  projectionLockedAt: 'projectionLockedAt',
   notes: 'notes',
   status: 'status',
   createdAt: 'createdAt',
@@ -2070,6 +2266,8 @@ export type GlobalOmitConfig = {
   category?: Prisma.CategoryOmit
   transaction?: Prisma.TransactionOmit
   importBatch?: Prisma.ImportBatchOmit
+  tripImportBatch?: Prisma.TripImportBatchOmit
+  invoiceImportBatch?: Prisma.InvoiceImportBatchOmit
   categoryRule?: Prisma.CategoryRuleOmit
   amazonInvoice?: Prisma.AmazonInvoiceOmit
   amazonInvoiceLineItem?: Prisma.AmazonInvoiceLineItemOmit

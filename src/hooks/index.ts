@@ -13,6 +13,11 @@ export {
   useForecastDateRange,
   useInvoiceMatchingStats,
   forecastingKeys,
+  // Filter hooks
+  useWeekOptions,
+  useImportBatchOptions,
+  useTripStatusCounts,
+  filterKeys,
 } from "./use-forecasting"
 // Re-export useSession for direct access if needed
 export { useSession } from "@/components/providers"

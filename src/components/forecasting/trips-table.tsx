@@ -11,7 +11,6 @@ import {
   Loader2,
   ChevronRight,
   MapPin,
-  Package,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -49,6 +48,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { TripWithLoadsForTable } from "@/actions/forecasting/trips";
 import { updateTrip } from "@/actions/forecasting";
 import { toast } from "sonner";
+import { FORECASTING_CONSTANTS } from "@/config/forecasting";
 
 interface TripsTableProps {
   trips: TripWithLoadsForTable[];
@@ -117,6 +117,42 @@ function getStops(load: LoadType): StopInfo[] {
 function countDeliveryStops(load: LoadType): number {
   if (load.isBobtail) return 0;
   return getStops(load).filter((s) => s.isDelivery).length;
+}
+
+/**
+ * Filter loads to only show those that introduce NEW delivery stops.
+ * This prevents showing duplicate delivery information when a stop appears in multiple loads.
+ * For example: if Load A delivers to PY24719, and Load B picks up from PY24719 and returns to MSP,
+ * Load B is hidden because PY24719 was already shown in Load A.
+ *
+ * Loads with more deliveries get priority - they "claim" their stops first.
+ */
+function filterLoadsWithUniqueDeliveries(loads: LoadType[]): LoadType[] {
+  // First, filter to only loads with deliveries
+  const loadsWithDeliveries = loads.filter((load) => countDeliveryStops(load) > 0);
+
+  // Sort by delivery count descending - loads with more deliveries get priority
+  const sortedLoads = [...loadsWithDeliveries].sort(
+    (a, b) => countDeliveryStops(b) - countDeliveryStops(a)
+  );
+
+  // Build a map of which load first introduces each delivery stop
+  const deliveryStopFirstLoad = new Map<string, string>();
+  sortedLoads.forEach((load) => {
+    getStops(load)
+      .filter((s) => s.isDelivery)
+      .forEach((stop) => {
+        if (!deliveryStopFirstLoad.has(stop.name)) {
+          deliveryStopFirstLoad.set(stop.name, load.loadId);
+        }
+      });
+  });
+
+  // Only show loads that first introduce at least one delivery stop
+  return sortedLoads.filter((load) => {
+    const deliveryStops = getStops(load).filter((s) => s.isDelivery);
+    return deliveryStops.some((stop) => deliveryStopFirstLoad.get(stop.name) === load.loadId);
+  });
 }
 
 export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionChange }: TripsTableProps) {
@@ -411,8 +447,15 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                         <span className="text-sm">{getStatusText(trip)}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatCurrency(trip.projectedRevenue)}
+                    <TableCell className="text-right">
+                      <div className="space-y-0.5">
+                        <div className="text-[10px] text-muted-foreground">
+                          ${(trip.projectedLoads * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE).toFixed(2)} + ${FORECASTING_CONSTANTS.DTR_RATE.toFixed(2)}
+                        </div>
+                        <div className="font-medium text-emerald-700 tabular-nums">
+                          ${((trip.projectedLoads * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE) + FORECASTING_CONSTANTS.DTR_RATE).toFixed(2)}
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {trip.actualRevenue !== null ? (
@@ -451,13 +494,40 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
                       <TableCell colSpan={10} className="p-0">
                         <div className="px-6 py-4 space-y-3">
-                          {trip.loads.map((load) => (
+                          {filterLoadsWithUniqueDeliveries(trip.loads).map((load) => (
                             <LoadCard
                               key={load.id}
                               load={load}
                               formatTime={formatTime}
                             />
                           ))}
+                          {filterLoadsWithUniqueDeliveries(trip.loads).length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-2">
+                              No delivery loads (only warehouse movements)
+                            </p>
+                          )}
+
+                          {/* Revenue Summary */}
+                          {trip.projectedLoads > 0 && (
+                            <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                              <div className="text-xs space-y-1">
+                                <div className="flex justify-between text-emerald-700">
+                                  <span>Accessorial:</span>
+                                  <span>
+                                    {trip.projectedLoads} × ${FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE} = ${(trip.projectedLoads * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE).toFixed(2)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-emerald-700">
+                                  <span>DTR:</span>
+                                  <span>${FORECASTING_CONSTANTS.DTR_RATE.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between pt-1 border-t border-emerald-200 font-medium text-emerald-800">
+                                  <span>Projected Revenue:</span>
+                                  <span>${((trip.projectedLoads * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE) + FORECASTING_CONSTANTS.DTR_RATE).toFixed(2)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -534,15 +604,10 @@ function LoadCard({ load, formatTime }: LoadCardProps) {
             )}
           </div>
           <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <MapPin className="h-3 w-3" />
-              <span>{stops.length} stops</span>
-              {!load.isBobtail && (
-                <span className="text-emerald-600 font-medium ml-1">
-                  ({deliveryCount} deliveries)
-                </span>
-              )}
-            </div>
+            <span className="text-muted-foreground">
+              {stops.length} stops
+              {!load.isBobtail && ` • ${deliveryCount} deliveries`}
+            </span>
             <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`} />
           </div>
         </CollapsibleTrigger>
@@ -576,14 +641,13 @@ function LoadCard({ load, formatTime }: LoadCardProps) {
                 </div>
               ))}
             </div>
-            {load.estimatedCost != null && load.estimatedCost > 0 && (
-              <div className="mt-2 pt-2 border-t text-xs text-muted-foreground flex items-center gap-4">
-                <div className="flex items-center gap-1">
-                  <Package className="h-3 w-3" />
-                  <span>Accessorial: <span className="font-medium text-emerald-600">${load.estimatedCost.toFixed(2)}</span></span>
-                </div>
+            {deliveryCount > 0 && (
+              <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                Accessorial: <span className="font-medium text-emerald-600">
+                  {deliveryCount} × ${FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE} = ${(deliveryCount * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE).toFixed(2)}
+                </span>
                 {load.estimateDistance > 0 && (
-                  <span>Distance: {load.estimateDistance.toFixed(1)} mi</span>
+                  <span className="ml-3">Distance: {load.estimateDistance.toFixed(1)} mi</span>
                 )}
               </div>
             )}

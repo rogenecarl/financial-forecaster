@@ -91,14 +91,21 @@ function countDeliveryStops(load: CreateTripLoad): number {
  * This prevents showing duplicate delivery information when a stop appears in multiple loads.
  * For example: if Load A delivers to PY24719, and Load B picks up from PY24719 and returns to MSP,
  * Load B is hidden because PY24719 was already shown in Load A.
+ *
+ * Loads with more deliveries get priority - they "claim" their stops first.
  */
 function filterLoadsWithUniqueDeliveries(loads: CreateTripLoad[]): CreateTripLoad[] {
   // First, filter to only loads with deliveries
   const loadsWithDeliveries = loads.filter((load) => countDeliveryStops(load) > 0);
 
+  // Sort by delivery count descending - loads with more deliveries get priority
+  const sortedLoads = [...loadsWithDeliveries].sort(
+    (a, b) => countDeliveryStops(b) - countDeliveryStops(a)
+  );
+
   // Build a map of which load first introduces each delivery stop
   const deliveryStopFirstLoad = new Map<string, string>();
-  loadsWithDeliveries.forEach((load) => {
+  sortedLoads.forEach((load) => {
     getStops(load)
       .filter((s) => s.isDelivery)
       .forEach((stop) => {
@@ -109,7 +116,7 @@ function filterLoadsWithUniqueDeliveries(loads: CreateTripLoad[]): CreateTripLoa
   });
 
   // Only show loads that first introduce at least one delivery stop
-  return loadsWithDeliveries.filter((load) => {
+  return sortedLoads.filter((load) => {
     const deliveryStops = getStops(load).filter((s) => s.isDelivery);
     return deliveryStops.some((stop) => deliveryStopFirstLoad.get(stop.name) === load.loadId);
   });

@@ -150,10 +150,14 @@ export default function TripsPage() {
     });
   };
 
+  // Calculate canceled and active trips
+  const canceledTrips = trips.filter((t) => t.tripStage === "CANCELED").length;
+  const activeTrips = trips.filter((t) => t.tripStage !== "CANCELED");
+  const activeTripsCount = activeTrips.length;
+  const activeProjectedLoads = activeTrips.reduce((sum, t) => sum + t.projectedLoads, 0);
+
   // Exclude canceled trips from projected revenue (canceled trips don't generate projected revenue)
-  const projectedRevenue = trips
-    .filter((t) => t.tripStage !== "CANCELED")
-    .reduce((sum, t) => sum + (t.projectedRevenue || 0), 0);
+  const projectedRevenue = activeTrips.reduce((sum, t) => sum + (t.projectedRevenue || 0), 0);
   const actualRevenue = trips.reduce((sum, t) => sum + (t.actualRevenue || 0), 0);
 
   return (
@@ -230,16 +234,16 @@ export default function TripsPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Trips
+              Active Trips
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-12" /> : stats.totalTrips}
+              {loading ? <Skeleton className="h-8 w-12" /> : activeTripsCount}
             </div>
           </CardContent>
         </Card>
@@ -251,7 +255,7 @@ export default function TripsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-12" /> : stats.projectedLoads}
+              {loading ? <Skeleton className="h-8 w-12" /> : activeProjectedLoads}
             </div>
           </CardContent>
         </Card>
@@ -278,8 +282,20 @@ export default function TripsPage() {
               {loading ? <Skeleton className="h-8 w-16" /> : `${stats.completion}%`}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.updatedCount} of {stats.totalTrips} trips updated
+              {stats.updatedCount} of {activeTripsCount} trips updated
             </p>
+          </CardContent>
+        </Card>
+        <Card className="bg-red-50/50 border-red-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-red-600">
+              Canceled
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-700">
+              {loading ? <Skeleton className="h-8 w-12" /> : canceledTrips}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -296,6 +312,11 @@ export default function TripsPage() {
                 </div>
                 <p className="text-2xl font-bold text-emerald-700">{formatCurrency(projectedRevenue)}</p>
               </div>
+              {canceledTrips > 0 && (
+                <p className="text-xs text-emerald-600 mt-2 pt-2 border-t border-emerald-200">
+                  Note: {canceledTrips} canceled {canceledTrips === 1 ? "trip is" : "trips are"} excluded from trip count and projected loads
+                </p>
+              )}
             </CardContent>
           </Card>
           {actualRevenue > 0 && (

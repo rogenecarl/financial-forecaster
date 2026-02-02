@@ -39,6 +39,7 @@ import { parseTripsFile, type TripsParseResult } from "@/lib/parsers/trips-parse
 import { importTrips } from "@/actions/forecasting";
 import { toast } from "sonner";
 import type { CreateTripLoad } from "@/schema/forecasting.schema";
+import { FORECASTING_CONSTANTS } from "@/config/forecasting";
 
 interface TripsImportModalProps {
   open: boolean;
@@ -83,6 +84,35 @@ function getStops(load: CreateTripLoad): StopInfo[] {
 function countDeliveryStops(load: CreateTripLoad): number {
   if (load.isBobtail) return 0;
   return getStops(load).filter((s) => s.isDelivery).length;
+}
+
+/**
+ * Filter loads to only show those that introduce NEW delivery stops.
+ * This prevents showing duplicate delivery information when a stop appears in multiple loads.
+ * For example: if Load A delivers to PY24719, and Load B picks up from PY24719 and returns to MSP,
+ * Load B is hidden because PY24719 was already shown in Load A.
+ */
+function filterLoadsWithUniqueDeliveries(loads: CreateTripLoad[]): CreateTripLoad[] {
+  // First, filter to only loads with deliveries
+  const loadsWithDeliveries = loads.filter((load) => countDeliveryStops(load) > 0);
+
+  // Build a map of which load first introduces each delivery stop
+  const deliveryStopFirstLoad = new Map<string, string>();
+  loadsWithDeliveries.forEach((load) => {
+    getStops(load)
+      .filter((s) => s.isDelivery)
+      .forEach((stop) => {
+        if (!deliveryStopFirstLoad.has(stop.name)) {
+          deliveryStopFirstLoad.set(stop.name, load.loadId);
+        }
+      });
+  });
+
+  // Only show loads that first introduce at least one delivery stop
+  return loadsWithDeliveries.filter((load) => {
+    const deliveryStops = getStops(load).filter((s) => s.isDelivery);
+    return deliveryStops.some((stop) => deliveryStopFirstLoad.get(stop.name) === load.loadId);
+  });
 }
 
 export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportModalProps) {
@@ -178,16 +208,25 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
     return format(new Date(date), "MMM d");
   };
 
-  // Memoize computed statistics
+  // Memoize computed statistics (excluding canceled trips from active counts)
   const stats = useMemo(() => {
     if (!parseResult) return null;
+
+    // Filter out canceled trips for active calculations
+    const activeTrips = parseResult.trips.filter((t) => t.tripStage !== "CANCELED");
+    const canceledTrips = parseResult.trips.filter((t) => t.tripStage === "CANCELED");
+
     return {
-      totalTrips: parseResult.stats.totalTrips,
-      totalLoads: parseResult.stats.totalLoads,
-      bobtailLoads: parseResult.stats.bobtailLoads,
-      canceledTrips: parseResult.stats.canceledTrips,
-      projectedLoads: parseResult.trips.reduce((sum, t) => sum + t.projectedLoads, 0),
-      projectedRevenue: parseResult.trips.reduce((sum, t) => sum + (t.projectedRevenue || 0), 0),
+      // Active trips count (excludes canceled)
+      activeTrips: activeTrips.length,
+      // Total trips from parser (includes canceled, for import button)
+      totalTripsRaw: parseResult.stats.totalTrips,
+      // Canceled trips count
+      canceledTrips: canceledTrips.length,
+      // Projected loads only from active (non-canceled) trips
+      projectedLoads: activeTrips.reduce((sum, t) => sum + t.projectedLoads, 0),
+      // Projected revenue only from active (non-canceled) trips
+      projectedRevenue: activeTrips.reduce((sum, t) => sum + (t.projectedRevenue || 0), 0),
     };
   }, [parseResult]);
 
@@ -235,23 +274,24 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
               <AlertTitle className="text-emerald-800">Data Parsed Successfully</AlertTitle>
               <AlertDescription className="text-emerald-700">
-                Found {stats.totalTrips} trips with {stats.projectedLoads} projected loads
+                Found {stats.activeTrips} trips with {stats.projectedLoads} projected loads
+                {stats.canceledTrips > 0 && (
+                  <span className="block text-xs text-emerald-600 mt-1">
+                    Note: {stats.canceledTrips} canceled {stats.canceledTrips === 1 ? "trip is" : "trips are"} excluded from trip count and projected loads
+                  </span>
+                )}
               </AlertDescription>
             </Alert>
 
             {/* Summary Stats */}
-            <div className="grid grid-cols-4 gap-3 text-sm flex-shrink-0">
+            <div className="grid grid-cols-3 gap-3 text-sm flex-shrink-0">
               <div className="p-3 bg-muted/50 rounded-lg text-center">
-                <p className="text-xl font-bold">{stats.totalTrips}</p>
-                <p className="text-xs text-muted-foreground">Trips</p>
+                <p className="text-xl font-bold">{stats.activeTrips}</p>
+                <p className="text-xs text-muted-foreground">Active Trips</p>
               </div>
               <div className="p-3 bg-muted/50 rounded-lg text-center">
                 <p className="text-xl font-bold">{stats.projectedLoads}</p>
                 <p className="text-xs text-muted-foreground">Proj. Loads</p>
-              </div>
-              <div className="p-3 bg-amber-50 rounded-lg text-center">
-                <p className="text-xl font-bold text-amber-700">{stats.bobtailLoads}</p>
-                <p className="text-xs text-amber-600">Bobtail</p>
               </div>
               <div className="p-3 bg-red-50 rounded-lg text-center">
                 <p className="text-xl font-bold text-red-700">{stats.canceledTrips}</p>
@@ -259,20 +299,34 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
               </div>
             </div>
 
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex-shrink-0">
-              <p className="text-sm text-emerald-800">
-                <span className="font-medium">Projected Revenue: </span>
-                {formatCurrency(stats.projectedRevenue)}
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex-shrink-0 space-y-2">
+              <p className="text-xs text-emerald-700">
+                Based on ${FORECASTING_CONSTANTS.DTR_RATE} DTR + ${FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE}/load accessorial
               </p>
-              <p className="text-xs text-emerald-700 mt-1">
-                Based on $452 DTR + estimated accessorials
-              </p>
+              <div className="text-xs text-emerald-800 space-y-1">
+                <p>
+                  <span className="text-emerald-600">Trip Completed Payout:</span>{" "}
+                  {stats.activeTrips} × ${FORECASTING_CONSTANTS.DTR_RATE} ={" "}
+                  <span className="font-medium">{formatCurrency(stats.activeTrips * FORECASTING_CONSTANTS.DTR_RATE)}</span>
+                </p>
+                <p>
+                  <span className="text-emerald-600">Projected Loads Accessorial:</span>{" "}
+                  {stats.projectedLoads} × ${FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE} ={" "}
+                  <span className="font-medium">{formatCurrency(stats.projectedLoads * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE)}</span>
+                </p>
+              </div>
+              <div className="pt-2 border-t border-emerald-200">
+                <p className="text-sm text-emerald-800">
+                  <span className="font-medium">Projected Revenue: </span>
+                  <span className="font-bold">{formatCurrency(stats.projectedRevenue)}</span>
+                </p>
+              </div>
             </div>
 
             {/* Trips Accordion */}
             <div className="flex-1 min-h-0 overflow-hidden">
               <p className="text-sm font-medium mb-2">Trip Details</p>
-              <ScrollArea className="h-[280px] rounded-md border">
+              <ScrollArea className="h-70 rounded-md border">
                 <Accordion type="multiple" className="w-full">
                   {parseResult.trips.map((trip) => {
                     const isCanceled = trip.tripStage === "CANCELED";
@@ -295,20 +349,27 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
                                 <span>{trip.projectedLoads} loads</span>
                               </div>
                               <span className="text-emerald-600 font-medium">
-                                {formatCurrency(trip.projectedRevenue || 0)}
+                                Accessorial: {formatCurrency(trip.projectedLoads * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE)}
                               </span>
                             </div>
                           </div>
                         </AccordionTrigger>
                         <AccordionContent className="px-4 pb-4">
                           <div className="space-y-3">
-                            {trip.loads.map((load) => (
+                            {/* Only show loads that introduce NEW delivery stops (deduped) */}
+                            {filterLoadsWithUniqueDeliveries(trip.loads).map((load) => (
                               <LoadCard
                                 key={load.loadId}
                                 load={load}
                                 formatTime={formatTime}
                               />
                             ))}
+                            {/* Show message if no unique delivery loads */}
+                            {filterLoadsWithUniqueDeliveries(trip.loads).length === 0 && (
+                              <p className="text-xs text-muted-foreground text-center py-2">
+                                No delivery loads (only warehouse movements)
+                              </p>
+                            )}
                           </div>
                         </AccordionContent>
                       </AccordionItem>
@@ -341,7 +402,7 @@ export function TripsImportModal({ open, onOpenChange, onSuccess }: TripsImportM
               </Button>
               <Button onClick={handleImport}>
                 <Truck className="mr-2 h-4 w-4" />
-                Import {stats.totalTrips} Trips
+                Import {stats.totalTripsRaw} Trips
               </Button>
             </div>
           </div>
@@ -435,9 +496,11 @@ function LoadCard({ load, formatTime }: LoadCardProps) {
                 </div>
               ))}
             </div>
-            {load.estimatedCost != null && load.estimatedCost > 0 && (
+            {deliveryCount > 0 && (
               <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                Accessorial: <span className="font-medium text-emerald-600">${load.estimatedCost.toFixed(2)}</span>
+                Accessorial: <span className="font-medium text-emerald-600">
+                  {deliveryCount} × ${FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE} = ${(deliveryCount * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE).toFixed(2)}
+                </span>
                 {load.estimateDistance > 0 && (
                   <span className="ml-3">Distance: {load.estimateDistance.toFixed(1)} mi</span>
                 )}

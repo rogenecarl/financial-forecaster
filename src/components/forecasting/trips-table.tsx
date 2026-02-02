@@ -246,7 +246,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
   const getStatusText = (trip: TripWithLoadsForTable) => {
     if (trip.tripStage === "CANCELED") return "Canceled";
     if (trip.actualLoads !== null) return "Updated";
-    if (new Date(trip.scheduledDate) < new Date()) return "Pending";
+    if (new Date(trip.scheduledDate) < new Date()) return "Pending/Rejected";
     return "Scheduled";
   };
 
@@ -278,7 +278,8 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
               <TableHead className="text-center">Projected</TableHead>
               <TableHead className="text-center">Actual</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Revenue</TableHead>
+              <TableHead className="text-right">Projected Rev.</TableHead>
+              <TableHead className="text-right">Actual Rev.</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -292,6 +293,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                 <TableCell><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
                 <TableCell><Skeleton className="h-8 w-16 mx-auto" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                 <TableCell><Skeleton className="h-8 w-8" /></TableCell>
               </TableRow>
@@ -332,7 +334,8 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
               <TableHead className="text-center">Projected</TableHead>
               <TableHead className="text-center">Actual</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Revenue</TableHead>
+              <TableHead className="text-right">Projected Rev.</TableHead>
+              <TableHead className="text-right">Actual Rev.</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -365,14 +368,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      <div className="flex items-center gap-2">
-                        {trip.tripId}
-                        {hasLoads && (
-                          <Badge variant="outline" className="text-[10px] px-1.5">
-                            {trip.loads.length} {trip.loads.length === 1 ? "load" : "loads"}
-                          </Badge>
-                        )}
-                      </div>
+                      {trip.tripId}
                     </TableCell>
                     <TableCell>
                       {format(new Date(trip.scheduledDate), "MMM d")}
@@ -418,6 +414,15 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                     <TableCell className="text-right tabular-nums">
                       {formatCurrency(trip.projectedRevenue)}
                     </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {trip.actualRevenue !== null ? (
+                        <span className="text-emerald-600 font-medium">
+                          {formatCurrency(trip.actualRevenue)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <TooltipProvider>
                         <Tooltip>
@@ -444,7 +449,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                   {/* Expanded loads section */}
                   {isExpanded && hasLoads && (
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableCell colSpan={9} className="p-0">
+                      <TableCell colSpan={10} className="p-0">
                         <div className="px-6 py-4 space-y-3">
                           {trip.loads.map((load) => (
                             <LoadCard

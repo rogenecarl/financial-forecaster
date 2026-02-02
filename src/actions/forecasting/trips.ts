@@ -6,6 +6,7 @@ import type { ActionResponse } from "@/types/api";
 import type { ImportTrip, Trip, TripLoad, UpdateTrip, TripFilter } from "@/schema/forecasting.schema";
 import { updateTripSchema, tripFilterSchema } from "@/schema/forecasting.schema";
 import { startOfWeek, endOfWeek, getWeek, getYear } from "date-fns";
+import { FORECASTING_CONSTANTS } from "@/config/forecasting";
 
 // ============================================
 // TYPES
@@ -862,10 +863,14 @@ async function createOrUpdateForecastWeek(userId: string, weekStart: Date) {
     },
   });
 
-  const projectedTours = trips.length;
-  const projectedLoads = trips.reduce((sum, t) => sum + t.projectedLoads, 0);
-  const projectedTourPay = projectedTours * 452; // DTR rate
-  const projectedAccessorials = trips.reduce((sum, t) => sum + toNumber(t.estimatedAccessorial), 0);
+  // Exclude canceled trips from projections
+  const activeTrips = trips.filter(t => t.tripStage !== "CANCELED");
+  const { DTR_RATE, LOAD_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
+
+  const projectedTours = activeTrips.length;
+  const projectedLoads = activeTrips.reduce((sum, t) => sum + t.projectedLoads, 0);
+  const projectedTourPay = projectedTours * DTR_RATE;
+  const projectedAccessorials = projectedLoads * LOAD_ACCESSORIAL_RATE;
   const projectedTotal = projectedTourPay + projectedAccessorials;
 
   const existing = await prisma.forecastWeek.findFirst({

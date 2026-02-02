@@ -150,7 +150,10 @@ export default function TripsPage() {
     });
   };
 
-  const projectedRevenue = trips.reduce((sum, t) => sum + (t.projectedRevenue || 0), 0);
+  // Exclude canceled trips from projected revenue (canceled trips don't generate projected revenue)
+  const projectedRevenue = trips
+    .filter((t) => t.tripStage !== "CANCELED")
+    .reduce((sum, t) => sum + (t.projectedRevenue || 0), 0);
   const actualRevenue = trips.reduce((sum, t) => sum + (t.actualRevenue || 0), 0);
 
   return (
@@ -289,7 +292,7 @@ export default function TripsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-emerald-700">Projected Revenue</p>
-                  <p className="text-xs text-emerald-600">Based on $452 DTR + estimated accessorials</p>
+                  <p className="text-xs text-emerald-600">Based on $452.09 DTR + $34.12/load</p>
                 </div>
                 <p className="text-2xl font-bold text-emerald-700">{formatCurrency(projectedRevenue)}</p>
               </div>

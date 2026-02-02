@@ -6,6 +6,7 @@ import type { ActionResponse } from "@/types/api";
 import type { ImportInvoice, AmazonInvoice, AmazonInvoiceLineItem } from "@/schema/forecasting.schema";
 import { importInvoiceSchema } from "@/schema/forecasting.schema";
 import { startOfWeek, endOfWeek, getWeek, getYear } from "date-fns";
+import { FORECASTING_CONSTANTS } from "@/config/forecasting";
 
 // ============================================
 // TYPES
@@ -448,6 +449,7 @@ async function recalculateForecastWeeksFromTrips(
       const year = getYear(weekStart);
 
       // Calculate actuals from trips
+      const { DTR_RATE } = FORECASTING_CONSTANTS;
       let actualTours = 0;
       let actualLoads = 0;
       let actualTourPay = 0;
@@ -462,9 +464,9 @@ async function recalculateForecastWeeksFromTrips(
         if (trip.tripStage === "COMPLETED") {
           actualTours++;
           // Estimate tour pay vs accessorials from actual revenue
-          // Tour pay is $452, rest is accessorials
-          actualTourPay += 452;
-          actualAccessorials += Math.max(0, tripActualRevenue - 452);
+          // Tour pay is DTR_RATE, rest is accessorials
+          actualTourPay += DTR_RATE;
+          actualAccessorials += Math.max(0, tripActualRevenue - DTR_RATE);
         } else if (trip.tripStage === "CANCELED" && tripActualRevenue > 0) {
           // TONU or other adjustment
           actualAdjustments += tripActualRevenue;
@@ -512,13 +514,14 @@ async function recalculateForecastWeeksFromTrips(
           },
         });
 
-        const projectedTours = allTripsInWeek.length;
-        const projectedLoads = allTripsInWeek.reduce((sum, t) => sum + t.projectedLoads, 0);
-        const projectedTourPay = projectedTours * 452;
-        const projectedAccessorials = allTripsInWeek.reduce(
-          (sum, t) => sum + toNumber(t.estimatedAccessorial),
-          0
-        );
+        // Exclude canceled trips from projections
+        const activeTripsInWeek = allTripsInWeek.filter(t => t.tripStage !== "CANCELED");
+        const { DTR_RATE: dtrRate, LOAD_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
+
+        const projectedTours = activeTripsInWeek.length;
+        const projectedLoads = activeTripsInWeek.reduce((sum, t) => sum + t.projectedLoads, 0);
+        const projectedTourPay = projectedTours * dtrRate;
+        const projectedAccessorials = projectedLoads * LOAD_ACCESSORIAL_RATE;
         const projectedTotal = projectedTourPay + projectedAccessorials;
 
         const variance = actualTotal - projectedTotal;

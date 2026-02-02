@@ -159,7 +159,7 @@ export function InvoiceDetailsTable({ lineItems, loading }: InvoiceDetailsTableP
               <TableHead>Date</TableHead>
               <TableHead className="text-center">Loads</TableHead>
               <TableHead className="text-right">Base Rate</TableHead>
-              <TableHead className="text-right">Fuel Sur.</TableHead>
+              <TableHead className="text-right">Accessorial</TableHead>
               <TableHead className="text-right">Total Pay</TableHead>
             </TableRow>
           </TableHeader>
@@ -200,7 +200,7 @@ export function InvoiceDetailsTable({ lineItems, loading }: InvoiceDetailsTableP
             <TableHead>Date</TableHead>
             <TableHead className="text-center">Loads</TableHead>
             <TableHead className="text-right">Base Rate</TableHead>
-            <TableHead className="text-right">Fuel Sur.</TableHead>
+            <TableHead className="text-right">Accessorial</TableHead>
             <TableHead className="text-right">Total Pay</TableHead>
           </TableRow>
         </TableHeader>
@@ -400,7 +400,7 @@ function LoadDetailCard({ load }: LoadDetailCardProps) {
                 <p className="font-medium">{formatCurrency(load.baseRate)}</p>
               </div>
               <div className="p-2 bg-slate-50 rounded">
-                <p className="text-muted-foreground">Fuel Surcharge</p>
+                <p className="text-muted-foreground">Accessorial</p>
                 <p className="font-medium">{formatCurrency(load.fuelSurcharge)}</p>
               </div>
               <div className="p-2 bg-slate-50 rounded">

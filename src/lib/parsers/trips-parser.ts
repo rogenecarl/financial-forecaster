@@ -1,5 +1,6 @@
 import Papa from "papaparse";
 import type { ImportTrip, CreateTripLoad, TripStage } from "@/schema/forecasting.schema";
+import { FORECASTING_CONSTANTS } from "@/config/forecasting";
 
 // ============================================
 // TYPES
@@ -329,18 +330,18 @@ export function parseTripsCSV(content: string): TripsParseResult {
 
       // Count delivery stops from non-bobtail, non-cancelled loads
       let projectedLoads = 0;
-      let estimatedAccessorial = 0;
 
       for (const load of activeLoads) {
         if (!load.isBobtail) {
           projectedLoads += countDeliveryStops(load);
-          estimatedAccessorial += load.estimatedCost || 0;
         }
       }
 
-      // Calculate projected revenue: $452 DTR + accessorial
-      const DTR_RATE = 452;
-      const projectedRevenue = DTR_RATE + estimatedAccessorial;
+      // Calculate projected revenue: DTR + (projectedLoads × accessorial rate)
+      // Note: We use a fixed accessorial rate per load, not Amazon's estimated cost
+      const { DTR_RATE, LOAD_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
+      const projectedAccessorial = projectedLoads * LOAD_ACCESSORIAL_RATE;
+      const projectedRevenue = DTR_RATE + projectedAccessorial;
 
       if (trip.tripStage === "CANCELED") {
         canceledTrips++;
@@ -353,7 +354,7 @@ export function parseTripsCSV(content: string): TripsParseResult {
         operatorType: trip.operatorType || null,
         scheduledDate: trip.scheduledDate!,
         projectedLoads,
-        estimatedAccessorial: estimatedAccessorial || null,
+        estimatedAccessorial: projectedAccessorial || null,
         projectedRevenue: projectedRevenue || null,
         loads,
       });

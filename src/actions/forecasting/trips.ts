@@ -784,6 +784,65 @@ export async function deleteTrip(id: string): Promise<ActionResponse<void>> {
 }
 
 // ============================================
+// BULK DELETE TRIPS
+// ============================================
+
+export async function bulkDeleteTrips(
+  tripIds: string[]
+): Promise<ActionResponse<{ deletedCount: number }>> {
+  try {
+    const session = await requireAuth();
+
+    if (tripIds.length === 0) {
+      return { success: false, error: "No trips selected" };
+    }
+
+    // Get all trips to find their scheduled dates for forecast week updates
+    const trips = await prisma.trip.findMany({
+      where: {
+        id: { in: tripIds },
+        userId: session.user.id,
+      },
+      select: { id: true, scheduledDate: true },
+    });
+
+    if (trips.length === 0) {
+      return { success: false, error: "No trips found" };
+    }
+
+    // Collect unique week start dates for forecast week updates
+    const uniqueWeekStarts = [
+      ...new Set(
+        trips.map((t) => startOfWeek(t.scheduledDate, { weekStartsOn: 1 }).getTime())
+      ),
+    ];
+
+    // Delete trips (loads will be cascade deleted via Prisma relation)
+    const deleteResult = await prisma.trip.deleteMany({
+      where: {
+        id: { in: trips.map((t) => t.id) },
+        userId: session.user.id,
+      },
+    });
+
+    // Update ForecastWeeks for affected weeks
+    await Promise.all(
+      uniqueWeekStarts.map((weekStartTime) =>
+        createOrUpdateForecastWeek(session.user.id, new Date(weekStartTime))
+      )
+    );
+
+    return {
+      success: true,
+      data: { deletedCount: deleteResult.count },
+    };
+  } catch (error) {
+    console.error("Failed to bulk delete trips:", error);
+    return { success: false, error: "Failed to delete trips" };
+  }
+}
+
+// ============================================
 // FORECAST WEEK HELPERS
 // ============================================
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Upload, Truck, Package, CheckCircle, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TripsImportModal, TripsTable } from "@/components/forecasting";
+import { TripsImportModal, TripsTable, TripsBulkActions } from "@/components/forecasting";
 import { useTripsWithLoads, useTripDateRange } from "@/hooks";
 
 type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months" | "thisWeek" | "lastWeek";
@@ -25,6 +25,7 @@ export default function TripsPage() {
     end: string | null;
   }>({ start: null, end: null });
   const [showImport, setShowImport] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Fetch available date range
   const { dateRange } = useTripDateRange();
@@ -121,10 +122,16 @@ export default function TripsPage() {
       : undefined;
 
   // TanStack Query hook for trips data (with loads for detailed view)
-  const { trips, stats, isLoading: loading, invalidate } = useTripsWithLoads(
+  const { trips, stats, isLoading: loading, invalidate, bulkDelete, isBulkDeleting } = useTripsWithLoads(
     effectiveDateRange?.start,
     effectiveDateRange?.end
   );
+
+  // Handle bulk delete
+  const handleBulkDelete = useCallback(() => {
+    bulkDelete(selectedIds);
+    setSelectedIds([]); // Clear selection immediately (optimistic)
+  }, [selectedIds, bulkDelete]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -314,7 +321,13 @@ export default function TripsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <TripsTable trips={trips} loading={loading} onUpdate={invalidate} />
+            <TripsTable
+              trips={trips}
+              loading={loading}
+              onUpdate={invalidate}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
+            />
           </CardContent>
         </Card>
       ) : (
@@ -385,6 +398,14 @@ export default function TripsPage() {
         open={showImport}
         onOpenChange={setShowImport}
         onSuccess={invalidate}
+      />
+
+      {/* Bulk Actions */}
+      <TripsBulkActions
+        selectedCount={selectedIds.length}
+        onClearSelection={() => setSelectedIds([])}
+        onBulkDelete={handleBulkDelete}
+        isDeleting={isBulkDeleting}
       />
     </div>
   );

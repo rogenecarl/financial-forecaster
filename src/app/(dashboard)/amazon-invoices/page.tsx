@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { InvoiceImportModal } from "@/components/forecasting";
+import { InvoiceImportModal, InvoiceDetailsTable } from "@/components/forecasting";
 import { useAmazonInvoices, useAmazonInvoiceDetail } from "@/hooks";
 
 export default function AmazonInvoicesPage() {
@@ -303,64 +303,11 @@ export default function AmazonInvoicesPage() {
                   </div>
                 </div>
 
-                {/* Line Items Table */}
-                <div className="rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Trip ID</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead className="text-right">Miles</TableHead>
-                        <TableHead className="text-right">Base</TableHead>
-                        <TableHead className="text-right">Fuel Sur.</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedInvoice.lineItems?.slice(0, 20).map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-mono text-sm">
-                            {item.loadId ? `└ ${item.loadId}` : item.tripId}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                item.itemType === "TOUR_COMPLETED"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : item.itemType === "LOAD_COMPLETED"
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-amber-100 text-amber-800"
-                              }`}
-                            >
-                              {item.itemType === "TOUR_COMPLETED"
-                                ? "Tour"
-                                : item.itemType === "LOAD_COMPLETED"
-                                ? "Load"
-                                : "Adjustment"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {item.distanceMiles > 0 ? item.distanceMiles.toFixed(1) : "-"}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {item.baseRate > 0 ? formatCurrency(item.baseRate) : "-"}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {item.fuelSurcharge > 0 ? formatCurrency(item.fuelSurcharge) : "-"}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums font-medium">
-                            {formatCurrency(item.grossPay)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                {selectedInvoice.lineItems && selectedInvoice.lineItems.length > 20 && (
-                  <p className="text-sm text-muted-foreground text-center">
-                    Showing 20 of {selectedInvoice.lineItems.length} line items
-                  </p>
-                )}
+                {/* Line Items Table with Accordion */}
+                <InvoiceDetailsTable
+                  lineItems={selectedInvoice.lineItems || []}
+                  loading={false}
+                />
               </div>
             ) : null}
           </CardContent>

@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useForecastVariance, useForecastDateRange } from "@/hooks";
+import { useForecastVariance, useForecastDateRange, useInvoiceMatchingStats } from "@/hooks";
 
 type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months" | "thisWeek" | "lastWeek";
 
@@ -132,6 +132,9 @@ export default function ForecastVsActualPage() {
     effectiveDateRange?.start,
     effectiveDateRange?.end
   );
+
+  // Get invoice matching stats to show unmatched items
+  const { matchingStats } = useInvoiceMatchingStats();
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -271,6 +274,49 @@ export default function ForecastVsActualPage() {
                 Showing {data.period.weekCount} week{data.period.weekCount !== 1 ? "s" : ""}: {formatDate(data.period.startDate)} - {formatDate(data.period.endDate)}
               </span>
             </div>
+          )}
+
+          {/* Unmatched Invoice Items Alert */}
+          {matchingStats && matchingStats.unmatchedCount > 0 && (
+            <Card className="border-amber-200 bg-amber-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-amber-800 flex items-center gap-2 text-base">
+                  <AlertCircle className="h-5 w-5" />
+                  Unmatched Invoice Items
+                </CardTitle>
+                <CardDescription className="text-amber-700">
+                  {matchingStats.unmatchedCount} invoice line items ({formatCurrency(matchingStats.unmatchedPay)})
+                  don&apos;t have matching trips in the database. These are not included in the &quot;Actual Revenue from completed trips&quot; calculation.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm space-y-1">
+                  <div className="grid grid-cols-3 gap-4 text-amber-800 mb-2">
+                    <div>
+                      <span className="font-medium">Invoice Total:</span> {formatCurrency(matchingStats.totalInvoicePay)}
+                    </div>
+                    <div>
+                      <span className="font-medium">Matched:</span> {formatCurrency(matchingStats.matchedPay)}
+                    </div>
+                    <div>
+                      <span className="font-medium">Unmatched:</span> {formatCurrency(matchingStats.unmatchedPay)}
+                    </div>
+                  </div>
+                  <details className="text-amber-700">
+                    <summary className="cursor-pointer hover:underline">
+                      View unmatched trip IDs ({matchingStats.unmatchedItems.length})
+                    </summary>
+                    <ul className="mt-2 pl-4 space-y-0.5 max-h-32 overflow-y-auto font-mono text-xs">
+                      {matchingStats.unmatchedItems.map((item, i) => (
+                        <li key={i}>
+                          {item.tripId} - {item.itemType}: {formatCurrency(item.grossPay)}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Variance Summary */}

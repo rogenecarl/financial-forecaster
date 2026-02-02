@@ -6,12 +6,15 @@ import {
   getAmazonInvoice,
   deleteAmazonInvoice,
   getInvoiceStats,
+  getInvoiceMatchingStats,
   type InvoiceSummary,
 } from "@/actions/forecasting";
 import {
   getTripsWithStats,
   getTripsWithLoads,
   getTripDateRange,
+  bulkDeleteTrips,
+  type TripWithLoadsForTable,
 } from "@/actions/forecasting/trips";
 import {
   getForecasts,
@@ -34,6 +37,7 @@ export const forecastingKeys = {
   invoicesList: () => [...forecastingKeys.invoices, "list"] as const,
   invoiceStats: () => [...forecastingKeys.invoices, "stats"] as const,
   invoiceDetail: (id: string) => [...forecastingKeys.invoices, "detail", id] as const,
+  invoiceMatchingStats: (id?: string) => [...forecastingKeys.invoices, "matchingStats", id] as const,
 
   // Trips
   trips: ["trips"] as const,
@@ -211,17 +215,70 @@ export function useTrips(startDate?: Date, endDate?: Date) {
 export function useTripsWithLoads(startDate?: Date, endDate?: Date) {
   const queryClient = useQueryClient();
 
+  const queryKey = [...forecastingKeys.tripsList(startDate, endDate), "withLoads"];
+
   const {
     data,
     isLoading,
   } = useQuery({
-    queryKey: [...forecastingKeys.tripsList(startDate, endDate), "withLoads"],
+    queryKey,
     queryFn: async () => {
       const result = await getTripsWithLoads(startDate, endDate);
       if (!result.success) throw new Error(result.error);
       return result.data;
     },
     staleTime: 30 * 1000,
+  });
+
+  // Bulk delete mutation with optimistic update
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (tripIds: string[]) => {
+      const result = await bulkDeleteTrips(tripIds);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    onMutate: async (tripIds) => {
+      await queryClient.cancelQueries({ queryKey });
+
+      const previousData = queryClient.getQueryData<{
+        trips: TripWithLoadsForTable[];
+        stats: { totalTrips: number; projectedLoads: number; actualLoads: number; updatedCount: number; completion: number };
+      }>(queryKey);
+
+      // Optimistically remove the trips
+      const idsSet = new Set(tripIds);
+      queryClient.setQueryData(queryKey, (old: typeof previousData) => {
+        if (!old) return old;
+        const remainingTrips = old.trips.filter((t) => !idsSet.has(t.id));
+        return {
+          ...old,
+          trips: remainingTrips,
+          stats: {
+            ...old.stats,
+            totalTrips: remainingTrips.length,
+            projectedLoads: remainingTrips.reduce((sum, t) => sum + t.projectedLoads, 0),
+            actualLoads: remainingTrips.reduce((sum, t) => sum + (t.actualLoads || 0), 0),
+            updatedCount: remainingTrips.filter((t) => t.actualLoads !== null).length,
+            completion: remainingTrips.length > 0
+              ? Math.round((remainingTrips.filter((t) => t.actualLoads !== null).length / remainingTrips.length) * 100)
+              : 0,
+          },
+        };
+      });
+
+      return { previousData, count: tripIds.length };
+    },
+    onError: (err, _, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+      toast.error(err instanceof Error ? err.message : "Failed to delete trips");
+    },
+    onSuccess: (data, _, context) => {
+      toast.success(`Deleted ${context?.count || data.deletedCount} trips`);
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: forecastingKeys.variance });
+    },
   });
 
   const invalidate = () => {
@@ -239,6 +296,8 @@ export function useTripsWithLoads(startDate?: Date, endDate?: Date) {
     },
     isLoading,
     invalidate,
+    bulkDelete: (ids: string[]) => bulkDeleteMutation.mutate(ids),
+    isBulkDeleting: bulkDeleteMutation.isPending,
   };
 }
 
@@ -341,6 +400,27 @@ export function useForecastVariance(startDate?: Date, endDate?: Date) {
 
   return {
     data: data ?? null,
+    isLoading,
+  };
+}
+
+// ============================================
+// INVOICE MATCHING STATS HOOK
+// ============================================
+
+export function useInvoiceMatchingStats(invoiceId?: string) {
+  const { data, isLoading } = useQuery({
+    queryKey: forecastingKeys.invoiceMatchingStats(invoiceId),
+    queryFn: async () => {
+      const result = await getInvoiceMatchingStats(invoiceId);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    staleTime: 30 * 1000,
+  });
+
+  return {
+    matchingStats: data ?? null,
     isLoading,
   };
 }

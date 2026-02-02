@@ -11,6 +11,7 @@ export {
   useForecasts,
   useForecastVariance,
   useForecastDateRange,
+  useInvoiceMatchingStats,
   forecastingKeys,
 } from "./use-forecasting"
 // Re-export useSession for direct access if needed

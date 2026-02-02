@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, Fragment, useCallback } from "react";
 import { format } from "date-fns";
 import {
   CheckCircle,
@@ -13,6 +13,7 @@ import {
   MapPin,
   Package,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -53,6 +54,8 @@ interface TripsTableProps {
   trips: TripWithLoadsForTable[];
   loading?: boolean;
   onUpdate: () => void;
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
 }
 
 interface StopInfo {
@@ -116,13 +119,32 @@ function countDeliveryStops(load: LoadType): number {
   return getStops(load).filter((s) => s.isDelivery).length;
 }
 
-export function TripsTable({ trips, loading, onUpdate }: TripsTableProps) {
+export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionChange }: TripsTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [notesTrip, setNotesTrip] = useState<TripWithLoadsForTable | null>(null);
   const [notesValue, setNotesValue] = useState("");
   const [expandedTrips, setExpandedTrips] = useState<Set<string>>(new Set());
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedIds.length === trips.length) {
+      onSelectionChange([]);
+    } else {
+      onSelectionChange(trips.map((t) => t.id));
+    }
+  }, [selectedIds, trips, onSelectionChange]);
+
+  const handleSelect = useCallback(
+    (id: string, checked: boolean) => {
+      if (checked) {
+        onSelectionChange([...selectedIds, id]);
+      } else {
+        onSelectionChange(selectedIds.filter((i) => i !== id));
+      }
+    },
+    [selectedIds, onSelectionChange]
+  );
 
   const toggleTrip = (tripId: string) => {
     setExpandedTrips((prev) => {
@@ -249,6 +271,7 @@ export function TripsTable({ trips, loading, onUpdate }: TripsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12"></TableHead>
               <TableHead className="w-[40px]"></TableHead>
               <TableHead>Trip ID</TableHead>
               <TableHead>Date</TableHead>
@@ -262,6 +285,7 @@ export function TripsTable({ trips, loading, onUpdate }: TripsTableProps) {
           <TableBody>
             {[...Array(5)].map((_, i) => (
               <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
@@ -293,6 +317,15 @@ export function TripsTable({ trips, loading, onUpdate }: TripsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={
+                    trips.length > 0 &&
+                    selectedIds.length === trips.length
+                  }
+                  onCheckedChange={handleSelectAll}
+                />
+              </TableHead>
               <TableHead className="w-[40px]"></TableHead>
               <TableHead>Trip ID</TableHead>
               <TableHead>Date</TableHead>
@@ -308,13 +341,22 @@ export function TripsTable({ trips, loading, onUpdate }: TripsTableProps) {
               const isExpanded = expandedTrips.has(trip.id);
               const hasLoads = trip.loads && trip.loads.length > 0;
               const isCanceled = trip.tripStage === "CANCELED";
+              const isSelected = selectedIds.includes(trip.id);
 
               return (
                 <Fragment key={trip.id}>
                   <TableRow
-                    className={`${isCanceled ? "opacity-50" : ""} ${hasLoads ? "cursor-pointer hover:bg-muted/50" : ""}`}
+                    className={`${isCanceled ? "opacity-50" : ""} ${hasLoads ? "cursor-pointer hover:bg-muted/50" : ""} ${isSelected ? "bg-blue-50" : ""}`}
                     onClick={() => hasLoads && toggleTrip(trip.id)}
                   >
+                    <TableCell className="w-12" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) =>
+                          handleSelect(trip.id, checked as boolean)
+                        }
+                      />
+                    </TableCell>
                     <TableCell className="w-[40px]">
                       {hasLoads && (
                         <ChevronRight
@@ -402,7 +444,7 @@ export function TripsTable({ trips, loading, onUpdate }: TripsTableProps) {
                   {/* Expanded loads section */}
                   {isExpanded && hasLoads && (
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableCell colSpan={8} className="p-0">
+                      <TableCell colSpan={9} className="p-0">
                         <div className="px-6 py-4 space-y-3">
                           {trip.loads.map((load) => (
                             <LoadCard

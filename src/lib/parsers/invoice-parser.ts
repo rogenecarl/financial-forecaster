@@ -31,41 +31,58 @@ interface RawInvoiceRow {
 // ============================================
 
 const columnMappings: Record<string, string[]> = {
-  tripId: ["trip id", "tripid", "trip_id", "trip"],
+  // Trip ID contains the tour identifier (e.g., T-111GTV5BG) in Amazon invoices
+  // Block Id column is often empty, so prioritize Trip ID
+  tripId: ["trip id", "tripid", "trip_id", "trip", "block id", "blockid", "block_id", "block"],
+  // Load ID is the individual load identifier
   loadId: ["load id", "loadid", "load_id", "load"],
-  startDate: ["start date", "startdate", "start"],
-  endDate: ["end date", "enddate", "end"],
-  operator: ["operator", "driver type", "team type"],
-  distanceMiles: ["distance (mi)", "distance", "miles", "mi"],
-  durationHours: ["duration (hrs)", "duration", "hours", "hrs"],
-  itemType: ["item type", "itemtype", "type", "category"],
-  baseRate: ["base rate", "baserate", "base", "dtr", "tour rate"],
-  fuelSurcharge: ["fuel surcharge", "fuelsurcharge", "fuel", "accessorial"],
+  startDate: ["start date", "startdate", "start_date", "start"],
+  endDate: ["end date", "enddate", "end_date", "end"],
+  operator: ["operator type", "operatortype", "operator", "driver type", "team type"],
+  distanceMiles: ["distance (mi)", "distance mi", "distance", "miles", "mi"],
+  durationHours: ["duration (hrs)", "duration hrs", "duration", "hours", "hrs"],
+  itemType: ["item type", "itemtype", "item_type", "type", "category"],
+  baseRate: ["base rate", "baserate", "base_rate", "base", "dtr", "tour rate"],
+  fuelSurcharge: ["fuel surcharge", "fuelsurcharge", "fuel_surcharge", "fuel", "accessorial"],
   detention: ["detention", "det"],
   tonu: ["tonu", "truck ordered not used", "cancelled"],
-  grossPay: ["gross pay", "grosspay", "gross", "total", "pay"],
+  grossPay: ["gross pay", "grosspay", "gross_pay", "gross", "total", "pay"],
   comments: ["comments", "comment", "notes", "note"],
 };
 
 function normalizeColumnName(col: string): string {
-  return col.toLowerCase().trim().replace(/[_-]/g, " ");
+  // Normalize: lowercase, trim, replace underscores/hyphens with spaces, collapse multiple spaces
+  return col.toLowerCase().trim().replace(/[_-]/g, " ").replace(/\s+/g, " ");
 }
 
-function mapColumns(headers: string[]): Record<string, string> {
+function mapColumns(headers: string[]): { mapping: Record<string, string>; unmapped: string[] } {
   const mapping: Record<string, string> = {};
   const normalizedHeaders = headers.map(h => normalizeColumnName(h));
+  const unmapped: string[] = [];
 
   for (const [field, aliases] of Object.entries(columnMappings)) {
+    let found = false;
     for (const alias of aliases) {
       const index = normalizedHeaders.indexOf(alias);
       if (index !== -1) {
         mapping[field] = headers[index];
+        found = true;
+        break;
+      }
+      // Also try partial match for columns with extra text
+      const partialIndex = normalizedHeaders.findIndex(h => h.includes(alias) || alias.includes(h));
+      if (partialIndex !== -1 && !found) {
+        mapping[field] = headers[partialIndex];
+        found = true;
         break;
       }
     }
+    if (!found) {
+      unmapped.push(field);
+    }
   }
 
-  return mapping;
+  return { mapping, unmapped };
 }
 
 // ============================================
@@ -240,14 +257,13 @@ export function parseInvoiceExcel(buffer: ArrayBuffer): InvoiceParseResult {
     const sheetName = paymentDetailsSheet || workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
 
-    if (!paymentDetailsSheet) {
-      warnings.push(`"Payment Details" sheet not found, using "${sheetName}"`);
-    }
-
-    // Convert to JSON
+    // Convert to JSON - use defval to preserve columns with empty values in first row
+    // Without this, columns like "Load ID", "Start Date", "End Date" get dropped
+    // because Tour rows have empty values for these columns
     const data = XLSX.utils.sheet_to_json<RawInvoiceRow>(sheet, {
       raw: false,
       dateNF: "yyyy-mm-dd",
+      defval: "",
     });
 
     if (data.length === 0) {
@@ -271,7 +287,7 @@ export function parseInvoiceExcel(buffer: ArrayBuffer): InvoiceParseResult {
 
     // Get column mapping
     const headers = Object.keys(data[0]);
-    const columnMap = mapColumns(headers);
+    const { mapping: columnMap } = mapColumns(headers);
 
     // Validate required columns
     if (!columnMap.tripId && !columnMap.grossPay) {
@@ -279,7 +295,7 @@ export function parseInvoiceExcel(buffer: ArrayBuffer): InvoiceParseResult {
         success: false,
         invoice: null,
         errors: [`Missing required columns. Found: ${headers.join(", ")}`],
-        warnings: [],
+        warnings,
         stats: {
           totalRows: 0,
           tourCount: 0,
@@ -298,11 +314,11 @@ export function parseInvoiceExcel(buffer: ArrayBuffer): InvoiceParseResult {
     // Track dates for period calculation
     let minDate: Date | null = null;
     let maxDate: Date | null = null;
+    let skippedRows = 0;
 
     // Parse each row
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
-      const rowNum = i + 2;
 
       const getValue = (field: string): string | number | Date | undefined => {
         const col = columnMap[field];
@@ -311,7 +327,7 @@ export function parseInvoiceExcel(buffer: ArrayBuffer): InvoiceParseResult {
 
       const tripId = getValue("tripId")?.toString().trim();
       if (!tripId) {
-        warnings.push(`Row ${rowNum}: Missing Trip ID, skipping`);
+        skippedRows++;
         continue;
       }
 
@@ -368,6 +384,11 @@ export function parseInvoiceExcel(buffer: ArrayBuffer): InvoiceParseResult {
     const invoiceNumber = extractInvoiceNumber(workbook);
 
     const totalPay = totalTourPay + totalAccessorials + totalAdjustments;
+
+    // Only warn if all rows were skipped (likely a mapping issue)
+    if (skippedRows > 0 && lineItems.length === 0) {
+      warnings.push(`All ${skippedRows} rows were skipped due to missing Trip ID. Please check your file format.`);
+    }
 
     const invoice: ImportInvoice = {
       invoiceNumber,

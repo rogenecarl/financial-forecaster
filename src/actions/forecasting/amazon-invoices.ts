@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth-server";
 import type { ActionResponse } from "@/types/api";
 import type { ImportInvoice, AmazonInvoice, AmazonInvoiceLineItem } from "@/schema/forecasting.schema";
 import { importInvoiceSchema } from "@/schema/forecasting.schema";
+import { startOfWeek, endOfWeek, getWeek, getYear } from "date-fns";
 
 // ============================================
 // TYPES
@@ -172,9 +173,10 @@ export async function getAmazonInvoice(id: string): Promise<ActionResponse<Invoi
 
 export async function importAmazonInvoice(
   data: ImportInvoice
-): Promise<ActionResponse<{ invoiceId: string; lineItemCount: number }>> {
+): Promise<ActionResponse<{ invoiceId: string; lineItemCount: number; matchedTrips: number }>> {
   try {
     const session = await requireAuth();
+    const userId = session.user.id;
 
     // Validate input
     const validated = importInvoiceSchema.parse(data);
@@ -182,7 +184,7 @@ export async function importAmazonInvoice(
     // Check for duplicate invoice number
     const existing = await prisma.amazonInvoice.findFirst({
       where: {
-        userId: session.user.id,
+        userId,
         invoiceNumber: validated.invoiceNumber,
       },
     });
@@ -211,7 +213,7 @@ export async function importAmazonInvoice(
     // Create invoice with line items
     const invoice = await prisma.amazonInvoice.create({
       data: {
-        userId: session.user.id,
+        userId,
         invoiceNumber: validated.invoiceNumber,
         routeDomicile: validated.routeDomicile || null,
         equipment: validated.equipment || null,
@@ -244,25 +246,22 @@ export async function importAmazonInvoice(
       },
     });
 
-    // Try to update ForecastWeek with actual data
-    if (validated.periodStart && validated.periodEnd) {
-      await updateForecastWeekActuals(session.user.id, invoice.id, {
-        periodStart: validated.periodStart,
-        periodEnd: validated.periodEnd,
-        totalTourPay,
-        totalAccessorials,
-        totalAdjustments,
-        totalPay,
-        tourCount: validated.lineItems.filter((i) => i.itemType === "TOUR_COMPLETED").length,
-        loadCount: validated.lineItems.filter((i) => i.itemType === "LOAD_COMPLETED").length,
-      });
-    }
+    // ============================================
+    // FIX: Update Trip records with actual data
+    // ============================================
+    const matchedTrips = await updateTripActualsFromInvoice(userId, validated.lineItems);
+
+    // ============================================
+    // FIX: Update ForecastWeeks based on matched trips
+    // ============================================
+    await recalculateForecastWeeksFromTrips(userId, invoice.id);
 
     return {
       success: true,
       data: {
         invoiceId: invoice.id,
         lineItemCount: validated.lineItems.length,
+        matchedTrips,
       },
     };
   } catch (error) {
@@ -298,62 +297,263 @@ export async function deleteAmazonInvoice(id: string): Promise<ActionResponse<vo
 }
 
 // ============================================
-// UPDATE FORECAST WEEK WITH ACTUALS
+// UPDATE TRIP ACTUALS FROM INVOICE
 // ============================================
 
-async function updateForecastWeekActuals(
+interface LineItemForMatching {
+  tripId: string;
+  itemType: string;
+  grossPay: number;
+}
+
+async function updateTripActualsFromInvoice(
   userId: string,
-  invoiceId: string,
-  data: {
-    periodStart: Date;
-    periodEnd: Date;
-    totalTourPay: number;
-    totalAccessorials: number;
-    totalAdjustments: number;
-    totalPay: number;
-    tourCount: number;
-    loadCount: number;
-  }
-) {
+  lineItems: LineItemForMatching[]
+): Promise<number> {
   try {
-    // Find the ForecastWeek that matches the invoice period
-    const forecastWeek = await prisma.forecastWeek.findFirst({
+    // Group line items by tripId
+    const tripDataMap = new Map<string, {
+      tourPay: number;
+      loadCount: number;
+      accessorials: number;
+      adjustments: number;
+      totalPay: number;
+      isAdjustmentOnly: boolean;
+    }>();
+
+    for (const item of lineItems) {
+      const existing = tripDataMap.get(item.tripId) || {
+        tourPay: 0,
+        loadCount: 0,
+        accessorials: 0,
+        adjustments: 0,
+        totalPay: 0,
+        isAdjustmentOnly: true,
+      };
+
+      if (item.itemType === "TOUR_COMPLETED") {
+        existing.tourPay += item.grossPay;
+        existing.isAdjustmentOnly = false;
+      } else if (item.itemType === "LOAD_COMPLETED") {
+        existing.loadCount += 1;
+        existing.accessorials += item.grossPay;
+        existing.isAdjustmentOnly = false;
+      } else {
+        // Adjustments (TONU, disputes, etc.)
+        existing.adjustments += item.grossPay;
+      }
+
+      existing.totalPay += item.grossPay;
+      tripDataMap.set(item.tripId, existing);
+    }
+
+    // Get all tripIds to match
+    const tripIds = [...tripDataMap.keys()];
+
+    // Find matching Trip records
+    const matchingTrips = await prisma.trip.findMany({
       where: {
         userId,
-        weekStart: {
-          lte: data.periodEnd,
-        },
-        weekEnd: {
-          gte: data.periodStart,
-        },
+        tripId: { in: tripIds },
+      },
+      select: { id: true, tripId: true, tripStage: true },
+    });
+
+    const tripIdToDbId = new Map(matchingTrips.map((t) => [t.tripId, { id: t.id, stage: t.tripStage }]));
+
+    // Update each matching Trip with actual data
+    let matchedCount = 0;
+
+    for (const [tripId, data] of tripDataMap) {
+      const tripRecord = tripIdToDbId.get(tripId);
+      if (tripRecord) {
+        // Determine the new trip stage
+        let newStage = tripRecord.stage;
+        if (data.isAdjustmentOnly && data.adjustments > 0) {
+          // Trip was canceled but got TONU payment - keep as CANCELED
+          newStage = "CANCELED";
+        } else if (!data.isAdjustmentOnly) {
+          // Trip was completed (has tour or load items)
+          newStage = "COMPLETED";
+        }
+
+        await prisma.trip.update({
+          where: { id: tripRecord.id },
+          data: {
+            actualLoads: data.loadCount,
+            actualRevenue: data.totalPay,
+            tripStage: newStage,
+          },
+        });
+        matchedCount++;
+      }
+    }
+
+    return matchedCount;
+  } catch (error) {
+    console.error("Failed to update trip actuals from invoice:", error);
+    return 0;
+  }
+}
+
+// ============================================
+// RECALCULATE FORECAST WEEKS FROM TRIPS
+// ============================================
+
+async function recalculateForecastWeeksFromTrips(
+  userId: string,
+  invoiceId: string
+): Promise<void> {
+  try {
+    // Get all trips that have actual data (actualRevenue is not null)
+    const tripsWithActuals = await prisma.trip.findMany({
+      where: {
+        userId,
+        actualRevenue: { not: null },
+      },
+      select: {
+        id: true,
+        tripId: true,
+        scheduledDate: true,
+        projectedLoads: true,
+        actualLoads: true,
+        projectedRevenue: true,
+        actualRevenue: true,
+        estimatedAccessorial: true,
+        tripStage: true,
       },
     });
 
-    if (forecastWeek) {
-      const variance = data.totalPay - toNumber(forecastWeek.projectedTotal);
-      const variancePercent = toNumber(forecastWeek.projectedTotal) !== 0
-        ? (variance / toNumber(forecastWeek.projectedTotal)) * 100
-        : null;
+    if (tripsWithActuals.length === 0) {
+      return;
+    }
 
-      await prisma.forecastWeek.update({
-        where: { id: forecastWeek.id },
-        data: {
-          actualTours: data.tourCount,
-          actualLoads: data.loadCount,
-          actualTourPay: data.totalTourPay,
-          actualAccessorials: data.totalAccessorials,
-          actualAdjustments: data.totalAdjustments,
-          actualTotal: data.totalPay,
-          variance,
-          variancePercent,
-          amazonInvoiceId: invoiceId,
-          status: "COMPLETED",
-        },
+    // Group trips by week (based on scheduledDate)
+    const weekMap = new Map<number, typeof tripsWithActuals>();
+
+    for (const trip of tripsWithActuals) {
+      const weekStart = startOfWeek(trip.scheduledDate, { weekStartsOn: 1 });
+      const weekKey = weekStart.getTime();
+
+      const existing = weekMap.get(weekKey) || [];
+      existing.push(trip);
+      weekMap.set(weekKey, existing);
+    }
+
+    // Update each ForecastWeek with aggregated actuals from its trips
+    for (const [weekStartTime, trips] of weekMap) {
+      const weekStart = new Date(weekStartTime);
+      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+      const weekNumber = getWeek(weekStart, { weekStartsOn: 1 });
+      const year = getYear(weekStart);
+
+      // Calculate actuals from trips
+      let actualTours = 0;
+      let actualLoads = 0;
+      let actualTourPay = 0;
+      let actualAccessorials = 0;
+      let actualAdjustments = 0;
+
+      for (const trip of trips) {
+        const tripActualRevenue = toNumber(trip.actualRevenue);
+        const tripActualLoads = trip.actualLoads || 0;
+
+        // Count completed tours (not adjustments-only)
+        if (trip.tripStage === "COMPLETED") {
+          actualTours++;
+          // Estimate tour pay vs accessorials from actual revenue
+          // Tour pay is $452, rest is accessorials
+          actualTourPay += 452;
+          actualAccessorials += Math.max(0, tripActualRevenue - 452);
+        } else if (trip.tripStage === "CANCELED" && tripActualRevenue > 0) {
+          // TONU or other adjustment
+          actualAdjustments += tripActualRevenue;
+        }
+
+        actualLoads += tripActualLoads;
+      }
+
+      const actualTotal = actualTourPay + actualAccessorials + actualAdjustments;
+
+      // Find or create the ForecastWeek
+      const forecastWeek = await prisma.forecastWeek.findFirst({
+        where: { userId, weekStart },
       });
+
+      if (forecastWeek) {
+        const projectedTotal = toNumber(forecastWeek.projectedTotal);
+        const variance = actualTotal - projectedTotal;
+        const variancePercent = projectedTotal !== 0
+          ? (variance / projectedTotal) * 100
+          : null;
+
+        await prisma.forecastWeek.update({
+          where: { id: forecastWeek.id },
+          data: {
+            actualTours,
+            actualLoads,
+            actualTourPay,
+            actualAccessorials,
+            actualAdjustments,
+            actualTotal,
+            variance,
+            variancePercent,
+            amazonInvoiceId: invoiceId,
+            status: "COMPLETED",
+          },
+        });
+      } else {
+        // Create new ForecastWeek if it doesn't exist
+        // First, get projected data from trips in this week
+        const allTripsInWeek = await prisma.trip.findMany({
+          where: {
+            userId,
+            scheduledDate: { gte: weekStart, lte: weekEnd },
+          },
+        });
+
+        const projectedTours = allTripsInWeek.length;
+        const projectedLoads = allTripsInWeek.reduce((sum, t) => sum + t.projectedLoads, 0);
+        const projectedTourPay = projectedTours * 452;
+        const projectedAccessorials = allTripsInWeek.reduce(
+          (sum, t) => sum + toNumber(t.estimatedAccessorial),
+          0
+        );
+        const projectedTotal = projectedTourPay + projectedAccessorials;
+
+        const variance = actualTotal - projectedTotal;
+        const variancePercent = projectedTotal !== 0
+          ? (variance / projectedTotal) * 100
+          : null;
+
+        await prisma.forecastWeek.create({
+          data: {
+            userId,
+            weekStart,
+            weekEnd,
+            weekNumber,
+            year,
+            projectedTours,
+            projectedLoads,
+            projectedTourPay,
+            projectedAccessorials,
+            projectedTotal,
+            actualTours,
+            actualLoads,
+            actualTourPay,
+            actualAccessorials,
+            actualAdjustments,
+            actualTotal,
+            variance,
+            variancePercent,
+            amazonInvoiceId: invoiceId,
+            status: "COMPLETED",
+          },
+        });
+      }
     }
   } catch (error) {
-    console.error("Failed to update forecast week with actuals:", error);
-    // Don't throw - this is a secondary operation
+    console.error("Failed to recalculate forecast weeks:", error);
   }
 }
 
@@ -394,5 +594,129 @@ export async function getInvoiceStats(): Promise<
   } catch (error) {
     console.error("Failed to get invoice stats:", error);
     return { success: false, error: "Failed to load stats" };
+  }
+}
+
+// ============================================
+// GET UNMATCHED LINE ITEMS
+// ============================================
+
+export interface UnmatchedLineItem {
+  tripId: string;
+  itemType: string;
+  grossPay: number;
+  invoiceNumber: string;
+}
+
+export interface InvoiceMatchingStats {
+  totalInvoicePay: number;
+  matchedPay: number;
+  unmatchedPay: number;
+  matchedCount: number;
+  unmatchedCount: number;
+  unmatchedItems: UnmatchedLineItem[];
+}
+
+export async function getInvoiceMatchingStats(
+  invoiceId?: string
+): Promise<ActionResponse<InvoiceMatchingStats>> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    // Get invoice(s) with line items
+    const whereClause = invoiceId
+      ? { userId, id: invoiceId }
+      : { userId };
+
+    const invoices = await prisma.amazonInvoice.findMany({
+      where: whereClause,
+      include: {
+        lineItems: {
+          select: {
+            tripId: true,
+            itemType: true,
+            grossPay: true,
+          },
+        },
+      },
+    });
+
+    if (invoices.length === 0) {
+      return {
+        success: true,
+        data: {
+          totalInvoicePay: 0,
+          matchedPay: 0,
+          unmatchedPay: 0,
+          matchedCount: 0,
+          unmatchedCount: 0,
+          unmatchedItems: [],
+        },
+      };
+    }
+
+    // Collect all unique tripIds from line items
+    const allTripIds = new Set<string>();
+    for (const invoice of invoices) {
+      for (const li of invoice.lineItems) {
+        allTripIds.add(li.tripId);
+      }
+    }
+
+    // Find which tripIds exist in Trip table
+    const existingTrips = await prisma.trip.findMany({
+      where: {
+        userId,
+        tripId: { in: [...allTripIds] },
+      },
+      select: { tripId: true },
+    });
+
+    const existingTripIds = new Set(existingTrips.map((t) => t.tripId));
+
+    // Calculate matched vs unmatched
+    let totalInvoicePay = 0;
+    let matchedPay = 0;
+    let unmatchedPay = 0;
+    let matchedCount = 0;
+    let unmatchedCount = 0;
+    const unmatchedItems: UnmatchedLineItem[] = [];
+
+    for (const invoice of invoices) {
+      for (const li of invoice.lineItems) {
+        const pay = toNumber(li.grossPay);
+        totalInvoicePay += pay;
+
+        if (existingTripIds.has(li.tripId)) {
+          matchedPay += pay;
+          matchedCount++;
+        } else {
+          unmatchedPay += pay;
+          unmatchedCount++;
+          unmatchedItems.push({
+            tripId: li.tripId,
+            itemType: li.itemType,
+            grossPay: pay,
+            invoiceNumber: invoice.invoiceNumber,
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        totalInvoicePay,
+        matchedPay,
+        unmatchedPay,
+        matchedCount,
+        unmatchedCount,
+        unmatchedItems,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get invoice matching stats:", error);
+    return { success: false, error: "Failed to get matching stats" };
   }
 }

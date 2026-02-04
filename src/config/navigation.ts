@@ -8,6 +8,8 @@ import {
   GitCompare,
   BarChart3,
   Tags,
+  History,
+  LineChart,
   type LucideIcon,
 } from "lucide-react";
 
@@ -78,12 +80,27 @@ export const dashboardNavigation: NavElement[] = [
         href: "/forecast-vs-actual",
         icon: GitCompare,
       },
+      {
+        title: "Import History",
+        href: "/import-history",
+        icon: History,
+      },
     ],
   },
   {
     title: "Reports",
-    href: "/reports",
-    icon: BarChart3,
+    items: [
+      {
+        title: "Analytics",
+        href: "/analytics",
+        icon: LineChart,
+      },
+      {
+        title: "Reports",
+        href: "/reports",
+        icon: BarChart3,
+      },
+    ],
   },
 ];
 
@@ -120,6 +137,14 @@ export const routeMeta: Record<string, { title: string; description?: string }> 
   "/forecast-vs-actual": {
     title: "Forecast vs Actual",
     description: "Compare predictions with actual Amazon payments",
+  },
+  "/import-history": {
+    title: "Import History",
+    description: "View all CSV import history",
+  },
+  "/analytics": {
+    title: "Analytics",
+    description: "Year-over-year performance analysis and trends",
   },
   "/reports": {
     title: "Reports",

@@ -2,6 +2,9 @@ import { getServerUser } from "@/lib/auth-server";
 import { getDashboardData } from "@/actions/dashboard/dashboard";
 import { MetricCard, MetricCardGrid } from "@/components/dashboard/metric-card";
 import { WeeklyForecastWidget } from "@/components/dashboard/weekly-forecast-widget";
+import { NextWeekPreviewCard } from "@/components/dashboard/next-week-preview-card";
+import { ModelAccuracyWidget } from "@/components/dashboard/model-accuracy-widget";
+import { YearToDateSummary } from "@/components/dashboard/year-to-date-summary";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { CashFlowChart } from "@/components/dashboard/cash-flow-chart";
 import { ForecastVsActualTable } from "@/components/dashboard/forecast-vs-actual-table";
@@ -107,6 +110,12 @@ export default async function DashboardPage() {
         />
       </MetricCardGrid>
 
+      {/* Year to Date Summary */}
+      <YearToDateSummary
+        data={dashboardData?.yearToDate || null}
+        loading={!dashboardData}
+      />
+
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left Column - Charts */}
@@ -124,13 +133,25 @@ export default async function DashboardPage() {
           />
         </div>
 
-        {/* Right Column - Quick Actions & This Week */}
+        {/* Right Column - Forecasts & Quick Actions */}
         <div className="space-y-6">
           {/* This Week's Forecast */}
           <WeeklyForecastWidget
             data={dashboardData?.thisWeekForecast || null}
             loading={!dashboardData}
           />
+
+          {/* Next Week Preview & Model Accuracy */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+            <NextWeekPreviewCard
+              data={dashboardData?.nextWeekForecast || null}
+              loading={!dashboardData}
+            />
+            <ModelAccuracyWidget
+              data={dashboardData?.modelAccuracy || null}
+              loading={!dashboardData}
+            />
+          </div>
 
           {/* Quick Actions */}
           <QuickActions />

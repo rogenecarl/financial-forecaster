@@ -12,11 +12,10 @@ export const FORECASTING_CONSTANTS = {
   DTR_RATE: 452.09,
 
   /**
-   * Average Accessorial Rate per Load
-   * This is the average payout per completed load delivery.
-   * Calculated from historical invoice data (average of LOAD_COMPLETED gross pay).
+   * Accessorial Rate per Trip
+   * This is the flat payout per trip ID (not per load).
    */
-  LOAD_ACCESSORIAL_RATE: 34.12,
+  TRIP_ACCESSORIAL_RATE: 70,
 } as const;
 
 export type ForecastingConstants = typeof FORECASTING_CONSTANTS;

@@ -316,6 +316,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Projected Rev.</TableHead>
               <TableHead className="text-right">Actual Rev.</TableHead>
+              <TableHead className="text-right">Variance</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -331,6 +332,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                 <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-14 ml-auto" /></TableCell>
                 <TableCell><Skeleton className="h-8 w-8" /></TableCell>
               </TableRow>
             ))}
@@ -372,6 +374,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Projected Rev.</TableHead>
               <TableHead className="text-right">Actual Rev.</TableHead>
+              <TableHead className="text-right">Variance</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -450,21 +453,50 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                     <TableCell className="text-right">
                       <div className="space-y-0.5">
                         <div className="text-[10px] text-muted-foreground">
-                          ${(trip.projectedLoads * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE).toFixed(2)} + ${FORECASTING_CONSTANTS.DTR_RATE.toFixed(2)}
+                          ${FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE} + ${FORECASTING_CONSTANTS.DTR_RATE.toFixed(2)}
                         </div>
                         <div className="font-medium text-emerald-700 tabular-nums">
-                          ${((trip.projectedLoads * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE) + FORECASTING_CONSTANTS.DTR_RATE).toFixed(2)}
+                          ${(FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE + FORECASTING_CONSTANTS.DTR_RATE).toFixed(2)}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {trip.actualRevenue !== null ? (
+                      {trip.actualLoads !== null && trip.actualRevenue !== null ? (
                         <span className="text-emerald-600 font-medium">
                           {formatCurrency(trip.actualRevenue)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {(() => {
+                        const projectedRev = FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE + FORECASTING_CONSTANTS.DTR_RATE;
+
+                        // Canceled trip with actual revenue = TONU
+                        if (isCanceled && trip.actualRevenue !== null && trip.actualRevenue > 0) {
+                          return (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 text-xs">
+                              TONU
+                            </Badge>
+                          );
+                        }
+
+                        // No actual loads entered yet - don't calculate variance
+                        if (trip.actualLoads === null) {
+                          return <span className="text-muted-foreground">-</span>;
+                        }
+
+                        // Calculate variance
+                        const variance = (trip.actualRevenue ?? 0) - projectedRev;
+                        const isPositive = variance >= 0;
+
+                        return (
+                          <span className={isPositive ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>
+                            {isPositive ? "+" : ""}{formatCurrency(variance)}
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <TooltipProvider>
@@ -492,7 +524,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                   {/* Expanded loads section */}
                   {isExpanded && hasLoads && (
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableCell colSpan={10} className="p-0">
+                      <TableCell colSpan={11} className="p-0">
                         <div className="px-6 py-4 space-y-3">
                           {filterLoadsWithUniqueDeliveries(trip.loads).map((load) => (
                             <LoadCard
@@ -508,26 +540,22 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                           )}
 
                           {/* Revenue Summary */}
-                          {trip.projectedLoads > 0 && (
-                            <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                              <div className="text-xs space-y-1">
-                                <div className="flex justify-between text-emerald-700">
-                                  <span>Accessorial:</span>
-                                  <span>
-                                    {trip.projectedLoads} × ${FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE} = ${(trip.projectedLoads * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE).toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-emerald-700">
-                                  <span>DTR:</span>
-                                  <span>${FORECASTING_CONSTANTS.DTR_RATE.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between pt-1 border-t border-emerald-200 font-medium text-emerald-800">
-                                  <span>Projected Revenue:</span>
-                                  <span>${((trip.projectedLoads * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE) + FORECASTING_CONSTANTS.DTR_RATE).toFixed(2)}</span>
-                                </div>
+                          <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            <div className="text-xs space-y-1">
+                              <div className="flex justify-between text-emerald-700">
+                                <span>Trip Accessorial:</span>
+                                <span>${FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-emerald-700">
+                                <span>DTR:</span>
+                                <span>${FORECASTING_CONSTANTS.DTR_RATE.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between pt-1 border-t border-emerald-200 font-medium text-emerald-800">
+                                <span>Projected Revenue:</span>
+                                <span>${(FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE + FORECASTING_CONSTANTS.DTR_RATE).toFixed(2)}</span>
                               </div>
                             </div>
-                          )}
+                          </div>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -641,13 +669,15 @@ function LoadCard({ load, formatTime }: LoadCardProps) {
                 </div>
               ))}
             </div>
-            {deliveryCount > 0 && (
+            {(deliveryCount > 0 || load.estimateDistance > 0) && (
               <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                Accessorial: <span className="font-medium text-emerald-600">
-                  {deliveryCount} × ${FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE} = ${(deliveryCount * FORECASTING_CONSTANTS.LOAD_ACCESSORIAL_RATE).toFixed(2)}
-                </span>
+                {deliveryCount > 0 && (
+                  <span className="font-medium text-emerald-600">
+                    {deliveryCount} {deliveryCount === 1 ? "delivery" : "deliveries"}
+                  </span>
+                )}
                 {load.estimateDistance > 0 && (
-                  <span className="ml-3">Distance: {load.estimateDistance.toFixed(1)} mi</span>
+                  <span className={deliveryCount > 0 ? "ml-3" : ""}>Distance: {load.estimateDistance.toFixed(1)} mi</span>
                 )}
               </div>
             )}

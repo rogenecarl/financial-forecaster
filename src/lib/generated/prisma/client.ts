@@ -75,15 +75,10 @@ export type Transaction = Prisma.TransactionModel
  */
 export type ImportBatch = Prisma.ImportBatchModel
 /**
- * Model TripImportBatch
+ * Model TripBatch
  * 
  */
-export type TripImportBatch = Prisma.TripImportBatchModel
-/**
- * Model InvoiceImportBatch
- * 
- */
-export type InvoiceImportBatch = Prisma.InvoiceImportBatchModel
+export type TripBatch = Prisma.TripBatchModel
 /**
  * Model CategoryRule
  * 
@@ -109,11 +104,6 @@ export type Trip = Prisma.TripModel
  * 
  */
 export type TripLoad = Prisma.TripLoadModel
-/**
- * Model ForecastWeek
- * 
- */
-export type ForecastWeek = Prisma.ForecastWeekModel
 /**
  * Model Forecast
  * 

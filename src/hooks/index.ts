@@ -9,15 +9,22 @@ export {
   useTripsWithLoads,
   useTripDateRange,
   useForecasts,
-  useForecastVariance,
-  useForecastDateRange,
   useInvoiceMatchingStats,
   forecastingKeys,
   // Filter hooks
-  useWeekOptions,
-  useImportBatchOptions,
+  useTripBatchOptions,
   useTripStatusCounts,
   filterKeys,
 } from "./use-forecasting"
+export {
+  useAnalyticsData,
+  useYearlySummary,
+  useMonthlyBreakdown,
+  useQuarterlySummary,
+  useAccuracyTrend,
+  useTopPerformingBatches,
+  useHistoricalComparison,
+  useAvailableYears,
+} from "./use-analytics"
 // Re-export useSession for direct access if needed
 export { useSession } from "@/components/providers"

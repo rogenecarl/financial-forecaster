@@ -1,51 +1,42 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { Upload, Truck, Package, CheckCircle, Clock } from "lucide-react";
+import { Upload, Truck, Package, CheckCircle, Clock, Construction } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { TripsImportModal, TripsTable, TripsBulkActions } from "@/components/forecasting";
 import {
-  WeekSelector,
-  ImportBatchSelector,
   TripStatusFilter,
   type TripStatusValue,
 } from "@/components/filters";
 import {
   useTripsWithLoads,
-  useWeekOptions,
-  useImportBatchOptions,
+  useTripBatchOptions,
   useTripStatusCounts,
 } from "@/hooks";
 import type { TripsFilterParams } from "@/actions/forecasting/trips";
 
 export default function TripsPage() {
-  // Filter state
-  const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
-  const [selectedImportBatchId, setSelectedImportBatchId] = useState<string | null>(null);
+  // Filter state - using batchId now instead of weekId/importBatchId
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<TripStatusValue>("all");
   const [showImport, setShowImport] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Fetch filter options
-  const { weeks, isLoading: weeksLoading, invalidate: invalidateWeeks } = useWeekOptions();
-  const { batches, isLoading: batchesLoading, invalidate: invalidateBatches } = useImportBatchOptions();
+  const { batches, isLoading: batchesLoading, invalidate: invalidateBatches } = useTripBatchOptions();
   const { statusCounts, isLoading: statusCountsLoading } = useTripStatusCounts(
-    selectedWeekId ?? undefined,
-    selectedImportBatchId ?? undefined
+    selectedBatchId ?? undefined
   );
 
   // Build filter params
   const filterParams = useMemo<TripsFilterParams>(() => {
     const params: TripsFilterParams = {};
 
-    if (selectedWeekId) {
-      params.weekId = selectedWeekId;
-    }
-
-    if (selectedImportBatchId) {
-      params.importBatchId = selectedImportBatchId;
+    if (selectedBatchId) {
+      params.batchId = selectedBatchId;
     }
 
     if (selectedStatus !== "all") {
@@ -53,7 +44,7 @@ export default function TripsPage() {
     }
 
     return params;
-  }, [selectedWeekId, selectedImportBatchId, selectedStatus]);
+  }, [selectedBatchId, selectedStatus]);
 
   // TanStack Query hook for trips data (with loads for detailed view)
   const {
@@ -74,16 +65,15 @@ export default function TripsPage() {
   // Handle import success - invalidate filters as well
   const handleImportSuccess = useCallback(() => {
     invalidate();
-    invalidateWeeks();
     invalidateBatches();
-  }, [invalidate, invalidateWeeks, invalidateBatches]);
+  }, [invalidate, invalidateBatches]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -97,8 +87,8 @@ export default function TripsPage() {
   const projectedRevenue = activeTrips.reduce((sum, t) => sum + (t.projectedRevenue || 0), 0);
   const actualRevenue = trips.reduce((sum, t) => sum + (t.actualRevenue || 0), 0);
 
-  // Get selected week info for display
-  const selectedWeek = weeks.find((w) => w.id === selectedWeekId);
+  // Get selected batch info for display
+  const selectedBatch = batches.find((b) => b.id === selectedBatchId);
 
   return (
     <div className="space-y-6">
@@ -116,20 +106,34 @@ export default function TripsPage() {
         </Button>
       </div>
 
+      {/* Redesign Notice */}
+      <Alert className="border-amber-200 bg-amber-50/50">
+        <Construction className="h-4 w-4 text-amber-600" />
+        <AlertTitle className="text-amber-800">Trip Batch System Coming Soon</AlertTitle>
+        <AlertDescription className="text-amber-700">
+          Trip imports are being redesigned to use Trip Batches for better organization.
+          Create a Trip Batch first, then import trips to that batch.
+        </AlertDescription>
+      </Alert>
+
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
-        <WeekSelector
-          weeks={weeks}
-          selectedWeekId={selectedWeekId}
-          onWeekChange={setSelectedWeekId}
-          loading={weeksLoading}
-        />
-        <ImportBatchSelector
-          batches={batches}
-          selectedBatchId={selectedImportBatchId}
-          onBatchChange={setSelectedImportBatchId}
-          loading={batchesLoading}
-        />
+        {/* Batch selector - simple select for now */}
+        {batches.length > 0 && (
+          <select
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+            value={selectedBatchId || ""}
+            onChange={(e) => setSelectedBatchId(e.target.value || null)}
+            disabled={batchesLoading}
+          >
+            <option value="">All Batches</option>
+            {batches.map((batch) => (
+              <option key={batch.id} value={batch.id}>
+                {batch.name}
+              </option>
+            ))}
+          </select>
+        )}
         <TripStatusFilter
           statusCounts={statusCounts}
           selectedStatus={selectedStatus}
@@ -139,17 +143,12 @@ export default function TripsPage() {
       </div>
 
       {/* Active filter indicator */}
-      {(selectedWeekId || selectedImportBatchId || selectedStatus !== "all") && (
+      {(selectedBatchId || selectedStatus !== "all") && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>Filtering by:</span>
-          {selectedWeek && (
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">
-              Week {selectedWeek.weekNumber}: {selectedWeek.label}
-            </span>
-          )}
-          {selectedImportBatchId && (
+          {selectedBatch && (
             <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md text-xs font-medium">
-              Import Batch
+              {selectedBatch.name}
             </span>
           )}
           {selectedStatus !== "all" && (
@@ -162,8 +161,7 @@ export default function TripsPage() {
             size="sm"
             className="h-6 px-2 text-xs"
             onClick={() => {
-              setSelectedWeekId(null);
-              setSelectedImportBatchId(null);
+              setSelectedBatchId(null);
               setSelectedStatus("all");
             }}
           >
@@ -232,7 +230,7 @@ export default function TripsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-emerald-700">Projected Revenue</p>
-                  <p className="text-xs text-emerald-600">Based on $452.09 DTR + $34.12/load</p>
+                  <p className="text-xs text-emerald-600">Based on $452.09 DTR + $70/trip</p>
                 </div>
                 <p className="text-2xl font-bold text-emerald-700">{formatCurrency(projectedRevenue)}</p>
               </div>
@@ -294,16 +292,15 @@ export default function TripsPage() {
                 No trips found
               </h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                {(selectedWeekId || selectedImportBatchId || selectedStatus !== "all")
+                {(selectedBatchId || selectedStatus !== "all")
                   ? "No trips found for the selected filters. Try changing or clearing the filters."
                   : "Import your trip schedule from Amazon Scheduler CSV to track projected vs actual loads."}
               </p>
-              {(selectedWeekId || selectedImportBatchId || selectedStatus !== "all") ? (
+              {(selectedBatchId || selectedStatus !== "all") ? (
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setSelectedWeekId(null);
-                    setSelectedImportBatchId(null);
+                    setSelectedBatchId(null);
                     setSelectedStatus("all");
                   }}
                 >

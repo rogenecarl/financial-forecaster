@@ -216,32 +216,32 @@ function generateForecastExcelBlob(data: CPAPackageData): Blob {
   summarySheet["!cols"] = [{ wch: 20 }, { wch: 25 }];
   XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
 
-  // Weekly Breakdown
-  const weeklyHeaders = [
-    "Week",
+  // Batch Breakdown
+  const batchHeaders = [
+    "Batch",
     "Projected Total",
     "Actual Total",
     "Variance",
     "Accuracy",
   ];
 
-  const weeklyData = forecastData.weeks.map((week) => [
-    week.weekLabel,
-    formatCurrencyPlain(week.projectedTotal),
-    week.actualTotal !== null ? formatCurrencyPlain(week.actualTotal) : "",
-    week.variance !== null ? formatCurrencyPlain(week.variance) : "",
-    week.accuracy !== null ? `${week.accuracy}%` : "",
+  const batchData = forecastData.batches.map((batch) => [
+    batch.batchName,
+    formatCurrencyPlain(batch.projectedTotal),
+    batch.actualTotal !== null ? formatCurrencyPlain(batch.actualTotal) : "",
+    batch.variance !== null ? formatCurrencyPlain(batch.variance) : "",
+    batch.accuracy !== null ? `${batch.accuracy}%` : "",
   ]);
 
-  const weeklySheet = XLSX.utils.aoa_to_sheet([weeklyHeaders, ...weeklyData]);
-  weeklySheet["!cols"] = [
+  const batchSheet = XLSX.utils.aoa_to_sheet([batchHeaders, ...batchData]);
+  batchSheet["!cols"] = [
     { wch: 25 },
     { wch: 18 },
     { wch: 15 },
     { wch: 12 },
     { wch: 12 },
   ];
-  XLSX.utils.book_append_sheet(workbook, weeklySheet, "Weekly Breakdown");
+  XLSX.utils.book_append_sheet(workbook, batchSheet, "Batch Breakdown");
 
   const buffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
   return new Blob([buffer], {

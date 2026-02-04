@@ -1,8 +1,19 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { endOfWeek } from "date-fns";
+import {
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  startOfQuarter,
+  endOfQuarter,
+  startOfYear,
+  endOfYear,
+  subMonths,
+  subWeeks,
+  startOfWeek,
+} from "date-fns";
 import {
   Download,
   FileText,
@@ -15,87 +26,162 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { WeekSelector } from "@/components/filters";
-import { usePLStatement, useTransactionDateRange, useWeekOptions } from "@/hooks";
-import { getWeekStartFromId } from "@/lib/week-utils";
+import {
+  PeriodTypeSelector,
+  QuickSelectButtons,
+  type PeriodType,
+  type QuickSelectOption,
+} from "@/components/filters";
+import { MonthSelector } from "@/components/reports/month-selector";
+import { QuarterSelector } from "@/components/reports/quarter-selector";
+import { YearSelector } from "@/components/reports/year-selector";
+import { usePLStatement, useTransactionDateRange } from "@/hooks";
 import type { PLSection } from "@/schema/transaction.schema";
+import type { MonthOption, QuarterOption } from "@/actions/reports/report-data";
 import { PLLineItemRow } from "@/components/pl";
 import { cn } from "@/lib/utils";
 
-type PeriodOption = "all" | "custom" | "thisMonth" | "lastMonth" | "last3Months";
-
 export default function PLStatementPage() {
-  const [periodOption, setPeriodOption] = useState<PeriodOption>("all");
+  // Period type state
+  const [periodType, setPeriodType] = useState<PeriodType>("weekly");
+  const [quickSelect, setQuickSelect] = useState<QuickSelectOption | undefined>("thisWeek");
+
   // Store custom dates as ISO strings to avoid Date object comparison issues
   const [customDateRange, setCustomDateRange] = useState<{
     start: string | null;
     end: string | null;
   }>({ start: null, end: null });
 
-  // Phase 3 filter state
-  const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
-
-  // Filter hooks
-  const { weeks, isLoading: weeksLoading } = useWeekOptions();
+  // Period-specific state
+  const [selectedMonth, setSelectedMonth] = useState<MonthOption | null>(null);
+  const [selectedQuarter, setSelectedQuarter] = useState<QuarterOption | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
 
   // Fetch available date range
   const { dateRange, isLoading: dateRangeLoading } = useTransactionDateRange();
 
-  // Get selected week info for display
-  const selectedWeek = weeks.find((w) => w.id === selectedWeekId);
+  // Handle period type change
+  const handlePeriodTypeChange = useCallback((type: PeriodType) => {
+    setPeriodType(type);
+    setQuickSelect(undefined);
+    // Don't reset other selections, just change the view
+  }, []);
 
-  // Calculate the effective date range based on period selection
-  // Week selection takes priority over period dropdown
-  const effectiveDateRange = useMemo(() => {
-    // Week selection takes priority
-    if (selectedWeekId) {
-      const weekStart = getWeekStartFromId(selectedWeekId);
-      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-      return { start: weekStart, end: weekEnd };
-    }
-
-    if (!dateRange?.hasTransactions) return null;
-
+  // Handle quick select
+  const handleQuickSelect = useCallback((option: QuickSelectOption) => {
+    setQuickSelect(option);
     const now = new Date();
 
-    switch (periodOption) {
-      case "all":
-        if (dateRange.minDate && dateRange.maxDate) {
+    switch (option) {
+      case "thisWeek": {
+        setPeriodType("weekly");
+        const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+        setCustomDateRange({
+          start: weekStart.toISOString(),
+          end: endOfWeek(weekStart, { weekStartsOn: 1 }).toISOString(),
+        });
+        break;
+      }
+      case "lastWeek": {
+        setPeriodType("weekly");
+        const weekStart = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
+        setCustomDateRange({
+          start: weekStart.toISOString(),
+          end: endOfWeek(weekStart, { weekStartsOn: 1 }).toISOString(),
+        });
+        break;
+      }
+      case "thisMonth": {
+        setPeriodType("monthly");
+        setSelectedMonth({
+          monthStart: startOfMonth(now),
+          monthEnd: endOfMonth(now),
+          label: now.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+          month: now.getMonth(),
+          year: now.getFullYear(),
+        });
+        break;
+      }
+      case "lastMonth": {
+        setPeriodType("monthly");
+        const lastMonth = subMonths(now, 1);
+        setSelectedMonth({
+          monthStart: startOfMonth(lastMonth),
+          monthEnd: endOfMonth(lastMonth),
+          label: lastMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+          month: lastMonth.getMonth(),
+          year: lastMonth.getFullYear(),
+        });
+        break;
+      }
+      case "thisQuarter": {
+        setPeriodType("quarterly");
+        const quarter = Math.floor(now.getMonth() / 3) + 1;
+        setSelectedQuarter({
+          year: now.getFullYear(),
+          quarter,
+          quarterStart: startOfQuarter(now),
+          quarterEnd: endOfQuarter(now),
+          label: `Q${quarter} ${now.getFullYear()}`,
+        });
+        break;
+      }
+    }
+  }, []);
+
+  // Calculate the effective date range based on period type
+  const effectiveDateRange = useMemo(() => {
+    const now = new Date();
+
+    switch (periodType) {
+      case "weekly": {
+        // Use custom date range for weekly view
+        if (customDateRange.start && customDateRange.end) {
           return {
-            start: new Date(dateRange.minDate),
-            end: new Date(dateRange.maxDate),
+            start: new Date(customDateRange.start),
+            end: new Date(customDateRange.end),
           };
         }
-        return null;
-
-      case "thisMonth": {
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        return { start, end };
+        // Default to current week
+        const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+        return { start: weekStart, end: endOfWeek(weekStart, { weekStartsOn: 1 }) };
       }
 
-      case "lastMonth": {
-        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const end = new Date(now.getFullYear(), now.getMonth(), 0);
-        return { start, end };
+      case "monthly": {
+        if (selectedMonth) {
+          return {
+            start: new Date(selectedMonth.monthStart),
+            end: new Date(selectedMonth.monthEnd),
+          };
+        }
+        // Default to current month
+        return { start: startOfMonth(now), end: endOfMonth(now) };
       }
 
-      case "last3Months": {
-        const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        return { start, end };
+      case "quarterly": {
+        if (selectedQuarter) {
+          return {
+            start: new Date(selectedQuarter.quarterStart),
+            end: new Date(selectedQuarter.quarterEnd),
+          };
+        }
+        // Default to current quarter
+        return { start: startOfQuarter(now), end: endOfQuarter(now) };
+      }
+
+      case "yearly": {
+        const year = selectedYear ?? now.getFullYear();
+        return {
+          start: startOfYear(new Date(year, 0, 1)),
+          end: endOfYear(new Date(year, 0, 1)),
+        };
       }
 
       case "custom": {
+        if (!dateRange?.hasTransactions) return null;
+
         const start = customDateRange.start
           ? new Date(customDateRange.start)
           : dateRange.minDate
@@ -116,7 +202,7 @@ export default function PLStatementPage() {
       default:
         return null;
     }
-  }, [selectedWeekId, periodOption, dateRange, customDateRange]);
+  }, [periodType, selectedMonth, selectedQuarter, selectedYear, dateRange, customDateRange]);
 
   // Get display values for date inputs
   const customStartDate = customDateRange.start
@@ -139,19 +225,6 @@ export default function PLStatementPage() {
   });
 
   const loading = dateRangeLoading || statementLoading;
-
-  // Handle week selection - clear period option when week is selected
-  const handleWeekChange = (weekId: string | null) => {
-    setSelectedWeekId(weekId);
-    // When selecting a specific week, don't change period option
-    // When clearing week selection, keep existing period option
-  };
-
-  // Handle period option change - clear week selection when period changes
-  const handlePeriodChange = (value: string) => {
-    setPeriodOption(value as PeriodOption);
-    setSelectedWeekId(null); // Clear week selection when period changes
-  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -292,8 +365,6 @@ export default function PLStatementPage() {
       statement.cogs.items.length > 0 ||
       statement.operatingExpenses.items.length > 0);
 
-  const hasActiveFilters = selectedWeekId !== null;
-
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -310,84 +381,127 @@ export default function PLStatementPage() {
         </Button>
       </div>
 
-      {/* Phase 3 Filters */}
-      <div className="flex flex-wrap gap-2">
-        <WeekSelector
-          weeks={weeks}
-          selectedWeekId={selectedWeekId}
-          onWeekChange={handleWeekChange}
-          loading={weeksLoading}
-        />
-        <Select
-          value={selectedWeekId ? "week" : periodOption}
-          onValueChange={handlePeriodChange}
-          disabled={selectedWeekId !== null}
-        >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder={selectedWeekId ? "Week Selected" : undefined} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Data</SelectItem>
-            <SelectItem value="thisMonth">This Month</SelectItem>
-            <SelectItem value="lastMonth">Last Month</SelectItem>
-            <SelectItem value="last3Months">Last 3 Months</SelectItem>
-            <SelectItem value="custom">Custom Range</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Period Selection */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2 items-center">
+          <PeriodTypeSelector
+            value={periodType}
+            onChange={handlePeriodTypeChange}
+          />
 
-        {periodOption === "custom" && !selectedWeekId && (
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              className="w-[140px]"
-              value={customStartDate ? customStartDate.toISOString().split("T")[0] : ""}
-              onChange={(e) =>
-                setCustomDateRange((prev) => ({
-                  ...prev,
-                  start: e.target.value || null,
-                }))
-              }
-              max={customEndDate ? customEndDate.toISOString().split("T")[0] : undefined}
+          {/* Dynamic picker based on period type */}
+          {periodType === "weekly" && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                className="w-[140px]"
+                value={customDateRange.start ? new Date(customDateRange.start).toISOString().split("T")[0] : ""}
+                onChange={(e) => {
+                  const start = e.target.value ? new Date(e.target.value) : null;
+                  if (start) {
+                    const weekStart = startOfWeek(start, { weekStartsOn: 1 });
+                    setCustomDateRange({
+                      start: weekStart.toISOString(),
+                      end: endOfWeek(weekStart, { weekStartsOn: 1 }).toISOString(),
+                    });
+                    setQuickSelect(undefined);
+                  }
+                }}
+              />
+              <span className="text-xs text-muted-foreground">Week starting</span>
+            </div>
+          )}
+
+          {periodType === "monthly" && (
+            <MonthSelector
+              value={selectedMonth}
+              onChange={(month) => {
+                setSelectedMonth(month);
+                setQuickSelect(undefined);
+              }}
             />
-            <span className="text-muted-foreground">to</span>
-            <Input
-              type="date"
-              className="w-[140px]"
-              value={customEndDate ? customEndDate.toISOString().split("T")[0] : ""}
-              onChange={(e) =>
-                setCustomDateRange((prev) => ({
-                  ...prev,
-                  end: e.target.value || null,
-                }))
-              }
-              min={customStartDate ? customStartDate.toISOString().split("T")[0] : undefined}
+          )}
+
+          {periodType === "quarterly" && (
+            <QuarterSelector
+              value={selectedQuarter}
+              onChange={(quarter) => {
+                setSelectedQuarter(quarter);
+                setQuickSelect(undefined);
+              }}
             />
-          </div>
-        )}
+          )}
+
+          {periodType === "yearly" && (
+            <YearSelector
+              value={selectedYear}
+              onChange={(year) => {
+                setSelectedYear(year);
+                setQuickSelect(undefined);
+              }}
+              minYear={dateRange?.minDate ? new Date(dateRange.minDate).getFullYear() : undefined}
+              maxYear={new Date().getFullYear()}
+            />
+          )}
+
+          {periodType === "custom" && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                className="w-[140px]"
+                value={customStartDate ? customStartDate.toISOString().split("T")[0] : ""}
+                onChange={(e) =>
+                  setCustomDateRange((prev) => ({
+                    ...prev,
+                    start: e.target.value || null,
+                  }))
+                }
+                max={customEndDate ? customEndDate.toISOString().split("T")[0] : undefined}
+              />
+              <span className="text-muted-foreground">to</span>
+              <Input
+                type="date"
+                className="w-[140px]"
+                value={customEndDate ? customEndDate.toISOString().split("T")[0] : ""}
+                onChange={(e) =>
+                  setCustomDateRange((prev) => ({
+                    ...prev,
+                    end: e.target.value || null,
+                  }))
+                }
+                min={customStartDate ? customStartDate.toISOString().split("T")[0] : undefined}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Quick Select Buttons */}
+        <QuickSelectButtons
+          selected={quickSelect}
+          onSelect={handleQuickSelect}
+        />
       </div>
 
-      {/* Active filter indicator */}
-      {hasActiveFilters && (
+      {/* Current period display */}
+      {effectiveDateRange && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>Filtering by:</span>
-          {selectedWeek && (
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">
-              Week {selectedWeek.weekNumber}: {selectedWeek.label}
-            </span>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-xs"
-            onClick={() => setSelectedWeekId(null)}
-          >
-            Clear
-          </Button>
+          <span>Showing:</span>
+          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">
+            {periodType === "weekly"
+              ? `${formatDate(effectiveDateRange.start)} - ${formatDate(effectiveDateRange.end)}`
+              : periodType === "monthly" && selectedMonth
+              ? selectedMonth.label
+              : periodType === "quarterly" && selectedQuarter
+              ? selectedQuarter.label
+              : periodType === "yearly" && selectedYear
+              ? selectedYear.toString()
+              : `${formatDate(effectiveDateRange.start)} - ${formatDate(effectiveDateRange.end)}`}
+          </span>
         </div>
       )}
 
       {/* Data range info */}
-      {dateRange?.hasTransactions && !selectedWeekId && (
+      {dateRange?.hasTransactions && periodType === "custom" && (
         <div className="text-sm text-muted-foreground">
           Available data: {formatDate(new Date(dateRange.minDate!))} - {formatDate(new Date(dateRange.maxDate!))}
         </div>
@@ -579,15 +693,19 @@ export default function PLStatementPage() {
                 No financial data
               </h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                {hasActiveFilters
-                  ? "No categorized transactions found for the selected week. Try selecting a different week or clear the filter."
-                  : dateRange?.hasTransactions
-                  ? "No categorized transactions found for the selected period."
+                {dateRange?.hasTransactions
+                  ? "No categorized transactions found for the selected period. Try selecting a different period."
                   : "Import and categorize transactions to generate your P&L statement."}
               </p>
-              {hasActiveFilters ? (
-                <Button variant="outline" onClick={() => setSelectedWeekId(null)}>
-                  Clear Filter
+              {dateRange?.hasTransactions ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setPeriodType("custom");
+                    setQuickSelect(undefined);
+                  }}
+                >
+                  View All Data
                 </Button>
               ) : (
                 <Button variant="outline" asChild>

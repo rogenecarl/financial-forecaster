@@ -337,10 +337,9 @@ export function parseTripsCSV(content: string): TripsParseResult {
         }
       }
 
-      // Calculate projected revenue: DTR + (projectedLoads × accessorial rate)
-      // Note: We use a fixed accessorial rate per load, not Amazon's estimated cost
-      const { DTR_RATE, LOAD_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
-      const projectedAccessorial = projectedLoads * LOAD_ACCESSORIAL_RATE;
+      // Calculate projected revenue: DTR + flat accessorial per trip (not per load)
+      const { DTR_RATE, TRIP_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
+      const projectedAccessorial = TRIP_ACCESSORIAL_RATE;
       const projectedRevenue = DTR_RATE + projectedAccessorial;
 
       if (trip.tripStage === "CANCELED") {

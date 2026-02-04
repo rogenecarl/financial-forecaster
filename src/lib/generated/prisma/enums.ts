@@ -39,6 +39,17 @@ export const ReviewStatus = {
 export type ReviewStatus = (typeof ReviewStatus)[keyof typeof ReviewStatus]
 
 
+export const BatchStatus = {
+  EMPTY: 'EMPTY',
+  UPCOMING: 'UPCOMING',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  INVOICED: 'INVOICED'
+} as const
+
+export type BatchStatus = (typeof BatchStatus)[keyof typeof BatchStatus]
+
+
 export const InvoiceItemType = {
   TOUR_COMPLETED: 'TOUR_COMPLETED',
   LOAD_COMPLETED: 'LOAD_COMPLETED',
@@ -57,12 +68,3 @@ export const TripStage = {
 } as const
 
 export type TripStage = (typeof TripStage)[keyof typeof TripStage]
-
-
-export const ForecastStatus = {
-  PROJECTED: 'PROJECTED',
-  IN_PROGRESS: 'IN_PROGRESS',
-  COMPLETED: 'COMPLETED'
-} as const
-
-export type ForecastStatus = (typeof ForecastStatus)[keyof typeof ForecastStatus]

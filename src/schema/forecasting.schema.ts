@@ -18,10 +18,12 @@ export const tripStageEnum = z.enum([
   "CANCELED",
 ]);
 
-export const forecastStatusEnum = z.enum([
-  "PROJECTED",
+export const batchStatusEnum = z.enum([
+  "EMPTY",
+  "UPCOMING",
   "IN_PROGRESS",
   "COMPLETED",
+  "INVOICED",
 ]);
 
 // ============================================
@@ -51,6 +53,7 @@ export const amazonInvoiceLineItemSchema = z.object({
 export const amazonInvoiceSchema = z.object({
   id: z.string().uuid(),
   userId: z.string().uuid(),
+  batchId: z.string().nullable(),
   invoiceNumber: z.string(),
   routeDomicile: z.string().nullable(),
   equipment: z.string().nullable(),
@@ -130,7 +133,7 @@ export const tripLoadSchema = z.object({
 export const tripSchema = z.object({
   id: z.string().uuid(),
   userId: z.string().uuid(),
-  weekId: z.string().uuid().nullable(),
+  batchId: z.string().nullable(),
   tripId: z.string(),
   tripStage: tripStageEnum.default("UPCOMING"),
   equipmentType: z.string().nullable(),
@@ -200,18 +203,23 @@ export const tripFilterSchema = z.object({
 });
 
 // ============================================
-// FORECAST WEEK SCHEMAS
+// TRIP BATCH SCHEMAS
 // ============================================
 
-export const forecastWeekSchema = z.object({
-  id: z.string().uuid(),
+export const tripBatchSchema = z.object({
+  id: z.string(),
   userId: z.string().uuid(),
-  weekStart: z.coerce.date(),
-  weekEnd: z.coerce.date(),
-  weekNumber: z.number().int(),
-  year: z.number().int(),
-  truckCount: z.number().int().default(2),
-  nightsCount: z.number().int().default(7),
+  name: z.string(),
+  description: z.string().nullable(),
+  status: batchStatusEnum.default("EMPTY"),
+  tripFileHash: z.string().nullable(),
+  invoiceFileHash: z.string().nullable(),
+  tripsImportedAt: z.coerce.date().nullable(),
+  invoiceImportedAt: z.coerce.date().nullable(),
+  tripCount: z.number().int().default(0),
+  loadCount: z.number().int().default(0),
+  canceledCount: z.number().int().default(0),
+  completedCount: z.number().int().default(0),
   projectedTours: z.number().int().default(0),
   projectedLoads: z.number().int().default(0),
   projectedTourPay: z.coerce.number().default(0),
@@ -225,18 +233,20 @@ export const forecastWeekSchema = z.object({
   actualTotal: z.coerce.number().nullable(),
   variance: z.coerce.number().nullable(),
   variancePercent: z.number().nullable(),
-  amazonInvoiceId: z.string().uuid().nullable(),
-  notes: z.string().nullable(),
-  status: forecastStatusEnum.default("PROJECTED"),
+  projectionLockedAt: z.coerce.date().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });
 
-export const updateForecastWeekSchema = z.object({
-  id: z.string().uuid(),
-  truckCount: z.number().int().optional(),
-  nightsCount: z.number().int().optional(),
-  notes: z.string().nullable().optional(),
+export const createTripBatchSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  description: z.string().nullable().optional(),
+});
+
+export const updateTripBatchSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
 });
 
 // ============================================
@@ -370,7 +380,7 @@ export const tripVarianceSchema = z.object({
 
 export type InvoiceItemType = z.infer<typeof invoiceItemTypeEnum>;
 export type TripStage = z.infer<typeof tripStageEnum>;
-export type ForecastStatus = z.infer<typeof forecastStatusEnum>;
+export type BatchStatus = z.infer<typeof batchStatusEnum>;
 
 export type AmazonInvoiceLineItem = z.infer<typeof amazonInvoiceLineItemSchema>;
 export type AmazonInvoice = z.infer<typeof amazonInvoiceSchema>;
@@ -384,8 +394,9 @@ export type ImportTrip = z.infer<typeof importTripSchema>;
 export type UpdateTrip = z.infer<typeof updateTripSchema>;
 export type TripFilter = z.infer<typeof tripFilterSchema>;
 
-export type ForecastWeek = z.infer<typeof forecastWeekSchema>;
-export type UpdateForecastWeek = z.infer<typeof updateForecastWeekSchema>;
+export type TripBatch = z.infer<typeof tripBatchSchema>;
+export type CreateTripBatch = z.infer<typeof createTripBatchSchema>;
+export type UpdateTripBatch = z.infer<typeof updateTripBatchSchema>;
 
 export type Forecast = z.infer<typeof forecastSchema>;
 export type CreateForecast = z.infer<typeof createForecastSchema>;

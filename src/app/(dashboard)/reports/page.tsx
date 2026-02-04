@@ -221,14 +221,14 @@ export default function ReportsPage() {
         return;
       }
 
-      if (result.data.weeks.length === 0) {
+      if (result.data.batches.length === 0) {
         toast.error("No forecast data found for the selected period");
         return;
       }
 
       generateForecastExcel(result.data);
       addRecentExport(`Forecast_Summary.xlsx`, "xlsx");
-      toast.success(`Exported ${result.data.weeks.length} weeks of forecast data`);
+      toast.success(`Exported ${result.data.batches.length} batches of forecast data`);
     } catch (error) {
       console.error("Error exporting forecast:", error);
       toast.error("Failed to export forecast data");

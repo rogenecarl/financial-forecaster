@@ -212,10 +212,8 @@ export type UserWhereInput = {
   categoryRules?: Prisma.CategoryRuleListRelationFilter
   amazonInvoices?: Prisma.AmazonInvoiceListRelationFilter
   trips?: Prisma.TripListRelationFilter
-  forecastWeeks?: Prisma.ForecastWeekListRelationFilter
+  tripBatches?: Prisma.TripBatchListRelationFilter
   forecasts?: Prisma.ForecastListRelationFilter
-  tripImportBatches?: Prisma.TripImportBatchListRelationFilter
-  invoiceImportBatches?: Prisma.InvoiceImportBatchListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -233,10 +231,8 @@ export type UserOrderByWithRelationInput = {
   categoryRules?: Prisma.CategoryRuleOrderByRelationAggregateInput
   amazonInvoices?: Prisma.AmazonInvoiceOrderByRelationAggregateInput
   trips?: Prisma.TripOrderByRelationAggregateInput
-  forecastWeeks?: Prisma.ForecastWeekOrderByRelationAggregateInput
+  tripBatches?: Prisma.TripBatchOrderByRelationAggregateInput
   forecasts?: Prisma.ForecastOrderByRelationAggregateInput
-  tripImportBatches?: Prisma.TripImportBatchOrderByRelationAggregateInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -257,10 +253,8 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   categoryRules?: Prisma.CategoryRuleListRelationFilter
   amazonInvoices?: Prisma.AmazonInvoiceListRelationFilter
   trips?: Prisma.TripListRelationFilter
-  forecastWeeks?: Prisma.ForecastWeekListRelationFilter
+  tripBatches?: Prisma.TripBatchListRelationFilter
   forecasts?: Prisma.ForecastListRelationFilter
-  tripImportBatches?: Prisma.TripImportBatchListRelationFilter
-  invoiceImportBatches?: Prisma.InvoiceImportBatchListRelationFilter
 }, "id" | "email">
 
 export type UserOrderByWithAggregationInput = {
@@ -306,10 +300,8 @@ export type UserCreateInput = {
   categoryRules?: Prisma.CategoryRuleCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceCreateNestedManyWithoutUserInput
   trips?: Prisma.TripCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -327,10 +319,8 @@ export type UserUncheckedCreateInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedCreateNestedManyWithoutUserInput
   trips?: Prisma.TripUncheckedCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchUncheckedCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastUncheckedCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -348,10 +338,8 @@ export type UserUpdateInput = {
   categoryRules?: Prisma.CategoryRuleUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -369,10 +357,8 @@ export type UserUncheckedUpdateInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUncheckedUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUncheckedUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUncheckedUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -508,32 +494,18 @@ export type UserUpdateOneRequiredWithoutTransactionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTransactionsInput, Prisma.UserUpdateWithoutTransactionsInput>, Prisma.UserUncheckedUpdateWithoutTransactionsInput>
 }
 
-export type UserCreateNestedOneWithoutTripImportBatchesInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutTripImportBatchesInput, Prisma.UserUncheckedCreateWithoutTripImportBatchesInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTripImportBatchesInput
+export type UserCreateNestedOneWithoutTripBatchesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTripBatchesInput, Prisma.UserUncheckedCreateWithoutTripBatchesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTripBatchesInput
   connect?: Prisma.UserWhereUniqueInput
 }
 
-export type UserUpdateOneRequiredWithoutTripImportBatchesNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutTripImportBatchesInput, Prisma.UserUncheckedCreateWithoutTripImportBatchesInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTripImportBatchesInput
-  upsert?: Prisma.UserUpsertWithoutTripImportBatchesInput
+export type UserUpdateOneRequiredWithoutTripBatchesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutTripBatchesInput, Prisma.UserUncheckedCreateWithoutTripBatchesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutTripBatchesInput
+  upsert?: Prisma.UserUpsertWithoutTripBatchesInput
   connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTripImportBatchesInput, Prisma.UserUpdateWithoutTripImportBatchesInput>, Prisma.UserUncheckedUpdateWithoutTripImportBatchesInput>
-}
-
-export type UserCreateNestedOneWithoutInvoiceImportBatchesInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutInvoiceImportBatchesInput, Prisma.UserUncheckedCreateWithoutInvoiceImportBatchesInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutInvoiceImportBatchesInput
-  connect?: Prisma.UserWhereUniqueInput
-}
-
-export type UserUpdateOneRequiredWithoutInvoiceImportBatchesNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutInvoiceImportBatchesInput, Prisma.UserUncheckedCreateWithoutInvoiceImportBatchesInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutInvoiceImportBatchesInput
-  upsert?: Prisma.UserUpsertWithoutInvoiceImportBatchesInput
-  connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutInvoiceImportBatchesInput, Prisma.UserUpdateWithoutInvoiceImportBatchesInput>, Prisma.UserUncheckedUpdateWithoutInvoiceImportBatchesInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTripBatchesInput, Prisma.UserUpdateWithoutTripBatchesInput>, Prisma.UserUncheckedUpdateWithoutTripBatchesInput>
 }
 
 export type UserCreateNestedOneWithoutCategoryRulesInput = {
@@ -578,20 +550,6 @@ export type UserUpdateOneRequiredWithoutTripsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTripsInput, Prisma.UserUpdateWithoutTripsInput>, Prisma.UserUncheckedUpdateWithoutTripsInput>
 }
 
-export type UserCreateNestedOneWithoutForecastWeeksInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutForecastWeeksInput, Prisma.UserUncheckedCreateWithoutForecastWeeksInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutForecastWeeksInput
-  connect?: Prisma.UserWhereUniqueInput
-}
-
-export type UserUpdateOneRequiredWithoutForecastWeeksNestedInput = {
-  create?: Prisma.XOR<Prisma.UserCreateWithoutForecastWeeksInput, Prisma.UserUncheckedCreateWithoutForecastWeeksInput>
-  connectOrCreate?: Prisma.UserCreateOrConnectWithoutForecastWeeksInput
-  upsert?: Prisma.UserUpsertWithoutForecastWeeksInput
-  connect?: Prisma.UserWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutForecastWeeksInput, Prisma.UserUpdateWithoutForecastWeeksInput>, Prisma.UserUncheckedUpdateWithoutForecastWeeksInput>
-}
-
 export type UserCreateNestedOneWithoutForecastsInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutForecastsInput, Prisma.UserUncheckedCreateWithoutForecastsInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutForecastsInput
@@ -620,10 +578,8 @@ export type UserCreateWithoutSessionsInput = {
   categoryRules?: Prisma.CategoryRuleCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceCreateNestedManyWithoutUserInput
   trips?: Prisma.TripCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSessionsInput = {
@@ -640,10 +596,8 @@ export type UserUncheckedCreateWithoutSessionsInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedCreateNestedManyWithoutUserInput
   trips?: Prisma.TripUncheckedCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchUncheckedCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastUncheckedCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSessionsInput = {
@@ -676,10 +630,8 @@ export type UserUpdateWithoutSessionsInput = {
   categoryRules?: Prisma.CategoryRuleUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -696,10 +648,8 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUncheckedUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUncheckedUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUncheckedUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAccountsInput = {
@@ -716,10 +666,8 @@ export type UserCreateWithoutAccountsInput = {
   categoryRules?: Prisma.CategoryRuleCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceCreateNestedManyWithoutUserInput
   trips?: Prisma.TripCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAccountsInput = {
@@ -736,10 +684,8 @@ export type UserUncheckedCreateWithoutAccountsInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedCreateNestedManyWithoutUserInput
   trips?: Prisma.TripUncheckedCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchUncheckedCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastUncheckedCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAccountsInput = {
@@ -772,10 +718,8 @@ export type UserUpdateWithoutAccountsInput = {
   categoryRules?: Prisma.CategoryRuleUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAccountsInput = {
@@ -792,10 +736,8 @@ export type UserUncheckedUpdateWithoutAccountsInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUncheckedUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUncheckedUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUncheckedUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTransactionsInput = {
@@ -812,10 +754,8 @@ export type UserCreateWithoutTransactionsInput = {
   categoryRules?: Prisma.CategoryRuleCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceCreateNestedManyWithoutUserInput
   trips?: Prisma.TripCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTransactionsInput = {
@@ -832,10 +772,8 @@ export type UserUncheckedCreateWithoutTransactionsInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedCreateNestedManyWithoutUserInput
   trips?: Prisma.TripUncheckedCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchUncheckedCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastUncheckedCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTransactionsInput = {
@@ -868,10 +806,8 @@ export type UserUpdateWithoutTransactionsInput = {
   categoryRules?: Prisma.CategoryRuleUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTransactionsInput = {
@@ -888,13 +824,11 @@ export type UserUncheckedUpdateWithoutTransactionsInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUncheckedUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUncheckedUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUncheckedUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedUpdateManyWithoutUserNestedInput
 }
 
-export type UserCreateWithoutTripImportBatchesInput = {
+export type UserCreateWithoutTripBatchesInput = {
   id?: string
   name: string
   email: string
@@ -909,12 +843,10 @@ export type UserCreateWithoutTripImportBatchesInput = {
   categoryRules?: Prisma.CategoryRuleCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceCreateNestedManyWithoutUserInput
   trips?: Prisma.TripCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchCreateNestedManyWithoutUserInput
 }
 
-export type UserUncheckedCreateWithoutTripImportBatchesInput = {
+export type UserUncheckedCreateWithoutTripBatchesInput = {
   id?: string
   name: string
   email: string
@@ -929,28 +861,26 @@ export type UserUncheckedCreateWithoutTripImportBatchesInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedCreateNestedManyWithoutUserInput
   trips?: Prisma.TripUncheckedCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastUncheckedCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedCreateNestedManyWithoutUserInput
 }
 
-export type UserCreateOrConnectWithoutTripImportBatchesInput = {
+export type UserCreateOrConnectWithoutTripBatchesInput = {
   where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutTripImportBatchesInput, Prisma.UserUncheckedCreateWithoutTripImportBatchesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutTripBatchesInput, Prisma.UserUncheckedCreateWithoutTripBatchesInput>
 }
 
-export type UserUpsertWithoutTripImportBatchesInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutTripImportBatchesInput, Prisma.UserUncheckedUpdateWithoutTripImportBatchesInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutTripImportBatchesInput, Prisma.UserUncheckedCreateWithoutTripImportBatchesInput>
+export type UserUpsertWithoutTripBatchesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutTripBatchesInput, Prisma.UserUncheckedUpdateWithoutTripBatchesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutTripBatchesInput, Prisma.UserUncheckedCreateWithoutTripBatchesInput>
   where?: Prisma.UserWhereInput
 }
 
-export type UserUpdateToOneWithWhereWithoutTripImportBatchesInput = {
+export type UserUpdateToOneWithWhereWithoutTripBatchesInput = {
   where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutTripImportBatchesInput, Prisma.UserUncheckedUpdateWithoutTripImportBatchesInput>
+  data: Prisma.XOR<Prisma.UserUpdateWithoutTripBatchesInput, Prisma.UserUncheckedUpdateWithoutTripBatchesInput>
 }
 
-export type UserUpdateWithoutTripImportBatchesInput = {
+export type UserUpdateWithoutTripBatchesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -965,12 +895,10 @@ export type UserUpdateWithoutTripImportBatchesInput = {
   categoryRules?: Prisma.CategoryRuleUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUpdateManyWithoutUserNestedInput
 }
 
-export type UserUncheckedUpdateWithoutTripImportBatchesInput = {
+export type UserUncheckedUpdateWithoutTripBatchesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -985,105 +913,7 @@ export type UserUncheckedUpdateWithoutTripImportBatchesInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUncheckedUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUncheckedUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedUpdateManyWithoutUserNestedInput
-}
-
-export type UserCreateWithoutInvoiceImportBatchesInput = {
-  id?: string
-  name: string
-  email: string
-  role?: $Enums.Role
-  emailVerified?: boolean
-  image?: string | null
-  createdAt?: Date | string
-  updatedAt?: Date | string
-  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
-  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
-  transactions?: Prisma.TransactionCreateNestedManyWithoutUserInput
-  categoryRules?: Prisma.CategoryRuleCreateNestedManyWithoutUserInput
-  amazonInvoices?: Prisma.AmazonInvoiceCreateNestedManyWithoutUserInput
-  trips?: Prisma.TripCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekCreateNestedManyWithoutUserInput
-  forecasts?: Prisma.ForecastCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchCreateNestedManyWithoutUserInput
-}
-
-export type UserUncheckedCreateWithoutInvoiceImportBatchesInput = {
-  id?: string
-  name: string
-  email: string
-  role?: $Enums.Role
-  emailVerified?: boolean
-  image?: string | null
-  createdAt?: Date | string
-  updatedAt?: Date | string
-  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
-  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
-  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutUserInput
-  categoryRules?: Prisma.CategoryRuleUncheckedCreateNestedManyWithoutUserInput
-  amazonInvoices?: Prisma.AmazonInvoiceUncheckedCreateNestedManyWithoutUserInput
-  trips?: Prisma.TripUncheckedCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedCreateNestedManyWithoutUserInput
-  forecasts?: Prisma.ForecastUncheckedCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedCreateNestedManyWithoutUserInput
-}
-
-export type UserCreateOrConnectWithoutInvoiceImportBatchesInput = {
-  where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutInvoiceImportBatchesInput, Prisma.UserUncheckedCreateWithoutInvoiceImportBatchesInput>
-}
-
-export type UserUpsertWithoutInvoiceImportBatchesInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutInvoiceImportBatchesInput, Prisma.UserUncheckedUpdateWithoutInvoiceImportBatchesInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutInvoiceImportBatchesInput, Prisma.UserUncheckedCreateWithoutInvoiceImportBatchesInput>
-  where?: Prisma.UserWhereInput
-}
-
-export type UserUpdateToOneWithWhereWithoutInvoiceImportBatchesInput = {
-  where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutInvoiceImportBatchesInput, Prisma.UserUncheckedUpdateWithoutInvoiceImportBatchesInput>
-}
-
-export type UserUpdateWithoutInvoiceImportBatchesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
-  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
-  transactions?: Prisma.TransactionUpdateManyWithoutUserNestedInput
-  categoryRules?: Prisma.CategoryRuleUpdateManyWithoutUserNestedInput
-  amazonInvoices?: Prisma.AmazonInvoiceUpdateManyWithoutUserNestedInput
-  trips?: Prisma.TripUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUpdateManyWithoutUserNestedInput
-  forecasts?: Prisma.ForecastUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUpdateManyWithoutUserNestedInput
-}
-
-export type UserUncheckedUpdateWithoutInvoiceImportBatchesInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
-  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
-  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutUserNestedInput
-  categoryRules?: Prisma.CategoryRuleUncheckedUpdateManyWithoutUserNestedInput
-  amazonInvoices?: Prisma.AmazonInvoiceUncheckedUpdateManyWithoutUserNestedInput
-  trips?: Prisma.TripUncheckedUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedUpdateManyWithoutUserNestedInput
-  forecasts?: Prisma.ForecastUncheckedUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutCategoryRulesInput = {
@@ -1100,10 +930,8 @@ export type UserCreateWithoutCategoryRulesInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceCreateNestedManyWithoutUserInput
   trips?: Prisma.TripCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutCategoryRulesInput = {
@@ -1120,10 +948,8 @@ export type UserUncheckedCreateWithoutCategoryRulesInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedCreateNestedManyWithoutUserInput
   trips?: Prisma.TripUncheckedCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchUncheckedCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastUncheckedCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutCategoryRulesInput = {
@@ -1156,10 +982,8 @@ export type UserUpdateWithoutCategoryRulesInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutCategoryRulesInput = {
@@ -1176,10 +1000,8 @@ export type UserUncheckedUpdateWithoutCategoryRulesInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUncheckedUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUncheckedUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUncheckedUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAmazonInvoicesInput = {
@@ -1196,10 +1018,8 @@ export type UserCreateWithoutAmazonInvoicesInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutUserInput
   categoryRules?: Prisma.CategoryRuleCreateNestedManyWithoutUserInput
   trips?: Prisma.TripCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAmazonInvoicesInput = {
@@ -1216,10 +1036,8 @@ export type UserUncheckedCreateWithoutAmazonInvoicesInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutUserInput
   categoryRules?: Prisma.CategoryRuleUncheckedCreateNestedManyWithoutUserInput
   trips?: Prisma.TripUncheckedCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchUncheckedCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastUncheckedCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAmazonInvoicesInput = {
@@ -1252,10 +1070,8 @@ export type UserUpdateWithoutAmazonInvoicesInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutUserNestedInput
   categoryRules?: Prisma.CategoryRuleUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAmazonInvoicesInput = {
@@ -1272,10 +1088,8 @@ export type UserUncheckedUpdateWithoutAmazonInvoicesInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutUserNestedInput
   categoryRules?: Prisma.CategoryRuleUncheckedUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUncheckedUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUncheckedUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUncheckedUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTripsInput = {
@@ -1292,10 +1106,8 @@ export type UserCreateWithoutTripsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutUserInput
   categoryRules?: Prisma.CategoryRuleCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTripsInput = {
@@ -1312,10 +1124,8 @@ export type UserUncheckedCreateWithoutTripsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutUserInput
   categoryRules?: Prisma.CategoryRuleUncheckedCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchUncheckedCreateNestedManyWithoutUserInput
   forecasts?: Prisma.ForecastUncheckedCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTripsInput = {
@@ -1348,10 +1158,8 @@ export type UserUpdateWithoutTripsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutUserNestedInput
   categoryRules?: Prisma.CategoryRuleUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTripsInput = {
@@ -1368,106 +1176,8 @@ export type UserUncheckedUpdateWithoutTripsInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutUserNestedInput
   categoryRules?: Prisma.CategoryRuleUncheckedUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUncheckedUpdateManyWithoutUserNestedInput
   forecasts?: Prisma.ForecastUncheckedUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedUpdateManyWithoutUserNestedInput
-}
-
-export type UserCreateWithoutForecastWeeksInput = {
-  id?: string
-  name: string
-  email: string
-  role?: $Enums.Role
-  emailVerified?: boolean
-  image?: string | null
-  createdAt?: Date | string
-  updatedAt?: Date | string
-  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
-  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
-  transactions?: Prisma.TransactionCreateNestedManyWithoutUserInput
-  categoryRules?: Prisma.CategoryRuleCreateNestedManyWithoutUserInput
-  amazonInvoices?: Prisma.AmazonInvoiceCreateNestedManyWithoutUserInput
-  trips?: Prisma.TripCreateNestedManyWithoutUserInput
-  forecasts?: Prisma.ForecastCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchCreateNestedManyWithoutUserInput
-}
-
-export type UserUncheckedCreateWithoutForecastWeeksInput = {
-  id?: string
-  name: string
-  email: string
-  role?: $Enums.Role
-  emailVerified?: boolean
-  image?: string | null
-  createdAt?: Date | string
-  updatedAt?: Date | string
-  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
-  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
-  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutUserInput
-  categoryRules?: Prisma.CategoryRuleUncheckedCreateNestedManyWithoutUserInput
-  amazonInvoices?: Prisma.AmazonInvoiceUncheckedCreateNestedManyWithoutUserInput
-  trips?: Prisma.TripUncheckedCreateNestedManyWithoutUserInput
-  forecasts?: Prisma.ForecastUncheckedCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedCreateNestedManyWithoutUserInput
-}
-
-export type UserCreateOrConnectWithoutForecastWeeksInput = {
-  where: Prisma.UserWhereUniqueInput
-  create: Prisma.XOR<Prisma.UserCreateWithoutForecastWeeksInput, Prisma.UserUncheckedCreateWithoutForecastWeeksInput>
-}
-
-export type UserUpsertWithoutForecastWeeksInput = {
-  update: Prisma.XOR<Prisma.UserUpdateWithoutForecastWeeksInput, Prisma.UserUncheckedUpdateWithoutForecastWeeksInput>
-  create: Prisma.XOR<Prisma.UserCreateWithoutForecastWeeksInput, Prisma.UserUncheckedCreateWithoutForecastWeeksInput>
-  where?: Prisma.UserWhereInput
-}
-
-export type UserUpdateToOneWithWhereWithoutForecastWeeksInput = {
-  where?: Prisma.UserWhereInput
-  data: Prisma.XOR<Prisma.UserUpdateWithoutForecastWeeksInput, Prisma.UserUncheckedUpdateWithoutForecastWeeksInput>
-}
-
-export type UserUpdateWithoutForecastWeeksInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
-  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
-  transactions?: Prisma.TransactionUpdateManyWithoutUserNestedInput
-  categoryRules?: Prisma.CategoryRuleUpdateManyWithoutUserNestedInput
-  amazonInvoices?: Prisma.AmazonInvoiceUpdateManyWithoutUserNestedInput
-  trips?: Prisma.TripUpdateManyWithoutUserNestedInput
-  forecasts?: Prisma.ForecastUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUpdateManyWithoutUserNestedInput
-}
-
-export type UserUncheckedUpdateWithoutForecastWeeksInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  email?: Prisma.StringFieldUpdateOperationsInput | string
-  role?: Prisma.EnumRoleFieldUpdateOperationsInput | $Enums.Role
-  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
-  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
-  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutUserNestedInput
-  categoryRules?: Prisma.CategoryRuleUncheckedUpdateManyWithoutUserNestedInput
-  amazonInvoices?: Prisma.AmazonInvoiceUncheckedUpdateManyWithoutUserNestedInput
-  trips?: Prisma.TripUncheckedUpdateManyWithoutUserNestedInput
-  forecasts?: Prisma.ForecastUncheckedUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutForecastsInput = {
@@ -1485,9 +1195,7 @@ export type UserCreateWithoutForecastsInput = {
   categoryRules?: Prisma.CategoryRuleCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceCreateNestedManyWithoutUserInput
   trips?: Prisma.TripCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutForecastsInput = {
@@ -1505,9 +1213,7 @@ export type UserUncheckedCreateWithoutForecastsInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedCreateNestedManyWithoutUserInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedCreateNestedManyWithoutUserInput
   trips?: Prisma.TripUncheckedCreateNestedManyWithoutUserInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedCreateNestedManyWithoutUserInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedCreateNestedManyWithoutUserInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedCreateNestedManyWithoutUserInput
+  tripBatches?: Prisma.TripBatchUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutForecastsInput = {
@@ -1541,9 +1247,7 @@ export type UserUpdateWithoutForecastsInput = {
   categoryRules?: Prisma.CategoryRuleUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutForecastsInput = {
@@ -1561,9 +1265,7 @@ export type UserUncheckedUpdateWithoutForecastsInput = {
   categoryRules?: Prisma.CategoryRuleUncheckedUpdateManyWithoutUserNestedInput
   amazonInvoices?: Prisma.AmazonInvoiceUncheckedUpdateManyWithoutUserNestedInput
   trips?: Prisma.TripUncheckedUpdateManyWithoutUserNestedInput
-  forecastWeeks?: Prisma.ForecastWeekUncheckedUpdateManyWithoutUserNestedInput
-  tripImportBatches?: Prisma.TripImportBatchUncheckedUpdateManyWithoutUserNestedInput
-  invoiceImportBatches?: Prisma.InvoiceImportBatchUncheckedUpdateManyWithoutUserNestedInput
+  tripBatches?: Prisma.TripBatchUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -1578,10 +1280,8 @@ export type UserCountOutputType = {
   categoryRules: number
   amazonInvoices: number
   trips: number
-  forecastWeeks: number
+  tripBatches: number
   forecasts: number
-  tripImportBatches: number
-  invoiceImportBatches: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1591,10 +1291,8 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   categoryRules?: boolean | UserCountOutputTypeCountCategoryRulesArgs
   amazonInvoices?: boolean | UserCountOutputTypeCountAmazonInvoicesArgs
   trips?: boolean | UserCountOutputTypeCountTripsArgs
-  forecastWeeks?: boolean | UserCountOutputTypeCountForecastWeeksArgs
+  tripBatches?: boolean | UserCountOutputTypeCountTripBatchesArgs
   forecasts?: boolean | UserCountOutputTypeCountForecastsArgs
-  tripImportBatches?: boolean | UserCountOutputTypeCountTripImportBatchesArgs
-  invoiceImportBatches?: boolean | UserCountOutputTypeCountInvoiceImportBatchesArgs
 }
 
 /**
@@ -1652,8 +1350,8 @@ export type UserCountOutputTypeCountTripsArgs<ExtArgs extends runtime.Types.Exte
 /**
  * UserCountOutputType without action
  */
-export type UserCountOutputTypeCountForecastWeeksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.ForecastWeekWhereInput
+export type UserCountOutputTypeCountTripBatchesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TripBatchWhereInput
 }
 
 /**
@@ -1661,20 +1359,6 @@ export type UserCountOutputTypeCountForecastWeeksArgs<ExtArgs extends runtime.Ty
  */
 export type UserCountOutputTypeCountForecastsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.ForecastWhereInput
-}
-
-/**
- * UserCountOutputType without action
- */
-export type UserCountOutputTypeCountTripImportBatchesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.TripImportBatchWhereInput
-}
-
-/**
- * UserCountOutputType without action
- */
-export type UserCountOutputTypeCountInvoiceImportBatchesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.InvoiceImportBatchWhereInput
 }
 
 
@@ -1693,10 +1377,8 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   categoryRules?: boolean | Prisma.User$categoryRulesArgs<ExtArgs>
   amazonInvoices?: boolean | Prisma.User$amazonInvoicesArgs<ExtArgs>
   trips?: boolean | Prisma.User$tripsArgs<ExtArgs>
-  forecastWeeks?: boolean | Prisma.User$forecastWeeksArgs<ExtArgs>
+  tripBatches?: boolean | Prisma.User$tripBatchesArgs<ExtArgs>
   forecasts?: boolean | Prisma.User$forecastsArgs<ExtArgs>
-  tripImportBatches?: boolean | Prisma.User$tripImportBatchesArgs<ExtArgs>
-  invoiceImportBatches?: boolean | Prisma.User$invoiceImportBatchesArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -1741,10 +1423,8 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   categoryRules?: boolean | Prisma.User$categoryRulesArgs<ExtArgs>
   amazonInvoices?: boolean | Prisma.User$amazonInvoicesArgs<ExtArgs>
   trips?: boolean | Prisma.User$tripsArgs<ExtArgs>
-  forecastWeeks?: boolean | Prisma.User$forecastWeeksArgs<ExtArgs>
+  tripBatches?: boolean | Prisma.User$tripBatchesArgs<ExtArgs>
   forecasts?: boolean | Prisma.User$forecastsArgs<ExtArgs>
-  tripImportBatches?: boolean | Prisma.User$tripImportBatchesArgs<ExtArgs>
-  invoiceImportBatches?: boolean | Prisma.User$invoiceImportBatchesArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1759,10 +1439,8 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     categoryRules: Prisma.$CategoryRulePayload<ExtArgs>[]
     amazonInvoices: Prisma.$AmazonInvoicePayload<ExtArgs>[]
     trips: Prisma.$TripPayload<ExtArgs>[]
-    forecastWeeks: Prisma.$ForecastWeekPayload<ExtArgs>[]
+    tripBatches: Prisma.$TripBatchPayload<ExtArgs>[]
     forecasts: Prisma.$ForecastPayload<ExtArgs>[]
-    tripImportBatches: Prisma.$TripImportBatchPayload<ExtArgs>[]
-    invoiceImportBatches: Prisma.$InvoiceImportBatchPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2173,10 +1851,8 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   categoryRules<T extends Prisma.User$categoryRulesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$categoryRulesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CategoryRulePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   amazonInvoices<T extends Prisma.User$amazonInvoicesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$amazonInvoicesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AmazonInvoicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   trips<T extends Prisma.User$tripsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tripsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TripPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  forecastWeeks<T extends Prisma.User$forecastWeeksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$forecastWeeksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ForecastWeekPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tripBatches<T extends Prisma.User$tripBatchesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tripBatchesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TripBatchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   forecasts<T extends Prisma.User$forecastsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$forecastsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ForecastPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  tripImportBatches<T extends Prisma.User$tripImportBatchesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tripImportBatchesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TripImportBatchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  invoiceImportBatches<T extends Prisma.User$invoiceImportBatchesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$invoiceImportBatchesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InvoiceImportBatchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2746,27 +2422,27 @@ export type User$tripsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs
 }
 
 /**
- * User.forecastWeeks
+ * User.tripBatches
  */
-export type User$forecastWeeksArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type User$tripBatchesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
-   * Select specific fields to fetch from the ForecastWeek
+   * Select specific fields to fetch from the TripBatch
    */
-  select?: Prisma.ForecastWeekSelect<ExtArgs> | null
+  select?: Prisma.TripBatchSelect<ExtArgs> | null
   /**
-   * Omit specific fields from the ForecastWeek
+   * Omit specific fields from the TripBatch
    */
-  omit?: Prisma.ForecastWeekOmit<ExtArgs> | null
+  omit?: Prisma.TripBatchOmit<ExtArgs> | null
   /**
    * Choose, which related nodes to fetch as well
    */
-  include?: Prisma.ForecastWeekInclude<ExtArgs> | null
-  where?: Prisma.ForecastWeekWhereInput
-  orderBy?: Prisma.ForecastWeekOrderByWithRelationInput | Prisma.ForecastWeekOrderByWithRelationInput[]
-  cursor?: Prisma.ForecastWeekWhereUniqueInput
+  include?: Prisma.TripBatchInclude<ExtArgs> | null
+  where?: Prisma.TripBatchWhereInput
+  orderBy?: Prisma.TripBatchOrderByWithRelationInput | Prisma.TripBatchOrderByWithRelationInput[]
+  cursor?: Prisma.TripBatchWhereUniqueInput
   take?: number
   skip?: number
-  distinct?: Prisma.ForecastWeekScalarFieldEnum | Prisma.ForecastWeekScalarFieldEnum[]
+  distinct?: Prisma.TripBatchScalarFieldEnum | Prisma.TripBatchScalarFieldEnum[]
 }
 
 /**
@@ -2791,54 +2467,6 @@ export type User$forecastsArgs<ExtArgs extends runtime.Types.Extensions.Internal
   take?: number
   skip?: number
   distinct?: Prisma.ForecastScalarFieldEnum | Prisma.ForecastScalarFieldEnum[]
-}
-
-/**
- * User.tripImportBatches
- */
-export type User$tripImportBatchesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the TripImportBatch
-   */
-  select?: Prisma.TripImportBatchSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the TripImportBatch
-   */
-  omit?: Prisma.TripImportBatchOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.TripImportBatchInclude<ExtArgs> | null
-  where?: Prisma.TripImportBatchWhereInput
-  orderBy?: Prisma.TripImportBatchOrderByWithRelationInput | Prisma.TripImportBatchOrderByWithRelationInput[]
-  cursor?: Prisma.TripImportBatchWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.TripImportBatchScalarFieldEnum | Prisma.TripImportBatchScalarFieldEnum[]
-}
-
-/**
- * User.invoiceImportBatches
- */
-export type User$invoiceImportBatchesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the InvoiceImportBatch
-   */
-  select?: Prisma.InvoiceImportBatchSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the InvoiceImportBatch
-   */
-  omit?: Prisma.InvoiceImportBatchOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.InvoiceImportBatchInclude<ExtArgs> | null
-  where?: Prisma.InvoiceImportBatchWhereInput
-  orderBy?: Prisma.InvoiceImportBatchOrderByWithRelationInput | Prisma.InvoiceImportBatchOrderByWithRelationInput[]
-  cursor?: Prisma.InvoiceImportBatchWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.InvoiceImportBatchScalarFieldEnum | Prisma.InvoiceImportBatchScalarFieldEnum[]
 }
 
 /**

@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/collapsible";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { FORECASTING_CONSTANTS } from "@/config/forecasting";
-import type { TripImportResult } from "@/actions/forecasting/trips";
+import type { TripImportResult } from "@/actions/forecasting/trip-batches";
 
 interface TripImportResultDialogProps {
   open: boolean;
@@ -49,9 +49,7 @@ export function TripImportResultDialog({
 }: TripImportResultDialogProps) {
   const [showSkipped, setShowSkipped] = useState(false);
 
-  const { DTR_RATE, LOAD_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
-
-  const totalInFile = result.imported + result.skipped;
+  const { DTR_RATE, TRIP_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -81,35 +79,20 @@ export function TripImportResultDialog({
             </h4>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Total in file:</span>
-                <span className="font-medium">{formatNumber(totalInFile)} trips</span>
-              </div>
-              <div className="flex justify-between">
                 <span className="flex items-center gap-1.5 text-green-600">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  New imported:
+                  Active Trips:
                 </span>
                 <span className="font-medium text-green-600">
-                  {formatNumber(result.imported)} trips
+                  {formatNumber(result.imported - result.canceledCount)} trips
                 </span>
               </div>
-              {result.skipped > 0 && (
-                <div className="flex justify-between">
-                  <span className="flex items-center gap-1.5 text-amber-600">
-                    <SkipForward className="h-3.5 w-3.5" />
-                    Skipped:
-                  </span>
-                  <span className="font-medium text-amber-600">
-                    {formatNumber(result.skipped)} trips (already exist)
-                  </span>
-                </div>
-              )}
               <div className="flex justify-between">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <Truck className="h-3.5 w-3.5" />
-                  Total loads:
+                  Projected Loads:
                 </span>
-                <span className="font-medium">{formatNumber(result.loadCount)} loads</span>
+                <span className="font-medium">{formatNumber(result.projectedLoads)} loads</span>
               </div>
               {result.canceledCount > 0 && (
                 <div className="flex justify-between">
@@ -122,7 +105,23 @@ export function TripImportResultDialog({
                   </span>
                 </div>
               )}
+              {result.skipped > 0 && (
+                <div className="flex justify-between pt-2 border-t border-muted">
+                  <span className="flex items-center gap-1.5 text-amber-600">
+                    <SkipForward className="h-3.5 w-3.5" />
+                    Skipped:
+                  </span>
+                  <span className="font-medium text-amber-600">
+                    {formatNumber(result.skipped)} trips (already exist)
+                  </span>
+                </div>
+              )}
             </div>
+            {result.canceledCount > 0 && (
+              <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
+                Note: {result.canceledCount} canceled {result.canceledCount === 1 ? "trip is" : "trips are"} excluded from active trips and projected loads
+              </p>
+            )}
           </div>
 
           {/* Projected Revenue */}
@@ -147,7 +146,7 @@ export function TripImportResultDialog({
                   <span className="font-medium">
                     {formatCurrency(result.projectedAccessorials)}
                     <span className="ml-1 text-xs text-muted-foreground">
-                      ({result.projectedLoads} x {formatCurrency(LOAD_ACCESSORIAL_RATE)})
+                      ({result.projectedTours} x {formatCurrency(TRIP_ACCESSORIAL_RATE)})
                     </span>
                   </span>
                 </div>
@@ -160,15 +159,6 @@ export function TripImportResultDialog({
               </div>
             </div>
           )}
-
-          {/* Period Covered */}
-          <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2 text-sm">
-            <span className="text-muted-foreground">Period covered:</span>
-            <span className="font-medium">
-              {format(new Date(result.periodStart), "MMM d")} -{" "}
-              {format(new Date(result.periodEnd), "MMM d, yyyy")}
-            </span>
-          </div>
 
           {/* Skipped Trips Collapsible */}
           {result.skipped > 0 && result.duplicateTripIds.length > 0 && (

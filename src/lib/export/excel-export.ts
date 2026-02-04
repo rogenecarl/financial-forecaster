@@ -38,11 +38,11 @@ export function generateForecastExcel(data: ForecastExportData): void {
 
   XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
 
-  // Weekly Breakdown Sheet
-  const weeklyHeaders = [
-    "Week",
-    "Week Start",
-    "Week End",
+  // Batch Breakdown Sheet
+  const batchHeaders = [
+    "Batch Name",
+    "Batch ID",
+    "Created At",
     "Projected Tours",
     "Projected Loads",
     "Projected Tour Pay",
@@ -59,33 +59,33 @@ export function generateForecastExcel(data: ForecastExportData): void {
     "Accuracy %",
   ];
 
-  const weeklyData = data.weeks.map((week) => [
-    week.weekLabel,
-    format(week.weekStart, "yyyy-MM-dd"),
-    format(week.weekEnd, "yyyy-MM-dd"),
-    week.projectedTours,
-    week.projectedLoads,
-    formatCurrencyPlain(week.projectedTourPay),
-    formatCurrencyPlain(week.projectedAccessorials),
-    formatCurrencyPlain(week.projectedTotal),
-    week.actualTours ?? "",
-    week.actualLoads ?? "",
-    week.actualTourPay !== null ? formatCurrencyPlain(week.actualTourPay) : "",
-    week.actualAccessorials !== null ? formatCurrencyPlain(week.actualAccessorials) : "",
-    week.actualAdjustments !== null ? formatCurrencyPlain(week.actualAdjustments) : "",
-    week.actualTotal !== null ? formatCurrencyPlain(week.actualTotal) : "",
-    week.variance !== null ? formatCurrencyPlain(week.variance) : "",
-    week.variancePercent !== null ? `${week.variancePercent.toFixed(1)}%` : "",
-    week.accuracy !== null ? `${week.accuracy}%` : "",
+  const batchData = data.batches.map((batch) => [
+    batch.batchName,
+    batch.batchId,
+    format(new Date(batch.createdAt), "yyyy-MM-dd"),
+    batch.projectedTours,
+    batch.projectedLoads,
+    formatCurrencyPlain(batch.projectedTourPay),
+    formatCurrencyPlain(batch.projectedAccessorials),
+    formatCurrencyPlain(batch.projectedTotal),
+    batch.actualTours ?? "",
+    batch.actualLoads ?? "",
+    batch.actualTourPay !== null ? formatCurrencyPlain(batch.actualTourPay) : "",
+    batch.actualAccessorials !== null ? formatCurrencyPlain(batch.actualAccessorials) : "",
+    batch.actualAdjustments !== null ? formatCurrencyPlain(batch.actualAdjustments) : "",
+    batch.actualTotal !== null ? formatCurrencyPlain(batch.actualTotal) : "",
+    batch.variance !== null ? formatCurrencyPlain(batch.variance) : "",
+    batch.variancePercent !== null ? `${batch.variancePercent.toFixed(1)}%` : "",
+    batch.accuracy !== null ? `${batch.accuracy}%` : "",
   ]);
 
-  const weeklySheet = XLSX.utils.aoa_to_sheet([weeklyHeaders, ...weeklyData]);
+  const batchSheet = XLSX.utils.aoa_to_sheet([batchHeaders, ...batchData]);
 
-  // Set column widths for weekly sheet
-  weeklySheet["!cols"] = [
-    { wch: 25 }, // Week
-    { wch: 12 }, // Week Start
-    { wch: 12 }, // Week End
+  // Set column widths for batch sheet
+  batchSheet["!cols"] = [
+    { wch: 25 }, // Batch Name
+    { wch: 36 }, // Batch ID
+    { wch: 12 }, // Created At
     { wch: 15 }, // Projected Tours
     { wch: 15 }, // Projected Loads
     { wch: 18 }, // Projected Tour Pay
@@ -102,7 +102,7 @@ export function generateForecastExcel(data: ForecastExportData): void {
     { wch: 12 }, // Accuracy %
   ];
 
-  XLSX.utils.book_append_sheet(workbook, weeklySheet, "Weekly Breakdown");
+  XLSX.utils.book_append_sheet(workbook, batchSheet, "Batch Breakdown");
 
   // Save
   const filename = `Forecast_Summary_${format(new Date(), "MMM_yyyy")}.xlsx`;

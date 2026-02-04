@@ -3,10 +3,9 @@
 import prisma from "@/lib/db";
 import { requireAuth } from "@/lib/auth-server";
 import type { ActionResponse } from "@/types/api";
-import type { ImportTrip, Trip, TripLoad, UpdateTrip, TripFilter } from "@/schema/forecasting.schema";
+import type { Trip, TripLoad, UpdateTrip, TripFilter } from "@/schema/forecasting.schema";
 import { updateTripSchema, tripFilterSchema } from "@/schema/forecasting.schema";
-import { startOfWeek, endOfWeek, getWeek, getYear } from "date-fns";
-import { FORECASTING_CONSTANTS } from "@/config/forecasting";
+import { recalculateBatchMetrics } from "./trip-batches";
 
 // ============================================
 // TYPES
@@ -121,25 +120,35 @@ export async function getTrips(
 }
 
 // ============================================
-// GET TRIPS BY WEEK
+// GET TRIPS BY BATCH
 // ============================================
 
-export async function getTripsByWeek(
-  weekStart: Date
+export interface WeekStats {
+  totalTrips: number;
+  projectedLoads: number;
+  actualLoads: number;
+  updatedCount: number;
+  completion: number;
+}
+
+export async function getTripsForBatch(
+  batchId: string,
+  tripStage?: "UPCOMING" | "IN_PROGRESS" | "COMPLETED" | "CANCELED"
 ): Promise<ActionResponse<{ trips: TripSummary[]; stats: WeekStats }>> {
   try {
     const session = await requireAuth();
 
-    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+    const where: Record<string, unknown> = {
+      userId: session.user.id,
+      batchId,
+    };
+
+    if (tripStage) {
+      where.tripStage = tripStage;
+    }
 
     const trips = await prisma.trip.findMany({
-      where: {
-        userId: session.user.id,
-        scheduledDate: {
-          gte: weekStart,
-          lte: weekEnd,
-        },
-      },
+      where,
       orderBy: { scheduledDate: "asc" },
       select: {
         id: true,
@@ -180,17 +189,9 @@ export async function getTripsByWeek(
 
     return { success: true, data: { trips: summaries, stats } };
   } catch (error) {
-    console.error("Failed to get trips by week:", error);
+    console.error("Failed to get trips for batch:", error);
     return { success: false, error: "Failed to load trips" };
   }
-}
-
-export interface WeekStats {
-  totalTrips: number;
-  projectedLoads: number;
-  actualLoads: number;
-  updatedCount: number;
-  completion: number;
 }
 
 export interface TripDateRange {
@@ -331,9 +332,8 @@ export type TripWithLoadsForTable = TripSummary & {
 export interface TripsFilterParams {
   startDate?: Date;
   endDate?: Date;
-  weekId?: string; // Format: "2026-W05" - filters by weekId field
-  importBatchId?: string; // Filters by importBatchId
-  tripStage?: "UPCOMING" | "IN_PROGRESS" | "COMPLETED" | "CANCELED"; // Filters by tripStage
+  batchId?: string;
+  tripStage?: "UPCOMING" | "IN_PROGRESS" | "COMPLETED" | "CANCELED";
 }
 
 export async function getTripsWithLoads(
@@ -341,29 +341,24 @@ export async function getTripsWithLoads(
 ): Promise<ActionResponse<{ trips: TripWithLoadsForTable[]; stats: WeekStats }>> {
   try {
     const session = await requireAuth();
-    const { startDate, endDate, weekId, importBatchId, tripStage } = params ?? {};
+    const { startDate, endDate, batchId, tripStage } = params ?? {};
 
     // Build where clause with filters
     const where: Record<string, unknown> = {
       userId: session.user.id,
     };
 
-    // Date range filter (used when no weekId is specified)
-    if (startDate && endDate && !weekId) {
+    // Date range filter
+    if (startDate && endDate) {
       where.scheduledDate = {
         gte: startDate,
         lte: endDate,
       };
     }
 
-    // Week filter (takes precedence over date range)
-    if (weekId) {
-      where.weekId = weekId;
-    }
-
-    // Import batch filter
-    if (importBatchId) {
-      where.importBatchId = importBatchId;
+    // Batch filter
+    if (batchId) {
+      where.batchId = batchId;
     }
 
     // Trip stage filter
@@ -482,7 +477,7 @@ export async function getTrip(id: string): Promise<ActionResponse<TripWithLoads>
     const result: TripWithLoads = {
       id: trip.id,
       userId: trip.userId,
-      weekId: trip.weekId,
+      batchId: trip.batchId,
       tripId: trip.tripId,
       tripStage: trip.tripStage,
       equipmentType: trip.equipmentType,
@@ -567,12 +562,13 @@ export async function updateTrip(data: UpdateTrip): Promise<ActionResponse<TripS
         projectedRevenue: true,
         actualRevenue: true,
         notes: true,
+        batchId: true,
       },
     });
 
-    // Update ForecastWeek if actual loads changed
-    if (validated.actualLoads !== undefined) {
-      await updateForecastWeekFromTrips(session.user.id, updated.scheduledDate);
+    // Update TripBatch metrics if trip belongs to a batch
+    if (updated.batchId) {
+      await recalculateBatchMetrics(updated.batchId);
     }
 
     return {
@@ -596,502 +592,6 @@ export async function updateTrip(data: UpdateTrip): Promise<ActionResponse<TripS
 }
 
 // ============================================
-// IMPORT TRIPS (With batch tracking and duplicate detection)
-// ============================================
-
-// ============================================
-// CHECK DUPLICATE FILE
-// ============================================
-
-export interface DuplicateFileCheckResult {
-  isDuplicate: boolean;
-  previousImport?: {
-    id: string;
-    fileName: string;
-    importedAt: Date;
-    tripCount: number;
-    newTripsCount: number;
-  };
-}
-
-export async function checkDuplicateTripFile(
-  fileHash: string
-): Promise<ActionResponse<DuplicateFileCheckResult>> {
-  try {
-    const session = await requireAuth();
-
-    const previousImport = await prisma.tripImportBatch.findFirst({
-      where: {
-        userId: session.user.id,
-        fileHash,
-        status: { not: "rolled_back" },
-      },
-      select: {
-        id: true,
-        fileName: true,
-        importedAt: true,
-        tripCount: true,
-        newTripsCount: true,
-      },
-    });
-
-    if (previousImport) {
-      return {
-        success: true,
-        data: {
-          isDuplicate: true,
-          previousImport,
-        },
-      };
-    }
-
-    return {
-      success: true,
-      data: { isDuplicate: false },
-    };
-  } catch (error) {
-    console.error("Failed to check duplicate file:", error);
-    return { success: false, error: "Failed to check for duplicate file" };
-  }
-}
-
-// Helper to chunk an array into smaller batches
-function chunkArray<T>(array: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
-}
-
-// Helper to create load data from a trip
-function createLoadData(tripDbId: string, load: ImportTrip["loads"][0]) {
-  return {
-    tripDbId,
-    loadId: load.loadId,
-    facilitySequence: load.facilitySequence || null,
-    loadExecutionStatus: load.loadExecutionStatus,
-    truckFilter: load.truckFilter || null,
-    isBobtail: load.isBobtail,
-    estimateDistance: load.estimateDistance,
-    estimatedCost: load.estimatedCost || null,
-    shipperAccount: load.shipperAccount || null,
-    stop1: load.stop1 || null,
-    stop1PlannedArr: load.stop1PlannedArr || null,
-    stop2: load.stop2 || null,
-    stop2PlannedArr: load.stop2PlannedArr || null,
-    stop3: load.stop3 || null,
-    stop3PlannedArr: load.stop3PlannedArr || null,
-    stop4: load.stop4 || null,
-    stop4PlannedArr: load.stop4PlannedArr || null,
-    stop5: load.stop5 || null,
-    stop5PlannedArr: load.stop5PlannedArr || null,
-    stop6: load.stop6 || null,
-    stop6PlannedArr: load.stop6PlannedArr || null,
-    stop7: load.stop7 || null,
-    stop7PlannedArr: load.stop7PlannedArr || null,
-  };
-}
-
-// ============================================
-// IMPORT RESULT TYPE
-// ============================================
-
-export interface TripImportResult {
-  imported: number;
-  skipped: number;
-  duplicateTripIds: string[];
-  batchId: string;
-  // Projection snapshot for this import
-  projectedTours: number;
-  projectedLoads: number;
-  projectedTourPay: number;
-  projectedAccessorials: number;
-  projectedTotal: number;
-  // Period covered
-  periodStart: Date;
-  periodEnd: Date;
-  // Stats
-  loadCount: number;
-  canceledCount: number;
-}
-
-export async function importTrips(
-  trips: ImportTrip[],
-  fileName: string = "trips.csv",
-  fileHash?: string
-): Promise<ActionResponse<TripImportResult>> {
-  try {
-    const session = await requireAuth();
-    const userId = session.user.id;
-
-    if (trips.length === 0) {
-      return { success: false, error: "No trips to import" };
-    }
-
-    // Check if same file was imported before (by hash)
-    if (fileHash) {
-      const previousImport = await prisma.tripImportBatch.findFirst({
-        where: { userId, fileHash },
-      });
-
-      if (previousImport) {
-        return {
-          success: false,
-          error: `DUPLICATE_FILE: This file was already imported on ${previousImport.importedAt.toLocaleDateString()}`,
-        };
-      }
-    }
-
-    // Batch fetch all existing trips in one query
-    const tripIds = trips.map((t) => t.tripId);
-    const existingTrips = await prisma.trip.findMany({
-      where: {
-        userId,
-        tripId: { in: tripIds },
-      },
-      select: { id: true, tripId: true },
-    });
-
-    const existingTripIds = new Set(existingTrips.map((t) => t.tripId));
-
-    // Separate new trips from duplicates (NO UPDATES - skip duplicates)
-    const newTrips = trips.filter((t) => !existingTripIds.has(t.tripId));
-    const duplicateTrips = trips.filter((t) => existingTripIds.has(t.tripId));
-
-    // Calculate period from ALL trips in file
-    const scheduledDates = trips.map((t) => t.scheduledDate.getTime());
-    const periodStart = new Date(Math.min(...scheduledDates));
-    const periodEnd = new Date(Math.max(...scheduledDates));
-
-    // Calculate projections from NEW trips only (excluding canceled)
-    const { DTR_RATE, LOAD_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
-    const activeNewTrips = newTrips.filter((t) => t.tripStage !== "CANCELED");
-    const canceledNewTrips = newTrips.filter((t) => t.tripStage === "CANCELED");
-
-    const projectedTours = activeNewTrips.length;
-    const projectedLoads = activeNewTrips.reduce((sum, t) => sum + t.projectedLoads, 0);
-    const projectedTourPay = projectedTours * DTR_RATE;
-    const projectedAccessorials = projectedLoads * LOAD_ACCESSORIAL_RATE;
-    const projectedTotal = projectedTourPay + projectedAccessorials;
-    const loadCount = newTrips.reduce((sum, t) => sum + t.loads.length, 0);
-
-    // Create import batch record
-    const batch = await prisma.tripImportBatch.create({
-      data: {
-        userId,
-        fileName,
-        fileHash: fileHash || null,
-        periodStart,
-        periodEnd,
-        tripCount: trips.length,
-        newTripsCount: newTrips.length,
-        skippedCount: duplicateTrips.length,
-        loadCount,
-        canceledCount: canceledNewTrips.length,
-        projectedTours,
-        projectedLoads,
-        projectedTourPay,
-        projectedAccessorials,
-        projectedTotal,
-        status: "processing",
-      },
-    });
-
-    try {
-      // Process inserts in chunks
-      const CHUNK_SIZE = 10;
-
-      if (newTrips.length > 0) {
-        const insertChunks = chunkArray(newTrips, CHUNK_SIZE);
-
-        for (const chunk of insertChunks) {
-          await prisma.$transaction(async (tx) => {
-            // Create trips and collect their IDs
-            const createdTrips: Array<{ id: string; tripId: string }> = [];
-
-            for (const tripData of chunk) {
-              const created = await tx.trip.create({
-                data: {
-                  userId,
-                  tripId: tripData.tripId,
-                  tripStage: mapTripStage(tripData.tripStage),
-                  equipmentType: tripData.equipmentType || null,
-                  operatorType: tripData.operatorType || null,
-                  scheduledDate: tripData.scheduledDate,
-                  projectedLoads: tripData.projectedLoads,
-                  estimatedAccessorial: tripData.estimatedAccessorial || null,
-                  projectedRevenue: tripData.projectedRevenue || null,
-                  // Store original projected values (IMMUTABLE)
-                  originalProjectedLoads: tripData.projectedLoads,
-                  originalProjectedRevenue: tripData.projectedRevenue || null,
-                  // Link to import batch
-                  importBatchId: batch.id,
-                },
-                select: { id: true, tripId: true },
-              });
-              createdTrips.push(created);
-            }
-
-            // Create a map of tripId to dbId
-            const newTripMap = new Map(createdTrips.map((t) => [t.tripId, t.id]));
-
-            // Create loads for all trips in this chunk
-            const chunkLoads = chunk.flatMap((tripData) => {
-              const dbId = newTripMap.get(tripData.tripId)!;
-              return tripData.loads.map((load) => createLoadData(dbId, load));
-            });
-
-            if (chunkLoads.length > 0) {
-              await tx.tripLoad.createMany({ data: chunkLoads });
-            }
-          }, { timeout: 30000 });
-        }
-      }
-
-      // Update ForecastWeeks for the affected weeks (only for new trips)
-      if (newTrips.length > 0) {
-        const newTripDates = newTrips.map((t) => t.scheduledDate);
-        const uniqueWeekStarts = [...new Set(newTripDates.map((d) => startOfWeek(d, { weekStartsOn: 1 }).getTime()))];
-
-        const weekChunks = chunkArray(uniqueWeekStarts, 5);
-        for (const weekChunk of weekChunks) {
-          await Promise.all(
-            weekChunk.map((weekStartTime) =>
-              createOrUpdateForecastWeek(userId, new Date(weekStartTime))
-            )
-          );
-        }
-      }
-
-      // Mark batch as completed
-      await prisma.tripImportBatch.update({
-        where: { id: batch.id },
-        data: { status: "completed" },
-      });
-
-      return {
-        success: true,
-        data: {
-          imported: newTrips.length,
-          skipped: duplicateTrips.length,
-          duplicateTripIds: duplicateTrips.map((t) => t.tripId),
-          batchId: batch.id,
-          projectedTours,
-          projectedLoads,
-          projectedTourPay,
-          projectedAccessorials,
-          projectedTotal,
-          periodStart,
-          periodEnd,
-          loadCount,
-          canceledCount: canceledNewTrips.length,
-        },
-      };
-    } catch (error) {
-      // Mark batch as failed
-      await prisma.tripImportBatch.update({
-        where: { id: batch.id },
-        data: {
-          status: "failed",
-          errorMessage: error instanceof Error ? error.message : "Unknown error",
-        },
-      });
-      throw error;
-    }
-  } catch (error) {
-    console.error("Failed to import trips:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to import trips" };
-  }
-}
-
-// ============================================
-// GET TRIP IMPORT BATCHES
-// ============================================
-
-export interface TripImportBatchSummary {
-  id: string;
-  fileName: string;
-  importedAt: Date;
-  periodStart: Date;
-  periodEnd: Date;
-  tripCount: number;
-  newTripsCount: number;
-  skippedCount: number;
-  loadCount: number;
-  canceledCount: number;
-  projectedTotal: number;
-  status: string;
-}
-
-export async function getTripImportBatches(): Promise<ActionResponse<TripImportBatchSummary[]>> {
-  try {
-    const session = await requireAuth();
-
-    const batches = await prisma.tripImportBatch.findMany({
-      where: { userId: session.user.id },
-      orderBy: { importedAt: "desc" },
-      select: {
-        id: true,
-        fileName: true,
-        importedAt: true,
-        periodStart: true,
-        periodEnd: true,
-        tripCount: true,
-        newTripsCount: true,
-        skippedCount: true,
-        loadCount: true,
-        canceledCount: true,
-        projectedTotal: true,
-        status: true,
-      },
-    });
-
-    return {
-      success: true,
-      data: batches.map((b) => ({
-        ...b,
-        projectedTotal: toNumber(b.projectedTotal),
-      })),
-    };
-  } catch (error) {
-    console.error("Failed to get trip import batches:", error);
-    return { success: false, error: "Failed to load import history" };
-  }
-}
-
-// ============================================
-// GET TRIP IMPORT BATCH BY ID
-// ============================================
-
-export async function getTripImportBatch(
-  batchId: string
-): Promise<ActionResponse<TripImportBatchSummary & { trips: TripSummary[] }>> {
-  try {
-    const session = await requireAuth();
-
-    const batch = await prisma.tripImportBatch.findFirst({
-      where: { id: batchId, userId: session.user.id },
-      include: {
-        trips: {
-          orderBy: { scheduledDate: "asc" },
-          select: {
-            id: true,
-            tripId: true,
-            tripStage: true,
-            scheduledDate: true,
-            projectedLoads: true,
-            actualLoads: true,
-            projectedRevenue: true,
-            actualRevenue: true,
-            notes: true,
-          },
-        },
-      },
-    });
-
-    if (!batch) {
-      return { success: false, error: "Import batch not found" };
-    }
-
-    return {
-      success: true,
-      data: {
-        id: batch.id,
-        fileName: batch.fileName,
-        importedAt: batch.importedAt,
-        periodStart: batch.periodStart,
-        periodEnd: batch.periodEnd,
-        tripCount: batch.tripCount,
-        newTripsCount: batch.newTripsCount,
-        skippedCount: batch.skippedCount,
-        loadCount: batch.loadCount,
-        canceledCount: batch.canceledCount,
-        projectedTotal: toNumber(batch.projectedTotal),
-        status: batch.status,
-        trips: batch.trips.map((trip) => ({
-          id: trip.id,
-          tripId: trip.tripId,
-          tripStage: trip.tripStage,
-          scheduledDate: trip.scheduledDate,
-          projectedLoads: trip.projectedLoads,
-          actualLoads: trip.actualLoads,
-          projectedRevenue: toNumber(trip.projectedRevenue),
-          actualRevenue: toNumber(trip.actualRevenue),
-          notes: trip.notes,
-        })),
-      },
-    };
-  } catch (error) {
-    console.error("Failed to get trip import batch:", error);
-    return { success: false, error: "Failed to load import batch" };
-  }
-}
-
-// ============================================
-// ROLLBACK TRIP IMPORT
-// ============================================
-
-export async function rollbackTripImport(
-  batchId: string
-): Promise<ActionResponse<{ deletedTrips: number }>> {
-  try {
-    const session = await requireAuth();
-    const userId = session.user.id;
-
-    const batch = await prisma.tripImportBatch.findFirst({
-      where: { id: batchId, userId },
-      include: {
-        trips: {
-          select: { id: true, scheduledDate: true },
-        },
-      },
-    });
-
-    if (!batch) {
-      return { success: false, error: "Import batch not found" };
-    }
-
-    if (batch.status === "rolled_back") {
-      return { success: false, error: "This import has already been rolled back" };
-    }
-
-    // Collect unique week starts for forecast week updates
-    const uniqueWeekStarts = [
-      ...new Set(
-        batch.trips.map((t) => startOfWeek(t.scheduledDate, { weekStartsOn: 1 }).getTime())
-      ),
-    ];
-
-    // Delete trips (loads will cascade delete)
-    const deleteResult = await prisma.trip.deleteMany({
-      where: { importBatchId: batchId },
-    });
-
-    // Mark batch as rolled back
-    await prisma.tripImportBatch.update({
-      where: { id: batchId },
-      data: { status: "rolled_back" },
-    });
-
-    // Update affected forecast weeks
-    await Promise.all(
-      uniqueWeekStarts.map((weekStartTime) =>
-        createOrUpdateForecastWeek(userId, new Date(weekStartTime))
-      )
-    );
-
-    return {
-      success: true,
-      data: { deletedTrips: deleteResult.count },
-    };
-  } catch (error) {
-    console.error("Failed to rollback trip import:", error);
-    return { success: false, error: "Failed to rollback import" };
-  }
-}
-
-// ============================================
 // DELETE TRIP
 // ============================================
 
@@ -1107,10 +607,14 @@ export async function deleteTrip(id: string): Promise<ActionResponse<void>> {
       return { success: false, error: "Trip not found" };
     }
 
+    const batchId = trip.batchId;
+
     await prisma.trip.delete({ where: { id } });
 
-    // Update ForecastWeek
-    await updateForecastWeekFromTrips(session.user.id, trip.scheduledDate);
+    // Update TripBatch metrics if trip belonged to a batch
+    if (batchId) {
+      await recalculateBatchMetrics(batchId);
+    }
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -1133,25 +637,21 @@ export async function bulkDeleteTrips(
       return { success: false, error: "No trips selected" };
     }
 
-    // Get all trips to find their scheduled dates for forecast week updates
+    // Get all trips to find their batch IDs
     const trips = await prisma.trip.findMany({
       where: {
         id: { in: tripIds },
         userId: session.user.id,
       },
-      select: { id: true, scheduledDate: true },
+      select: { id: true, batchId: true },
     });
 
     if (trips.length === 0) {
       return { success: false, error: "No trips found" };
     }
 
-    // Collect unique week start dates for forecast week updates
-    const uniqueWeekStarts = [
-      ...new Set(
-        trips.map((t) => startOfWeek(t.scheduledDate, { weekStartsOn: 1 }).getTime())
-      ),
-    ];
+    // Collect unique batch IDs for metric updates
+    const uniqueBatchIds = [...new Set(trips.map((t) => t.batchId).filter(Boolean))] as string[];
 
     // Delete trips (loads will be cascade deleted via Prisma relation)
     const deleteResult = await prisma.trip.deleteMany({
@@ -1161,11 +661,9 @@ export async function bulkDeleteTrips(
       },
     });
 
-    // Update ForecastWeeks for affected weeks
+    // Update TripBatch metrics for affected batches
     await Promise.all(
-      uniqueWeekStarts.map((weekStartTime) =>
-        createOrUpdateForecastWeek(session.user.id, new Date(weekStartTime))
-      )
+      uniqueBatchIds.map((batchId) => recalculateBatchMetrics(batchId))
     );
 
     return {
@@ -1176,81 +674,4 @@ export async function bulkDeleteTrips(
     console.error("Failed to bulk delete trips:", error);
     return { success: false, error: "Failed to delete trips" };
   }
-}
-
-// ============================================
-// FORECAST WEEK HELPERS
-// ============================================
-
-async function createOrUpdateForecastWeek(userId: string, weekStart: Date) {
-  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-  const weekNumber = getWeek(weekStart, { weekStartsOn: 1 });
-  const year = getYear(weekStart);
-
-  // Check if forecast week exists and if projections are locked
-  const existing = await prisma.forecastWeek.findFirst({
-    where: {
-      userId,
-      weekStart,
-    },
-  });
-
-  // If projections are locked (invoice has arrived), do NOT update projections
-  if (existing?.projectionLockedAt) {
-    return; // Projections are immutable after invoice
-  }
-
-  // Get all trips for this week
-  const trips = await prisma.trip.findMany({
-    where: {
-      userId,
-      scheduledDate: {
-        gte: weekStart,
-        lte: weekEnd,
-      },
-    },
-  });
-
-  // Exclude canceled trips from projections
-  const activeTrips = trips.filter(t => t.tripStage !== "CANCELED");
-  const { DTR_RATE, LOAD_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
-
-  const projectedTours = activeTrips.length;
-  const projectedLoads = activeTrips.reduce((sum, t) => sum + t.projectedLoads, 0);
-  const projectedTourPay = projectedTours * DTR_RATE;
-  const projectedAccessorials = projectedLoads * LOAD_ACCESSORIAL_RATE;
-  const projectedTotal = projectedTourPay + projectedAccessorials;
-
-  if (existing) {
-    await prisma.forecastWeek.update({
-      where: { id: existing.id },
-      data: {
-        projectedTours,
-        projectedLoads,
-        projectedTourPay,
-        projectedAccessorials,
-        projectedTotal,
-      },
-    });
-  } else {
-    await prisma.forecastWeek.create({
-      data: {
-        userId,
-        weekStart,
-        weekEnd,
-        weekNumber,
-        year,
-        projectedTours,
-        projectedLoads,
-        projectedTourPay,
-        projectedAccessorials,
-        projectedTotal,
-      },
-    });
-  }
-}
-
-async function updateForecastWeekFromTrips(userId: string, tripDate: Date) {
-  const weekStart = startOfWeek(tripDate, { weekStartsOn: 1 });
-  await createOrUpdateForecastWeek(userId, weekStart);
 }

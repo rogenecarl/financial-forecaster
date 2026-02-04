@@ -3,7 +3,7 @@
 import prisma from "@/lib/db";
 import { requireAuth } from "@/lib/auth-server";
 import type { ActionResponse } from "@/types/api";
-import { startOfWeek, endOfWeek, subWeeks, format } from "date-fns";
+import { startOfWeek, endOfWeek, subWeeks, addWeeks, format, startOfYear, getWeek } from "date-fns";
 import { calculateForecast } from "@/lib/forecast-calculations";
 
 // ============================================
@@ -60,6 +60,30 @@ export interface CashFlowDataPoint {
   profit: number;
 }
 
+export interface NextWeekForecast {
+  weekNumber: number;
+  weekStart: Date;
+  weekEnd: Date;
+  projectedTotal: number;
+  hasTrips: boolean;
+  tripCount: number;
+}
+
+export interface ModelAccuracy {
+  accuracy: number;
+  weekCount: number;
+}
+
+export interface YearToDateData {
+  year: number;
+  totalRevenue: number;
+  totalProjected: number;
+  accuracy: number;
+  tripsCompleted: number;
+  loadsDelivered: number;
+  canceledCount: number;
+}
+
 // ============================================
 // HELPERS
 // ============================================
@@ -70,14 +94,6 @@ function toNumber(value: any): number {
   if (typeof value === "number") return value;
   if (typeof value?.toNumber === "function") return value.toNumber();
   return Number(value) || 0;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toNumberOrNull(value: any): number | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "number") return value;
-  if (typeof value?.toNumber === "function") return value.toNumber();
-  return Number(value) || null;
 }
 
 // ============================================
@@ -261,15 +277,7 @@ export async function getThisWeekForecast(): Promise<ActionResponse<ThisWeekFore
     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
 
-    // Get forecast week data
-    const forecastWeek = await prisma.forecastWeek.findFirst({
-      where: {
-        userId,
-        weekStart,
-      },
-    });
-
-    // Get trips for this week
+    // Get trips for this week (across all batches)
     const trips = await prisma.trip.findMany({
       where: {
         userId,
@@ -289,23 +297,11 @@ export async function getThisWeekForecast(): Promise<ActionResponse<ThisWeekFore
     const loadsTotal = trips.reduce((sum, t) => sum + t.projectedLoads, 0);
     const loadsDelivered = trips.reduce((sum, t) => sum + (t.actualLoads || 0), 0);
 
-    // Get projected total from forecast week or calculate from trips
-    let projectedTotal = 0;
-    if (forecastWeek) {
-      projectedTotal = toNumber(forecastWeek.projectedTotal);
-    } else {
-      // Calculate from trips if no forecast week exists
-      projectedTotal = trips.reduce((sum, t) => sum + toNumber(t.projectedRevenue), 0);
-    }
+    // Calculate from trips
+    const projectedTotal = trips.reduce((sum, t) => sum + toNumber(t.projectedRevenue), 0);
 
-    // Get current total (actual revenue from completed trips or invoice)
-    let currentTotal = 0;
-    if (forecastWeek?.actualTotal) {
-      currentTotal = toNumber(forecastWeek.actualTotal);
-    } else {
-      // Sum actual revenue from trips with actual loads
-      currentTotal = trips.reduce((sum, t) => sum + toNumber(t.actualRevenue), 0);
-    }
+    // Sum actual revenue from trips with actual loads
+    const currentTotal = trips.reduce((sum, t) => sum + toNumber(t.actualRevenue), 0);
 
     const progressPercent =
       projectedTotal > 0 ? Math.min(100, (currentTotal / projectedTotal) * 100) : 0;
@@ -350,17 +346,27 @@ export async function getForecastVsActual(
       const weekEnd = endOfWeek(weekDate, { weekStartsOn: 1 });
       const weekLabel = `${format(weekStart, "MMM d")}-${format(weekEnd, "d")}`;
 
-      // Get forecast week data
-      const forecastWeek = await prisma.forecastWeek.findFirst({
+      // Get trips for this week (across all batches)
+      const trips = await prisma.trip.findMany({
         where: {
           userId,
-          weekStart,
+          scheduledDate: {
+            gte: weekStart,
+            lte: weekEnd,
+          },
         },
       });
 
-      if (forecastWeek) {
-        const forecast = toNumber(forecastWeek.projectedTotal);
-        const actual = toNumberOrNull(forecastWeek.actualTotal);
+      if (trips.length > 0) {
+        const forecast = trips.reduce(
+          (sum, t) => sum + toNumber(t.projectedRevenue),
+          0
+        );
+        const actualSum = trips
+          .filter((t) => t.actualRevenue !== null)
+          .reduce((sum, t) => sum + toNumber(t.actualRevenue), 0);
+        const hasActual = trips.some((t) => t.actualRevenue !== null);
+        const actual = hasActual ? actualSum : null;
         const variance = actual !== null ? actual - forecast : null;
 
         let accuracy: number | null = null;
@@ -378,46 +384,6 @@ export async function getForecastVsActual(
           variance,
           accuracy,
         });
-      } else {
-        // Check if there are trips for this week to calculate a forecast
-        const trips = await prisma.trip.findMany({
-          where: {
-            userId,
-            scheduledDate: {
-              gte: weekStart,
-              lte: weekEnd,
-            },
-          },
-        });
-
-        if (trips.length > 0) {
-          const forecast = trips.reduce(
-            (sum, t) => sum + toNumber(t.projectedRevenue),
-            0
-          );
-          const actualSum = trips
-            .filter((t) => t.actualRevenue !== null)
-            .reduce((sum, t) => sum + toNumber(t.actualRevenue), 0);
-          const hasActual = trips.some((t) => t.actualRevenue !== null);
-          const actual = hasActual ? actualSum : null;
-          const variance = actual !== null ? actual - forecast : null;
-
-          let accuracy: number | null = null;
-          if (actual !== null && forecast > 0) {
-            const varianceAbs = Math.abs(actual - forecast);
-            accuracy = Math.max(0, Math.round((1 - varianceAbs / forecast) * 100));
-          }
-
-          weeks.push({
-            weekStart,
-            weekEnd,
-            weekLabel,
-            forecast,
-            actual,
-            variance,
-            accuracy,
-          });
-        }
       }
     }
 
@@ -492,6 +458,186 @@ export async function getCashFlowTrend(
 }
 
 // ============================================
+// GET NEXT WEEK'S FORECAST
+// ============================================
+
+export async function getNextWeekForecast(): Promise<ActionResponse<NextWeekForecast | null>> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    const now = new Date();
+    const nextWeekDate = addWeeks(now, 1);
+    const weekStart = startOfWeek(nextWeekDate, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(nextWeekDate, { weekStartsOn: 1 });
+    const weekNumber = getWeek(weekStart, { weekStartsOn: 1 });
+
+    // Get trips for next week (across all batches)
+    const trips = await prisma.trip.findMany({
+      where: {
+        userId,
+        scheduledDate: {
+          gte: weekStart,
+          lte: weekEnd,
+        },
+      },
+    });
+
+    const hasTrips = trips.length > 0;
+    const tripCount = trips.length;
+
+    // Calculate projected total from trips
+    const projectedTotal = hasTrips
+      ? trips.reduce((sum, t) => sum + toNumber(t.projectedRevenue), 0)
+      : 0;
+
+    return {
+      success: true,
+      data: {
+        weekNumber,
+        weekStart,
+        weekEnd,
+        projectedTotal,
+        hasTrips,
+        tripCount,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get next week forecast:", error);
+    return { success: false, error: "Failed to load next week forecast" };
+  }
+}
+
+// ============================================
+// GET MODEL ACCURACY (LAST N WEEKS AVERAGE)
+// ============================================
+
+export async function getModelAccuracy(
+  weekCount: number = 4
+): Promise<ActionResponse<ModelAccuracy>> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    const now = new Date();
+    const accuracies: number[] = [];
+
+    for (let i = 1; i <= weekCount; i++) {
+      const weekDate = subWeeks(now, i);
+      const weekStart = startOfWeek(weekDate, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(weekDate, { weekStartsOn: 1 });
+
+      // Get trips for this week (across all batches)
+      const trips = await prisma.trip.findMany({
+        where: {
+          userId,
+          scheduledDate: {
+            gte: weekStart,
+            lte: weekEnd,
+          },
+        },
+      });
+
+      const hasActualData = trips.some((t) => t.actualRevenue !== null);
+      if (trips.length > 0 && hasActualData) {
+        const forecast = trips.reduce((sum, t) => sum + toNumber(t.projectedRevenue), 0);
+        const actual = trips
+          .filter((t) => t.actualRevenue !== null)
+          .reduce((sum, t) => sum + toNumber(t.actualRevenue), 0);
+
+        if (forecast > 0) {
+          const varianceAbs = Math.abs(actual - forecast);
+          const weekAccuracy = Math.max(0, (1 - varianceAbs / forecast) * 100);
+          accuracies.push(weekAccuracy);
+        }
+      }
+    }
+
+    const averageAccuracy =
+      accuracies.length > 0
+        ? accuracies.reduce((sum, a) => sum + a, 0) / accuracies.length
+        : 0;
+
+    return {
+      success: true,
+      data: {
+        accuracy: averageAccuracy,
+        weekCount: accuracies.length,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get model accuracy:", error);
+    return { success: false, error: "Failed to load model accuracy" };
+  }
+}
+
+// ============================================
+// GET YEAR-TO-DATE DATA
+// ============================================
+
+export async function getYearToDateData(): Promise<ActionResponse<YearToDateData>> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const yearStart = startOfYear(now);
+
+    // Get all trips for this year (across all batches)
+    const trips = await prisma.trip.findMany({
+      where: {
+        userId,
+        scheduledDate: {
+          gte: yearStart,
+          lte: now,
+        },
+      },
+    });
+
+    // Calculate totals from trips
+    const totalProjected = trips.reduce((sum, t) => sum + toNumber(t.projectedRevenue), 0);
+    const totalRevenue = trips
+      .filter((t) => t.actualRevenue !== null)
+      .reduce((sum, t) => sum + toNumber(t.actualRevenue), 0);
+
+    // Calculate YTD accuracy
+    let accuracy = 0;
+    if (totalProjected > 0 && totalRevenue > 0) {
+      const varianceAbs = Math.abs(totalRevenue - totalProjected);
+      accuracy = Math.max(0, (1 - varianceAbs / totalProjected) * 100);
+    }
+
+    // Count completed trips
+    const tripsCompleted = trips.filter(
+      (t) => t.tripStage === "COMPLETED" || t.actualLoads !== null
+    ).length;
+
+    // Sum loads delivered
+    const loadsDelivered = trips.reduce((sum, t) => sum + (t.actualLoads || 0), 0);
+
+    // Count canceled trips
+    const canceledCount = trips.filter((t) => t.tripStage === "CANCELED").length;
+
+    return {
+      success: true,
+      data: {
+        year,
+        totalRevenue,
+        totalProjected,
+        accuracy,
+        tripsCompleted,
+        loadsDelivered,
+        canceledCount,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get year-to-date data:", error);
+    return { success: false, error: "Failed to load year-to-date data" };
+  }
+}
+
+// ============================================
 // GET ALL DASHBOARD DATA (COMBINED)
 // ============================================
 
@@ -501,6 +647,9 @@ export interface DashboardData {
   thisWeekForecast: ThisWeekForecast | null;
   forecastVsActual: ForecastVsActualWeek[];
   cashFlowTrend: CashFlowDataPoint[];
+  nextWeekForecast: NextWeekForecast | null;
+  modelAccuracy: ModelAccuracy | null;
+  yearToDate: YearToDateData | null;
 }
 
 export async function getDashboardData(): Promise<ActionResponse<DashboardData>> {
@@ -511,12 +660,18 @@ export async function getDashboardData(): Promise<ActionResponse<DashboardData>>
       forecastResult,
       comparisonResult,
       cashFlowResult,
+      nextWeekResult,
+      accuracyResult,
+      ytdResult,
     ] = await Promise.all([
       getDashboardMetrics(),
       getRecentTransactions(5),
       getThisWeekForecast(),
       getForecastVsActual(4),
       getCashFlowTrend(8),
+      getNextWeekForecast(),
+      getModelAccuracy(4),
+      getYearToDateData(),
     ]);
 
     if (!metricsResult.success) {
@@ -531,6 +686,9 @@ export async function getDashboardData(): Promise<ActionResponse<DashboardData>>
         thisWeekForecast: forecastResult.success ? forecastResult.data : null,
         forecastVsActual: comparisonResult.success ? comparisonResult.data : [],
         cashFlowTrend: cashFlowResult.success ? cashFlowResult.data : [],
+        nextWeekForecast: nextWeekResult.success ? nextWeekResult.data : null,
+        modelAccuracy: accuracyResult.success ? accuracyResult.data : null,
+        yearToDate: ytdResult.success ? ytdResult.data : null,
       },
     };
   } catch (error) {

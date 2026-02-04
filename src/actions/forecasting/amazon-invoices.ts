@@ -5,7 +5,6 @@ import { requireAuth } from "@/lib/auth-server";
 import type { ActionResponse } from "@/types/api";
 import type { ImportInvoice, AmazonInvoice, AmazonInvoiceLineItem } from "@/schema/forecasting.schema";
 import { importInvoiceSchema } from "@/schema/forecasting.schema";
-import { startOfWeek, endOfWeek, getWeek, getYear } from "date-fns";
 import { FORECASTING_CONSTANTS } from "@/config/forecasting";
 
 // ============================================
@@ -32,6 +31,8 @@ export type InvoiceSummary = Pick<
   tourCount: number;
   loadCount: number;
   isMatched: boolean;
+  batchId: string | null;
+  batchName: string | null;
 };
 
 // ============================================
@@ -60,44 +61,42 @@ function mapInvoiceItemType(type: string): "TOUR_COMPLETED" | "LOAD_COMPLETED" |
 }
 
 // ============================================
-// CHECK DUPLICATE FILE
+// CHECK DUPLICATE FILE (for batch import)
 // ============================================
 
 export interface DuplicateInvoiceFileCheckResult {
   isDuplicate: boolean;
-  previousImport?: {
-    id: string;
-    fileName: string;
-    importedAt: Date;
-    invoiceCount: number;
-  };
+  batchName?: string;
+  importedAt?: Date;
 }
 
 export async function checkDuplicateInvoiceFile(
+  batchId: string,
   fileHash: string
 ): Promise<ActionResponse<DuplicateInvoiceFileCheckResult>> {
   try {
     const session = await requireAuth();
 
-    const previousImport = await prisma.invoiceImportBatch.findFirst({
+    // Check if this file was imported to any batch
+    const existingBatch = await prisma.tripBatch.findFirst({
       where: {
         userId: session.user.id,
-        fileHash,
+        invoiceFileHash: fileHash,
+        id: { not: batchId },
       },
       select: {
-        id: true,
-        fileName: true,
-        importedAt: true,
-        invoiceCount: true,
+        name: true,
+        invoiceImportedAt: true,
       },
     });
 
-    if (previousImport) {
+    if (existingBatch) {
       return {
         success: true,
         data: {
           isDuplicate: true,
-          previousImport,
+          batchName: existingBatch.name,
+          importedAt: existingBatch.invoiceImportedAt || undefined,
         },
       };
     }
@@ -130,6 +129,9 @@ export async function getAmazonInvoices(): Promise<ActionResponse<InvoiceSummary
         transactions: {
           select: { id: true },
         },
+        batch: {
+          select: { id: true, name: true },
+        },
       },
     });
 
@@ -147,11 +149,62 @@ export async function getAmazonInvoices(): Promise<ActionResponse<InvoiceSummary
       tourCount: invoice.lineItems.filter((li) => li.itemType === "TOUR_COMPLETED").length,
       loadCount: invoice.lineItems.filter((li) => li.itemType === "LOAD_COMPLETED").length,
       isMatched: invoice.transactions.length > 0,
+      batchId: invoice.batch?.id || null,
+      batchName: invoice.batch?.name || null,
     }));
 
     return { success: true, data: summaries };
   } catch (error) {
     console.error("Failed to get invoices:", error);
+    return { success: false, error: "Failed to load invoices" };
+  }
+}
+
+// ============================================
+// GET INVOICES FOR BATCH
+// ============================================
+
+export async function getInvoicesForBatch(batchId: string): Promise<ActionResponse<InvoiceSummary[]>> {
+  try {
+    const session = await requireAuth();
+
+    const invoices = await prisma.amazonInvoice.findMany({
+      where: { userId: session.user.id, batchId },
+      orderBy: { paymentDate: "desc" },
+      include: {
+        lineItems: {
+          select: { itemType: true },
+        },
+        transactions: {
+          select: { id: true },
+        },
+        batch: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    const summaries: InvoiceSummary[] = invoices.map((invoice) => ({
+      id: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      totalTourPay: toNumber(invoice.totalTourPay),
+      totalAccessorials: toNumber(invoice.totalAccessorials),
+      totalAdjustments: toNumber(invoice.totalAdjustments),
+      totalPay: toNumber(invoice.totalPay),
+      periodStart: invoice.periodStart,
+      periodEnd: invoice.periodEnd,
+      paymentDate: invoice.paymentDate,
+      createdAt: invoice.createdAt,
+      tourCount: invoice.lineItems.filter((li) => li.itemType === "TOUR_COMPLETED").length,
+      loadCount: invoice.lineItems.filter((li) => li.itemType === "LOAD_COMPLETED").length,
+      isMatched: invoice.transactions.length > 0,
+      batchId: invoice.batch?.id || null,
+      batchName: invoice.batch?.name || null,
+    }));
+
+    return { success: true, data: summaries };
+  } catch (error) {
+    console.error("Failed to get invoices for batch:", error);
     return { success: false, error: "Failed to load invoices" };
   }
 }
@@ -180,6 +233,7 @@ export async function getAmazonInvoice(id: string): Promise<ActionResponse<Invoi
     const result: InvoiceWithLineItems = {
       id: invoice.id,
       userId: invoice.userId,
+      batchId: invoice.batchId,
       invoiceNumber: invoice.invoiceNumber,
       routeDomicile: invoice.routeDomicile,
       equipment: invoice.equipment,
@@ -222,7 +276,7 @@ export async function getAmazonInvoice(id: string): Promise<ActionResponse<Invoi
 }
 
 // ============================================
-// IMPORT INVOICE (With batch tracking)
+// IMPORT INVOICE TO BATCH
 // ============================================
 
 export interface InvoiceImportResult {
@@ -233,14 +287,23 @@ export interface InvoiceImportResult {
   unmatchedTrips: number;
 }
 
-export async function importAmazonInvoice(
+export async function importInvoiceToBatch(
+  batchId: string,
   data: ImportInvoice,
-  fileName: string = "invoice.xlsx",
   fileHash?: string
 ): Promise<ActionResponse<InvoiceImportResult>> {
   try {
     const session = await requireAuth();
     const userId = session.user.id;
+
+    // Verify batch exists and belongs to user
+    const batch = await prisma.tripBatch.findFirst({
+      where: { id: batchId, userId },
+    });
+
+    if (!batch) {
+      return { success: false, error: "Batch not found" };
+    }
 
     // Validate input
     const validated = importInvoiceSchema.parse(data);
@@ -259,14 +322,18 @@ export async function importAmazonInvoice(
 
     // Check if same file was imported before (by hash)
     if (fileHash) {
-      const previousImport = await prisma.invoiceImportBatch.findFirst({
-        where: { userId, fileHash },
+      const previousBatch = await prisma.tripBatch.findFirst({
+        where: {
+          userId,
+          invoiceFileHash: fileHash,
+          id: { not: batchId },
+        },
       });
 
-      if (previousImport) {
+      if (previousBatch) {
         return {
           success: false,
-          error: `DUPLICATE_FILE: This file was already imported on ${previousImport.importedAt.toLocaleDateString()}`,
+          error: `DUPLICATE_FILE: This file was already imported to batch "${previousBatch.name}"`,
         };
       }
     }
@@ -288,141 +355,71 @@ export async function importAmazonInvoice(
 
     const totalPay = totalTourPay + totalAccessorials + totalAdjustments;
 
-    // Pre-check which trips will match
+    // Pre-check which trips will match (within this batch)
     const uniqueTripIds = [...new Set(validated.lineItems.map((li) => li.tripId))];
     const matchingTrips = await prisma.trip.findMany({
-      where: { userId, tripId: { in: uniqueTripIds } },
+      where: { userId, batchId, tripId: { in: uniqueTripIds } },
       select: { tripId: true },
     });
     const matchingTripIds = new Set(matchingTrips.map((t) => t.tripId));
     const unmatchedCount = uniqueTripIds.filter((id) => !matchingTripIds.has(id)).length;
 
-    // Create import batch record
-    const batch = await prisma.invoiceImportBatch.create({
+    // Create invoice with line items
+    const invoice = await prisma.amazonInvoice.create({
       data: {
         userId,
-        fileName,
-        fileHash: fileHash || null,
-        invoiceCount: 1,
+        batchId,
+        invoiceNumber: validated.invoiceNumber,
+        routeDomicile: validated.routeDomicile || null,
+        equipment: validated.equipment || null,
+        programType: validated.programType || null,
+        totalTourPay,
+        totalAccessorials,
+        totalAdjustments,
+        totalPay,
+        periodStart: validated.periodStart || null,
+        periodEnd: validated.periodEnd || null,
+        paymentDate: validated.paymentDate || null,
+        lineItems: {
+          create: validated.lineItems.map((item) => ({
+            tripId: item.tripId,
+            loadId: item.loadId || null,
+            startDate: item.startDate || null,
+            endDate: item.endDate || null,
+            operator: item.operator || null,
+            distanceMiles: item.distanceMiles,
+            durationHours: item.durationHours,
+            itemType: mapInvoiceItemType(item.itemType),
+            baseRate: item.baseRate,
+            fuelSurcharge: item.fuelSurcharge,
+            detention: item.detention,
+            tonu: item.tonu,
+            grossPay: item.grossPay,
+            comments: item.comments || null,
+          })),
+        },
+      },
+    });
+
+    // Update Trip records with actual data (only trips in this batch)
+    const matchedTripsCount = await updateTripActualsFromInvoice(userId, batchId, validated.lineItems);
+
+    // Update TripBatch with actual metrics and LOCK projections
+    await recalculateBatchActualsFromInvoice(batchId, invoice.id, fileHash);
+
+    return {
+      success: true,
+      data: {
+        invoiceId: invoice.id,
+        batchId,
         lineItemCount: validated.lineItems.length,
-        matchedTrips: matchingTrips.length,
+        matchedTrips: matchedTripsCount,
         unmatchedTrips: unmatchedCount,
-        status: "processing",
       },
-    });
-
-    try {
-      // Create invoice with line items
-      const invoice = await prisma.amazonInvoice.create({
-        data: {
-          userId,
-          importBatchId: batch.id,
-          invoiceNumber: validated.invoiceNumber,
-          routeDomicile: validated.routeDomicile || null,
-          equipment: validated.equipment || null,
-          programType: validated.programType || null,
-          totalTourPay,
-          totalAccessorials,
-          totalAdjustments,
-          totalPay,
-          periodStart: validated.periodStart || null,
-          periodEnd: validated.periodEnd || null,
-          paymentDate: validated.paymentDate || null,
-          lineItems: {
-            create: validated.lineItems.map((item) => ({
-              tripId: item.tripId,
-              loadId: item.loadId || null,
-              startDate: item.startDate || null,
-              endDate: item.endDate || null,
-              operator: item.operator || null,
-              distanceMiles: item.distanceMiles,
-              durationHours: item.durationHours,
-              itemType: mapInvoiceItemType(item.itemType),
-              baseRate: item.baseRate,
-              fuelSurcharge: item.fuelSurcharge,
-              detention: item.detention,
-              tonu: item.tonu,
-              grossPay: item.grossPay,
-              comments: item.comments || null,
-            })),
-          },
-        },
-      });
-
-      // Update Trip records with actual data
-      const matchedTrips = await updateTripActualsFromInvoice(userId, validated.lineItems);
-
-      // Update ForecastWeeks and LOCK projections
-      await recalculateForecastWeeksFromTrips(userId, invoice.id);
-
-      // Mark batch as completed
-      await prisma.invoiceImportBatch.update({
-        where: { id: batch.id },
-        data: { status: "completed" },
-      });
-
-      return {
-        success: true,
-        data: {
-          invoiceId: invoice.id,
-          batchId: batch.id,
-          lineItemCount: validated.lineItems.length,
-          matchedTrips,
-          unmatchedTrips: unmatchedCount,
-        },
-      };
-    } catch (error) {
-      // Mark batch as failed
-      await prisma.invoiceImportBatch.update({
-        where: { id: batch.id },
-        data: { status: "failed" },
-      });
-      throw error;
-    }
+    };
   } catch (error) {
-    console.error("Failed to import invoice:", error);
+    console.error("Failed to import invoice to batch:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to import invoice" };
-  }
-}
-
-// ============================================
-// GET INVOICE IMPORT BATCHES
-// ============================================
-
-export interface InvoiceImportBatchSummary {
-  id: string;
-  fileName: string;
-  importedAt: Date;
-  invoiceCount: number;
-  lineItemCount: number;
-  matchedTrips: number;
-  unmatchedTrips: number;
-  status: string;
-}
-
-export async function getInvoiceImportBatches(): Promise<ActionResponse<InvoiceImportBatchSummary[]>> {
-  try {
-    const session = await requireAuth();
-
-    const batches = await prisma.invoiceImportBatch.findMany({
-      where: { userId: session.user.id },
-      orderBy: { importedAt: "desc" },
-      select: {
-        id: true,
-        fileName: true,
-        importedAt: true,
-        invoiceCount: true,
-        lineItemCount: true,
-        matchedTrips: true,
-        unmatchedTrips: true,
-        status: true,
-      },
-    });
-
-    return { success: true, data: batches };
-  } catch (error) {
-    console.error("Failed to get invoice import batches:", error);
-    return { success: false, error: "Failed to load import history" };
   }
 }
 
@@ -442,8 +439,41 @@ export async function deleteAmazonInvoice(id: string): Promise<ActionResponse<vo
       return { success: false, error: "Invoice not found" };
     }
 
+    const batchId = invoice.batchId;
+
     // Delete invoice (line items cascade)
     await prisma.amazonInvoice.delete({ where: { id } });
+
+    // If invoice was linked to a batch, recalculate batch metrics
+    if (batchId) {
+      // Reset batch actuals since invoice is deleted
+      await prisma.tripBatch.update({
+        where: { id: batchId },
+        data: {
+          status: "COMPLETED", // Revert to completed (no invoice)
+          invoiceFileHash: null,
+          invoiceImportedAt: null,
+          actualTours: null,
+          actualLoads: null,
+          actualTourPay: null,
+          actualAccessorials: null,
+          actualAdjustments: null,
+          actualTotal: null,
+          variance: null,
+          variancePercent: null,
+          projectionLockedAt: null,
+        },
+      });
+
+      // Reset trip actuals in this batch
+      await prisma.trip.updateMany({
+        where: { batchId },
+        data: {
+          actualLoads: null,
+          actualRevenue: null,
+        },
+      });
+    }
 
     return { success: true, data: undefined };
   } catch (error) {
@@ -464,6 +494,7 @@ interface LineItemForMatching {
 
 async function updateTripActualsFromInvoice(
   userId: string,
+  batchId: string,
   lineItems: LineItemForMatching[]
 ): Promise<number> {
   try {
@@ -506,10 +537,11 @@ async function updateTripActualsFromInvoice(
     // Get all tripIds to match
     const tripIds = [...tripDataMap.keys()];
 
-    // Find matching Trip records
+    // Find matching Trip records (only within this batch)
     const matchingTrips = await prisma.trip.findMany({
       where: {
         userId,
+        batchId,
         tripId: { in: tripIds },
       },
       select: { id: true, tripId: true, tripStage: true },
@@ -553,169 +585,84 @@ async function updateTripActualsFromInvoice(
 }
 
 // ============================================
-// RECALCULATE FORECAST WEEKS FROM TRIPS
+// RECALCULATE BATCH ACTUALS FROM INVOICE
 // ============================================
 
-async function recalculateForecastWeeksFromTrips(
-  userId: string,
-  invoiceId: string
+async function recalculateBatchActualsFromInvoice(
+  batchId: string,
+  invoiceId: string,
+  fileHash?: string
 ): Promise<void> {
   try {
-    // Get all trips that have actual data (actualRevenue is not null)
-    const tripsWithActuals = await prisma.trip.findMany({
-      where: {
-        userId,
-        actualRevenue: { not: null },
-      },
+    // Get all trips for this batch with their actual data
+    const trips = await prisma.trip.findMany({
+      where: { batchId },
       select: {
-        id: true,
-        tripId: true,
-        scheduledDate: true,
-        projectedLoads: true,
-        actualLoads: true,
-        projectedRevenue: true,
-        actualRevenue: true,
-        estimatedAccessorial: true,
         tripStage: true,
+        actualLoads: true,
+        actualRevenue: true,
       },
     });
 
-    if (tripsWithActuals.length === 0) {
-      return;
-    }
+    // Get batch for projected data
+    const batch = await prisma.tripBatch.findFirst({
+      where: { id: batchId },
+    });
 
-    // Group trips by week (based on scheduledDate)
-    const weekMap = new Map<number, typeof tripsWithActuals>();
+    if (!batch) return;
 
-    for (const trip of tripsWithActuals) {
-      const weekStart = startOfWeek(trip.scheduledDate, { weekStartsOn: 1 });
-      const weekKey = weekStart.getTime();
+    // Calculate actuals from trips
+    const { DTR_RATE } = FORECASTING_CONSTANTS;
+    let actualTours = 0;
+    let actualLoads = 0;
+    let actualTourPay = 0;
+    let actualAccessorials = 0;
+    let actualAdjustments = 0;
 
-      const existing = weekMap.get(weekKey) || [];
-      existing.push(trip);
-      weekMap.set(weekKey, existing);
-    }
+    for (const trip of trips) {
+      const tripActualRevenue = toNumber(trip.actualRevenue);
+      const tripActualLoads = trip.actualLoads || 0;
 
-    // Update each ForecastWeek with aggregated actuals from its trips
-    for (const [weekStartTime, trips] of weekMap) {
-      const weekStart = new Date(weekStartTime);
-      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-      const weekNumber = getWeek(weekStart, { weekStartsOn: 1 });
-      const year = getYear(weekStart);
-
-      // Calculate actuals from trips
-      const { DTR_RATE } = FORECASTING_CONSTANTS;
-      let actualTours = 0;
-      let actualLoads = 0;
-      let actualTourPay = 0;
-      let actualAccessorials = 0;
-      let actualAdjustments = 0;
-
-      for (const trip of trips) {
-        const tripActualRevenue = toNumber(trip.actualRevenue);
-        const tripActualLoads = trip.actualLoads || 0;
-
-        // Count completed tours (not adjustments-only)
-        if (trip.tripStage === "COMPLETED") {
-          actualTours++;
-          // Estimate tour pay vs accessorials from actual revenue
-          // Tour pay is DTR_RATE, rest is accessorials
-          actualTourPay += DTR_RATE;
-          actualAccessorials += Math.max(0, tripActualRevenue - DTR_RATE);
-        } else if (trip.tripStage === "CANCELED" && tripActualRevenue > 0) {
-          // TONU or other adjustment
-          actualAdjustments += tripActualRevenue;
-        }
-
-        actualLoads += tripActualLoads;
+      // Count completed tours (not adjustments-only)
+      if (trip.tripStage === "COMPLETED") {
+        actualTours++;
+        // Estimate tour pay vs accessorials from actual revenue
+        // Tour pay is DTR_RATE, rest is accessorials
+        actualTourPay += DTR_RATE;
+        actualAccessorials += Math.max(0, tripActualRevenue - DTR_RATE);
+      } else if (trip.tripStage === "CANCELED" && tripActualRevenue > 0) {
+        // TONU or other adjustment
+        actualAdjustments += tripActualRevenue;
       }
 
-      const actualTotal = actualTourPay + actualAccessorials + actualAdjustments;
-
-      // Find or create the ForecastWeek
-      const forecastWeek = await prisma.forecastWeek.findFirst({
-        where: { userId, weekStart },
-      });
-
-      if (forecastWeek) {
-        const projectedTotal = toNumber(forecastWeek.projectedTotal);
-        const variance = actualTotal - projectedTotal;
-        const variancePercent = projectedTotal !== 0
-          ? (variance / projectedTotal) * 100
-          : null;
-
-        await prisma.forecastWeek.update({
-          where: { id: forecastWeek.id },
-          data: {
-            actualTours,
-            actualLoads,
-            actualTourPay,
-            actualAccessorials,
-            actualAdjustments,
-            actualTotal,
-            variance,
-            variancePercent,
-            amazonInvoiceId: invoiceId,
-            status: "COMPLETED",
-            // LOCK projections - they should never change after invoice arrives
-            projectionLockedAt: forecastWeek.projectionLockedAt || new Date(),
-          },
-        });
-      } else {
-        // Create new ForecastWeek if it doesn't exist
-        // First, get projected data from trips in this week
-        const allTripsInWeek = await prisma.trip.findMany({
-          where: {
-            userId,
-            scheduledDate: { gte: weekStart, lte: weekEnd },
-          },
-        });
-
-        // Exclude canceled trips from projections
-        const activeTripsInWeek = allTripsInWeek.filter(t => t.tripStage !== "CANCELED");
-        const { DTR_RATE: dtrRate, LOAD_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
-
-        const projectedTours = activeTripsInWeek.length;
-        const projectedLoads = activeTripsInWeek.reduce((sum, t) => sum + t.projectedLoads, 0);
-        const projectedTourPay = projectedTours * dtrRate;
-        const projectedAccessorials = projectedLoads * LOAD_ACCESSORIAL_RATE;
-        const projectedTotal = projectedTourPay + projectedAccessorials;
-
-        const variance = actualTotal - projectedTotal;
-        const variancePercent = projectedTotal !== 0
-          ? (variance / projectedTotal) * 100
-          : null;
-
-        await prisma.forecastWeek.create({
-          data: {
-            userId,
-            weekStart,
-            weekEnd,
-            weekNumber,
-            year,
-            projectedTours,
-            projectedLoads,
-            projectedTourPay,
-            projectedAccessorials,
-            projectedTotal,
-            actualTours,
-            actualLoads,
-            actualTourPay,
-            actualAccessorials,
-            actualAdjustments,
-            actualTotal,
-            variance,
-            variancePercent,
-            amazonInvoiceId: invoiceId,
-            status: "COMPLETED",
-            // LOCK projections - they should never change after invoice arrives
-            projectionLockedAt: new Date(),
-          },
-        });
-      }
+      actualLoads += tripActualLoads;
     }
+
+    const actualTotal = actualTourPay + actualAccessorials + actualAdjustments;
+    const projectedTotal = toNumber(batch.projectedTotal);
+    const variance = actualTotal - projectedTotal;
+    const variancePercent = projectedTotal !== 0 ? (variance / projectedTotal) * 100 : null;
+
+    // Update batch with actuals and LOCK projections
+    await prisma.tripBatch.update({
+      where: { id: batchId },
+      data: {
+        status: "INVOICED",
+        invoiceFileHash: fileHash || null,
+        invoiceImportedAt: new Date(),
+        actualTours,
+        actualLoads,
+        actualTourPay,
+        actualAccessorials,
+        actualAdjustments,
+        actualTotal,
+        variance,
+        variancePercent,
+        projectionLockedAt: new Date(),
+      },
+    });
   } catch (error) {
-    console.error("Failed to recalculate forecast weeks:", error);
+    console.error("Failed to recalculate batch actuals:", error);
   }
 }
 

@@ -21,10 +21,6 @@ import {
   getForecasts,
   deleteForecast,
 } from "@/actions/forecasting/forecasts";
-import {
-  getAggregatedVariance,
-  getForecastDateRange,
-} from "@/actions/forecasting/forecast-weeks";
 import type { Forecast } from "@/schema/forecasting.schema";
 import { toast } from "sonner";
 
@@ -48,8 +44,7 @@ export const forecastingKeys = {
       "list",
       params?.startDate?.toISOString(),
       params?.endDate?.toISOString(),
-      params?.weekId,
-      params?.importBatchId,
+      params?.batchId,
       params?.tripStage,
     ] as const,
   tripDateRange: () => [...forecastingKeys.trips, "dateRange"] as const,
@@ -58,11 +53,10 @@ export const forecastingKeys = {
   forecasts: ["forecasts"] as const,
   forecastsList: () => [...forecastingKeys.forecasts, "list"] as const,
 
-  // Forecast vs Actual
-  variance: ["variance"] as const,
-  varianceData: (startDate?: Date, endDate?: Date) =>
-    [...forecastingKeys.variance, "data", startDate?.toISOString(), endDate?.toISOString()] as const,
-  varianceDateRange: () => [...forecastingKeys.variance, "dateRange"] as const,
+  // Trip Batches
+  tripBatches: ["tripBatches"] as const,
+  tripBatchesList: () => [...forecastingKeys.tripBatches, "list"] as const,
+  tripBatchDetail: (id: string) => [...forecastingKeys.tripBatches, "detail", id] as const,
 };
 
 // ============================================
@@ -287,7 +281,7 @@ export function useTripsWithLoads(params?: TripsFilterParams) {
     onSuccess: (data, _, context) => {
       toast.success(`Deleted ${context?.count || data.deletedCount} trips`);
       // Invalidate related queries
-      queryClient.invalidateQueries({ queryKey: forecastingKeys.variance });
+      queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatches });
     },
   });
 
@@ -377,44 +371,6 @@ export function useForecasts() {
 }
 
 // ============================================
-// FORECAST VS ACTUAL HOOKS
-// ============================================
-
-export function useForecastDateRange() {
-  const { data: dateRange, isLoading } = useQuery({
-    queryKey: forecastingKeys.varianceDateRange(),
-    queryFn: async () => {
-      const result = await getForecastDateRange();
-      if (!result.success) throw new Error(result.error);
-      return result.data;
-    },
-    staleTime: 60 * 1000,
-  });
-
-  return { dateRange: dateRange ?? null, isLoading };
-}
-
-export function useForecastVariance(startDate?: Date, endDate?: Date) {
-  const {
-    data,
-    isLoading,
-  } = useQuery({
-    queryKey: forecastingKeys.varianceData(startDate, endDate),
-    queryFn: async () => {
-      const result = await getAggregatedVariance(startDate, endDate);
-      if (!result.success) throw new Error(result.error);
-      return result.data;
-    },
-    staleTime: 30 * 1000,
-  });
-
-  return {
-    data: data ?? null,
-    isLoading,
-  };
-}
-
-// ============================================
 // INVOICE MATCHING STATS HOOK
 // ============================================
 
@@ -440,59 +396,32 @@ export function useInvoiceMatchingStats(invoiceId?: string) {
 // ============================================
 
 import {
-  getWeekOptions,
-  getImportBatchOptions,
+  getTripBatchOptions,
   getTripStatusCounts,
 } from "@/actions/filters";
 
 export const filterKeys = {
-  weeks: ["filters", "weeks"] as const,
-  weekOptions: () => [...filterKeys.weeks, "options"] as const,
-  importBatches: ["filters", "importBatches"] as const,
-  importBatchOptions: () => [...filterKeys.importBatches, "options"] as const,
-  statusCounts: (weekId?: string, importBatchId?: string) =>
-    ["filters", "statusCounts", weekId, importBatchId] as const,
+  tripBatches: ["filters", "tripBatches"] as const,
+  tripBatchOptions: () => [...filterKeys.tripBatches, "options"] as const,
+  statusCounts: (batchId?: string) =>
+    ["filters", "statusCounts", batchId] as const,
 };
 
-export function useWeekOptions() {
+export function useTripBatchOptions() {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: filterKeys.weekOptions(),
+    queryKey: filterKeys.tripBatchOptions(),
     queryFn: async () => {
-      const result = await getWeekOptions();
+      const result = await getTripBatchOptions();
       if (!result.success) throw new Error(result.error);
       return result.data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes - weeks don't change often
+    staleTime: 60 * 1000, // 1 minute - changes on batch creation/import
   });
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: filterKeys.weeks });
-  };
-
-  return {
-    weeks: data ?? [],
-    isLoading,
-    invalidate,
-  };
-}
-
-export function useImportBatchOptions() {
-  const queryClient = useQueryClient();
-
-  const { data, isLoading } = useQuery({
-    queryKey: filterKeys.importBatchOptions(),
-    queryFn: async () => {
-      const result = await getImportBatchOptions();
-      if (!result.success) throw new Error(result.error);
-      return result.data;
-    },
-    staleTime: 60 * 1000, // 1 minute - changes on import
-  });
-
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: filterKeys.importBatches });
+    queryClient.invalidateQueries({ queryKey: filterKeys.tripBatches });
   };
 
   return {
@@ -502,14 +431,11 @@ export function useImportBatchOptions() {
   };
 }
 
-export function useTripStatusCounts(weekId?: string, importBatchId?: string) {
+export function useTripStatusCounts(batchId?: string) {
   const { data, isLoading } = useQuery({
-    queryKey: filterKeys.statusCounts(weekId ?? undefined, importBatchId ?? undefined),
+    queryKey: filterKeys.statusCounts(batchId ?? undefined),
     queryFn: async () => {
-      const result = await getTripStatusCounts(
-        weekId ?? undefined,
-        importBatchId ?? undefined
-      );
+      const result = await getTripStatusCounts(batchId ?? undefined);
       if (!result.success) throw new Error(result.error);
       return result.data;
     },

@@ -39,12 +39,8 @@ model User {
   categoryRules  CategoryRule[]
   amazonInvoices AmazonInvoice[]
   trips          Trip[]
-  forecastWeeks  ForecastWeek[]
+  tripBatches    TripBatch[]
   forecasts      Forecast[]
-
-  // Relations - Import Batches
-  tripImportBatches    TripImportBatch[]
-  invoiceImportBatches InvoiceImportBatch[]
 
   @@map("user")
 }
@@ -198,78 +194,76 @@ model ImportBatch {
 }
 
 // ============================================
-// TRIP IMPORT BATCH - Track trip CSV imports
+// TRIP BATCH - User-created container for trips and invoices
 // ============================================
 
-model TripImportBatch {
-  id     String @id @default(uuid())
-  userId String
-
-  // File info
-  fileName String
-  fileHash String? // MD5 hash for duplicate file detection
-
-  // Import metadata
-  importedAt DateTime @default(now())
-
-  // Period covered by trips in this import
-  periodStart DateTime // Earliest trip scheduledDate
-  periodEnd   DateTime // Latest trip scheduledDate
-
-  // Import statistics
-  tripCount     Int // Total trips in file
-  newTripsCount Int // Actually imported (new)
-  skippedCount  Int // Skipped as duplicates
-  loadCount     Int // Total loads
-  canceledCount Int @default(0)
-
-  // SNAPSHOT: Projections at time of import (IMMUTABLE)
-  projectedTours        Int
-  projectedLoads        Int
-  projectedTourPay      Decimal @db.Decimal(12, 2)
-  projectedAccessorials Decimal @db.Decimal(12, 2)
-  projectedTotal        Decimal @db.Decimal(12, 2)
-
-  // Status
-  status       String  @default("completed") // processing, completed, failed
-  errorMessage String?
-
-  // Relations
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trips Trip[]
-
-  @@index([userId, importedAt])
-  @@index([userId, periodStart, periodEnd])
-  @@index([fileHash])
-  @@map("trip_import_batch")
+enum BatchStatus {
+  EMPTY       // Just created, no data
+  UPCOMING    // Has trips imported
+  IN_PROGRESS // Some trips completed
+  COMPLETED   // All trips done, awaiting invoice
+  INVOICED    // Has invoice, fully reconciled
 }
 
-// ============================================
-// INVOICE IMPORT BATCH - Track invoice imports
-// ============================================
+model TripBatch {
+  id     String @id @default(cuid())
+  userId String
 
-model InvoiceImportBatch {
-  id       String @id @default(uuid())
-  userId   String
-  fileName String
-  fileHash String?
+  // User-defined metadata
+  name        String // "Week 5 - Feb 2026"
+  description String? // Optional notes
 
-  importedAt DateTime @default(now())
+  // Status tracking
+  status BatchStatus @default(EMPTY)
 
-  // Stats
-  invoiceCount   Int
-  lineItemCount  Int
-  matchedTrips   Int
-  unmatchedTrips Int
+  // File tracking (for duplicate detection)
+  tripFileHash    String? // MD5 of last trip CSV
+  invoiceFileHash String? // MD5 of last invoice file
 
-  status String @default("completed")
+  // Import timestamps
+  tripsImportedAt   DateTime?
+  invoiceImportedAt DateTime?
+
+  // Trip statistics (updated on import)
+  tripCount      Int @default(0)
+  loadCount      Int @default(0)
+  canceledCount  Int @default(0)
+  completedCount Int @default(0)
+
+  // Projected metrics (calculated from trips, IMMUTABLE after invoice)
+  projectedTours        Int     @default(0)
+  projectedLoads        Int     @default(0)
+  projectedTourPay      Decimal @default(0) @db.Decimal(12, 2)
+  projectedAccessorials Decimal @default(0) @db.Decimal(12, 2)
+  projectedTotal        Decimal @default(0) @db.Decimal(12, 2)
+
+  // Actual metrics (calculated from invoice)
+  actualTours        Int?
+  actualLoads        Int?
+  actualTourPay      Decimal? @db.Decimal(12, 2)
+  actualAccessorials Decimal? @db.Decimal(12, 2)
+  actualAdjustments  Decimal? @db.Decimal(12, 2)
+  actualTotal        Decimal? @db.Decimal(12, 2)
+
+  // Variance (calculated: actual - projected)
+  variance        Decimal? @db.Decimal(12, 2)
+  variancePercent Float?
+
+  // Lock projections when invoice imported
+  projectionLockedAt DateTime?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trips    Trip[]
   invoices AmazonInvoice[]
 
-  @@index([userId, importedAt])
-  @@map("invoice_import_batch")
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@map("trip_batch")
 }
 
 model CategoryRule {
@@ -303,11 +297,9 @@ model CategoryRule {
 // ============================================
 
 model AmazonInvoice {
-  id     String @id @default(uuid())
-  userId String
-
-  // Link to import batch
-  importBatchId String?
+  id      String  @id @default(uuid())
+  userId  String
+  batchId String? // Link to TripBatch container
 
   // Invoice header
   invoiceNumber String  @unique
@@ -331,12 +323,12 @@ model AmazonInvoice {
 
   // Relations
   user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batch        TripBatch?              @relation(fields: [batchId], references: [id], onDelete: SetNull)
   lineItems    AmazonInvoiceLineItem[]
   transactions Transaction[]
-  importBatch  InvoiceImportBatch?     @relation(fields: [importBatchId], references: [id])
 
   @@index([userId, paymentDate])
-  @@index([importBatchId])
+  @@index([batchId])
   @@map("amazon_invoice")
 }
 
@@ -394,12 +386,9 @@ enum TripStage {
 }
 
 model Trip {
-  id     String  @id @default(uuid())
-  userId String
-  weekId String? // Group trips by week
-
-  // Link to import batch
-  importBatchId String?
+  id      String  @id @default(uuid())
+  userId  String
+  batchId String? // Link to TripBatch container
 
   // Identifiers from CSV
   tripId    String    // Amazon Trip ID (T-112YY5BG)
@@ -431,16 +420,14 @@ model Trip {
   updatedAt DateTime @updatedAt
 
   // Relations
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  week        ForecastWeek?    @relation(fields: [weekId], references: [id])
-  loads       TripLoad[]
-  importBatch TripImportBatch? @relation(fields: [importBatchId], references: [id])
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batch TripBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  loads TripLoad[]
 
   @@unique([userId, tripId])
   @@index([userId, scheduledDate])
   @@index([userId, tripStage])
-  @@index([weekId])
-  @@index([importBatchId])
+  @@index([batchId])
   @@map("trip")
 }
 
@@ -490,67 +477,6 @@ model TripLoad {
   @@index([tripDbId])
   @@index([loadId])
   @@map("trip_load")
-}
-
-enum ForecastStatus {
-  PROJECTED
-  IN_PROGRESS
-  COMPLETED
-}
-
-model ForecastWeek {
-  id     String @id @default(uuid())
-  userId String
-
-  // Week identification
-  weekStart  DateTime // Monday
-  weekEnd    DateTime // Sunday
-  weekNumber Int // Week of year
-  year       Int
-
-  // Inputs
-  truckCount  Int @default(2)
-  nightsCount Int @default(7)
-
-  // Projected (before week - calculated from Trips import)
-  projectedTours        Int     @default(0)
-  projectedLoads        Int     @default(0)
-  projectedTourPay      Decimal @default(0) @db.Decimal(12, 2)
-  projectedAccessorials Decimal @default(0) @db.Decimal(12, 2)
-  projectedTotal        Decimal @default(0) @db.Decimal(12, 2)
-
-  // Actual (after invoice - calculated from Amazon Invoice import)
-  actualTours        Int?
-  actualLoads        Int?
-  actualTourPay      Decimal? @db.Decimal(12, 2)
-  actualAccessorials Decimal? @db.Decimal(12, 2)
-  actualAdjustments  Decimal? @db.Decimal(12, 2)
-  actualTotal        Decimal? @db.Decimal(12, 2)
-
-  // Variance (calculated: actual - projected)
-  variance        Decimal? @db.Decimal(12, 2)
-  variancePercent Float?
-
-  // Link to Amazon Invoice for this week
-  amazonInvoiceId String?
-
-  // Lock projections when invoice arrives (IMMUTABLE after this)
-  projectionLockedAt DateTime?
-
-  notes  String?
-  status ForecastStatus @default(PROJECTED)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trips Trip[]
-
-  @@unique([userId, weekStart])
-  @@index([userId, year, weekNumber])
-  @@index([userId, status])
-  @@map("forecast_week")
 }
 
 model Forecast {

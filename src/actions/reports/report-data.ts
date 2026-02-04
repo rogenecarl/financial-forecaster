@@ -95,10 +95,10 @@ export interface ForecastExportData {
     startDate: Date | null;
     endDate: Date | null;
   };
-  weeks: Array<{
-    weekLabel: string;
-    weekStart: Date;
-    weekEnd: Date;
+  batches: Array<{
+    batchName: string;
+    batchId: string;
+    createdAt: Date;
     projectedTours: number;
     projectedLoads: number;
     projectedTourPay: number;
@@ -473,23 +473,21 @@ export async function getForecastExportData(
     const session = await requireAuth();
     const userId = session.user.id;
 
-    // Build where clause
+    // Build where clause - filter by createdAt for trip batches
     const whereClause: {
       userId: string;
-      weekStart?: { gte?: Date };
-      weekEnd?: { lte?: Date };
+      createdAt?: { gte?: Date; lte?: Date };
     } = { userId };
 
-    if (startDate) {
-      whereClause.weekStart = { gte: startDate };
-    }
-    if (endDate) {
-      whereClause.weekEnd = { lte: endDate };
+    if (startDate || endDate) {
+      whereClause.createdAt = {};
+      if (startDate) whereClause.createdAt.gte = startDate;
+      if (endDate) whereClause.createdAt.lte = endDate;
     }
 
-    const weeks = await prisma.forecastWeek.findMany({
+    const batches = await prisma.tripBatch.findMany({
       where: whereClause,
-      orderBy: { weekStart: "desc" },
+      orderBy: { createdAt: "desc" },
     });
 
     let totalProjected = 0;
@@ -498,9 +496,9 @@ export async function getForecastExportData(
     let accuracySum = 0;
     let accuracyCount = 0;
 
-    const exportWeeks = weeks.map((week) => {
-      const projectedTotal = toNumber(week.projectedTotal);
-      const actualTotal = toNumberOrNull(week.actualTotal);
+    const exportBatches = batches.map((batch) => {
+      const projectedTotal = toNumber(batch.projectedTotal);
+      const actualTotal = toNumberOrNull(batch.actualTotal);
       const variance =
         actualTotal !== null ? actualTotal - projectedTotal : null;
       const variancePercent =
@@ -520,19 +518,19 @@ export async function getForecastExportData(
       }
 
       return {
-        weekLabel: `${format(week.weekStart, "MMM d")} - ${format(week.weekEnd, "MMM d, yyyy")}`,
-        weekStart: week.weekStart,
-        weekEnd: week.weekEnd,
-        projectedTours: week.projectedTours,
-        projectedLoads: week.projectedLoads,
-        projectedTourPay: toNumber(week.projectedTourPay),
-        projectedAccessorials: toNumber(week.projectedAccessorials),
+        batchName: batch.name,
+        batchId: batch.id,
+        createdAt: batch.createdAt,
+        projectedTours: batch.projectedTours,
+        projectedLoads: batch.projectedLoads,
+        projectedTourPay: toNumber(batch.projectedTourPay),
+        projectedAccessorials: toNumber(batch.projectedAccessorials),
         projectedTotal,
-        actualTours: week.actualTours,
-        actualLoads: week.actualLoads,
-        actualTourPay: toNumberOrNull(week.actualTourPay),
-        actualAccessorials: toNumberOrNull(week.actualAccessorials),
-        actualAdjustments: toNumberOrNull(week.actualAdjustments),
+        actualTours: batch.actualTours,
+        actualLoads: batch.actualLoads,
+        actualTourPay: toNumberOrNull(batch.actualTourPay),
+        actualAccessorials: toNumberOrNull(batch.actualAccessorials),
+        actualAdjustments: toNumberOrNull(batch.actualAdjustments),
         actualTotal,
         variance,
         variancePercent,
@@ -547,7 +545,7 @@ export async function getForecastExportData(
           startDate: startDate || null,
           endDate: endDate || null,
         },
-        weeks: exportWeeks,
+        batches: exportBatches,
         summary: {
           totalProjected,
           totalActual: hasActualData ? totalActual : null,

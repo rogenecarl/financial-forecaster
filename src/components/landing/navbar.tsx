@@ -33,7 +33,6 @@ export function Navbar() {
 
   const navLinks = [
     { label: "Features", href: "#features" },
-    { label: "Metrics", href: "#metrics" },
     { label: "Stack", href: "#tech-stack" },
   ];
 

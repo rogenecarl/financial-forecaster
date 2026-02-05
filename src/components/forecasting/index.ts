@@ -18,3 +18,4 @@ export { TripBatchSummaryCard } from "./trip-batch-summary-card";
 export { TripBatchImportSection } from "./trip-batch-import-section";
 export { TripSummaryCards } from "./trip-summary-cards";
 export { InvoiceSummaryCards } from "./invoice-summary-cards";
+export { BatchInsightsCharts } from "./batch-insights-charts";

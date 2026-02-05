@@ -24,6 +24,7 @@ import {
   TripSummaryCards,
   InvoiceSummaryCards,
   InvoiceDetailsTable,
+  BatchInsightsCharts,
 } from "@/components/forecasting";
 import {
   TripStatusFilter,
@@ -269,6 +270,9 @@ export default function TripBatchDetailPage() {
 
       {/* Invoice Summary Cards - shown when invoice is imported */}
       <InvoiceSummaryCards batch={batch} />
+
+      {/* Batch Insights Charts */}
+      <BatchInsightsCharts batch={batch} trips={trips} />
 
       {/* Trips Table */}
       {trips.length > 0 || tripsLoading ? (

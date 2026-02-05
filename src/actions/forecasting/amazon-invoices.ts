@@ -671,6 +671,56 @@ async function recalculateBatchActualsFromInvoice(
 }
 
 // ============================================
+// GET INVOICE LINE ITEMS FOR BATCH
+// ============================================
+
+export async function getInvoiceLineItemsForBatch(
+  batchId: string
+): Promise<ActionResponse<AmazonInvoiceLineItem[]>> {
+  try {
+    const session = await requireAuth();
+
+    const invoice = await prisma.amazonInvoice.findFirst({
+      where: { batchId, userId: session.user.id },
+      include: {
+        lineItems: {
+          orderBy: [{ tripId: "asc" }, { itemType: "asc" }],
+        },
+      },
+    });
+
+    if (!invoice) {
+      return { success: true, data: [] };
+    }
+
+    const lineItems: AmazonInvoiceLineItem[] = invoice.lineItems.map((li) => ({
+      id: li.id,
+      invoiceId: li.invoiceId,
+      tripId: li.tripId,
+      loadId: li.loadId,
+      startDate: li.startDate,
+      endDate: li.endDate,
+      operator: li.operator,
+      distanceMiles: toNumber(li.distanceMiles),
+      durationHours: toNumber(li.durationHours),
+      itemType: li.itemType,
+      baseRate: toNumber(li.baseRate),
+      fuelSurcharge: toNumber(li.fuelSurcharge),
+      detention: toNumber(li.detention),
+      tonu: toNumber(li.tonu),
+      grossPay: toNumber(li.grossPay),
+      comments: li.comments,
+      createdAt: li.createdAt,
+    }));
+
+    return { success: true, data: lineItems };
+  } catch (error) {
+    console.error("Failed to get invoice line items for batch:", error);
+    return { success: false, error: "Failed to load invoice line items" };
+  }
+}
+
+// ============================================
 // GET INVOICE STATS
 // ============================================
 

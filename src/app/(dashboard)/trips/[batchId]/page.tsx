@@ -23,12 +23,14 @@ import {
   TripsBulkActions,
   TripSummaryCards,
   InvoiceSummaryCards,
+  InvoiceDetailsTable,
 } from "@/components/forecasting";
 import {
   TripStatusFilter,
   type TripStatusValue,
 } from "@/components/filters";
 import { getTripBatch } from "@/actions/forecasting/trip-batches";
+import { getInvoiceLineItemsForBatch } from "@/actions/forecasting/amazon-invoices";
 import {
   getTripsWithLoads,
   bulkDeleteTrips,
@@ -100,6 +102,18 @@ export default function TripBatchDetailPage() {
       return result.data;
     },
     staleTime: 30 * 1000,
+  });
+
+  // Fetch invoice line items (only when batch is invoiced)
+  const { data: invoiceLineItems = [], isLoading: invoiceLoading } = useQuery({
+    queryKey: forecastingKeys.invoiceLineItems(batchId),
+    queryFn: async () => {
+      const result = await getInvoiceLineItemsForBatch(batchId);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    enabled: batch?.status === "INVOICED",
+    staleTime: 60 * 1000,
   });
 
   // Bulk delete trips mutation
@@ -323,6 +337,24 @@ export default function TripBatchDetailPage() {
                 Clear Filter
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Invoice Details Table - shown when invoice is imported */}
+      {batch.status === "INVOICED" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Invoice Details</CardTitle>
+            <CardDescription>
+              {invoiceLineItems.length} line items
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <InvoiceDetailsTable
+              lineItems={invoiceLineItems}
+              loading={invoiceLoading}
+            />
           </CardContent>
         </Card>
       )}

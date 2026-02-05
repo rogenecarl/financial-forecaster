@@ -38,7 +38,7 @@ interface TourGroup {
   adjustments: AmazonInvoiceLineItem[];
   totalGrossPay: number;
   totalDistance: number;
-  totalFuelSurcharge: number;
+  totalLoadPay: number;
   dateRangeStart: Date | null;
   dateRangeEnd: Date | null;
 }
@@ -57,7 +57,7 @@ function groupByTripId(lineItems: AmazonInvoiceLineItem[]): TourGroup[] {
         adjustments: [],
         totalGrossPay: 0,
         totalDistance: 0,
-        totalFuelSurcharge: 0,
+        totalLoadPay: 0,
         dateRangeStart: null,
         dateRangeEnd: null,
       });
@@ -66,7 +66,9 @@ function groupByTripId(lineItems: AmazonInvoiceLineItem[]): TourGroup[] {
     const group = groups.get(tripId)!;
     group.totalGrossPay += item.grossPay;
     group.totalDistance += item.distanceMiles;
-    group.totalFuelSurcharge += item.fuelSurcharge;
+    if (item.itemType === "LOAD_COMPLETED") {
+      group.totalLoadPay += item.grossPay;
+    }
 
     // Track date range from all items (loads have dates, tours may not)
     if (item.startDate) {
@@ -158,7 +160,7 @@ export function InvoiceDetailsTable({ lineItems, loading }: InvoiceDetailsTableP
               <TableHead>Trip ID</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="text-center">Loads</TableHead>
-              <TableHead className="text-right">Base Rate</TableHead>
+              <TableHead className="text-right">Tour Pay</TableHead>
               <TableHead className="text-right">Accessorial</TableHead>
               <TableHead className="text-right">Total Pay</TableHead>
             </TableRow>
@@ -226,11 +228,6 @@ export function InvoiceDetailsTable({ lineItems, loading }: InvoiceDetailsTableP
                   <TableCell className="font-mono text-sm">
                     <div className="flex items-center gap-2">
                       {group.tripId}
-                      {group.loads.length > 0 && (
-                        <Badge variant="outline" className="text-[10px] px-1.5">
-                          {group.loads.length} {group.loads.length === 1 ? "load" : "loads"}
-                        </Badge>
-                      )}
                       {group.adjustments.length > 0 && (
                         <Badge variant="outline" className="text-[10px] px-1.5 bg-amber-100 text-amber-700 border-amber-300">
                           {group.adjustments.length} adj
@@ -245,13 +242,13 @@ export function InvoiceDetailsTable({ lineItems, loading }: InvoiceDetailsTableP
                     {group.loads.length}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {group.tour && group.tour.baseRate > 0
-                      ? formatCurrency(group.tour.baseRate)
+                    {group.tour
+                      ? formatCurrency(group.tour.grossPay)
                       : "-"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {group.totalFuelSurcharge > 0
-                      ? formatCurrency(group.totalFuelSurcharge)
+                    {group.totalLoadPay > 0
+                      ? formatCurrency(group.totalLoadPay)
                       : "-"}
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-medium text-emerald-600">

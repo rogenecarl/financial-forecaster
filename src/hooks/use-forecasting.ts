@@ -35,6 +35,7 @@ export const forecastingKeys = {
   invoiceStats: () => [...forecastingKeys.invoices, "stats"] as const,
   invoiceDetail: (id: string) => [...forecastingKeys.invoices, "detail", id] as const,
   invoiceMatchingStats: (id?: string) => [...forecastingKeys.invoices, "matchingStats", id] as const,
+  invoiceLineItems: (batchId: string) => [...forecastingKeys.invoices, "lineItems", batchId] as const,
 
   // Trips
   trips: ["trips"] as const,

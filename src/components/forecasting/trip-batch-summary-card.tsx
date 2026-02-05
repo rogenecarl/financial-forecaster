@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   TrendingUp,
@@ -50,20 +50,21 @@ export function TripBatchSummaryCard({
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader className="pb-2">
-          <Skeleton className="h-5 w-32" />
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-br from-muted/60 to-muted/30 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-7 w-36 rounded-full" />
+          </div>
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-6">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="space-y-2">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-9 w-20" />
               </div>
             ))}
           </div>
-        </CardContent>
+        </div>
       </Card>
     );
   }
@@ -74,18 +75,72 @@ export function TripBatchSummaryCard({
   const variancePercent = batch.variancePercent;
   const hasActuals = batch.actualTotal !== null;
 
+  const metrics = [
+    {
+      icon: Truck,
+      label: "Trips",
+      value: batch.tripCount.toString(),
+      sub:
+        batch.canceledCount > 0
+          ? `${batch.canceledCount} canceled`
+          : undefined,
+      subColor: "text-red-500",
+    },
+    {
+      icon: Package,
+      label: "Loads",
+      value: batch.loadCount.toString(),
+      sub:
+        batch.actualLoads !== null
+          ? `${batch.actualLoads} actual`
+          : "projected",
+      subColor:
+        batch.actualLoads !== null
+          ? getVarianceColor(batch.actualLoads - batch.loadCount)
+          : "text-muted-foreground",
+    },
+    {
+      icon: MapPin,
+      label: "Stops",
+      value: batch.projectedLoads.toString(),
+      sub: "projected",
+      subColor: "text-muted-foreground",
+    },
+    {
+      icon: DollarSign,
+      label: "Projected",
+      value: formatCurrency(batch.projectedTotal),
+      sub: "revenue",
+      subColor: "text-muted-foreground",
+      valueColor: "text-emerald-700 dark:text-emerald-400",
+    },
+    {
+      icon: BarChart3,
+      label: "Actual",
+      value: formatCurrency(batch.actualTotal),
+      sub: hasActuals ? "revenue" : "awaiting invoice",
+      subColor: "text-muted-foreground",
+      valueColor: hasActuals
+        ? "text-blue-700 dark:text-blue-400"
+        : "text-muted-foreground",
+    },
+  ];
+
   return (
-    <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">Summary</CardTitle>
+    <Card className="overflow-hidden p-0">
+      <div className="bg-gradient-to-br from-muted/60 to-muted/30 p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Batch Overview
+          </h3>
           {hasActuals && variance !== null && (
             <div
               className={cn(
-                "flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-medium",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold",
                 variance >= 0
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-red-100 text-red-700"
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
               )}
             >
               {getVarianceIcon(variance)}
@@ -94,7 +149,7 @@ export function TripBatchSummaryCard({
                 {formatCurrency(variance)}
               </span>
               {variancePercent !== null && (
-                <span className="text-xs opacity-75">
+                <span className="text-xs opacity-70">
                   ({variancePercent >= 0 ? "+" : ""}
                   {variancePercent.toFixed(1)}%)
                 </span>
@@ -102,97 +157,42 @@ export function TripBatchSummaryCard({
             </div>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
-          {/* Trips */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Truck className="h-4 w-4" />
-              <span>Trips</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{batch.tripCount}</span>
-              {batch.canceledCount > 0 && (
-                <span className="text-xs text-red-600">
-                  ({batch.canceledCount} canceled)
-                </span>
-              )}
-            </div>
-          </div>
 
-          {/* Projected Loads */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Package className="h-4 w-4" />
-              <span>Loads</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{batch.loadCount}</span>
-              {batch.actualLoads !== null && (
-                <span
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-3 md:grid-cols-5 gap-4 md:gap-6">
+          {metrics.map((metric) => {
+            const Icon = metric.icon;
+            return (
+              <div key={metric.label} className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Icon className="h-3.5 w-3.5" />
+                  <span className="uppercase tracking-wider font-medium">
+                    {metric.label}
+                  </span>
+                </div>
+                <div
                   className={cn(
-                    "text-sm font-medium",
-                    getVarianceColor(
-                      batch.actualLoads - batch.loadCount
-                    )
+                    "text-2xl md:text-3xl font-bold tracking-tight tabular-nums",
+                    metric.valueColor || "text-foreground"
                   )}
                 >
-                  / {batch.actualLoads}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {batch.actualLoads !== null ? "projected / actual" : "projected"}
-            </p>
-          </div>
-
-          {/* Projected Stops */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>Stops</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{batch.projectedLoads}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">projected</p>
-          </div>
-
-          {/* Projected Revenue */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <DollarSign className="h-4 w-4" />
-              <span>Projected</span>
-            </div>
-            <div className="text-2xl font-bold text-emerald-700">
-              {formatCurrency(batch.projectedTotal)}
-            </div>
-            <p className="text-xs text-muted-foreground">revenue</p>
-          </div>
-
-          {/* Actual Revenue */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <BarChart3 className="h-4 w-4" />
-              <span>Actual</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span
-                className={cn(
-                  "text-2xl font-bold",
-                  hasActuals ? "text-blue-700" : "text-muted-foreground"
+                  {metric.value}
+                </div>
+                {metric.sub && (
+                  <p
+                    className={cn(
+                      "text-xs",
+                      metric.subColor || "text-muted-foreground"
+                    )}
+                  >
+                    {metric.sub}
+                  </p>
                 )}
-              >
-                {formatCurrency(batch.actualTotal)}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {hasActuals ? "revenue" : "awaiting invoice"}
-            </p>
-          </div>
+              </div>
+            );
+          })}
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }

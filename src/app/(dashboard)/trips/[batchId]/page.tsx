@@ -3,29 +3,20 @@
 import { useState, useCallback, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  Pencil,
-  Trash2,
-  MoreVertical,
-  Truck,
-} from "lucide-react";
+import { ArrowLeft, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   TripBatchStatusBadge,
   TripBatchImportSection,
   TripBatchSummaryCard,
-  TripBatchCreateModal,
-  TripBatchDeleteDialog,
   TripsImportModal,
   InvoiceImportModal,
   TripsTable,
@@ -37,10 +28,7 @@ import {
   TripStatusFilter,
   type TripStatusValue,
 } from "@/components/filters";
-import {
-  getTripBatch,
-  deleteTripBatch,
-} from "@/actions/forecasting/trip-batches";
+import { getTripBatch } from "@/actions/forecasting/trip-batches";
 import {
   getTripsWithLoads,
   bulkDeleteTrips,
@@ -59,17 +47,12 @@ export default function TripBatchDetailPage() {
   // Local state
   const [statusFilter, setStatusFilter] = useState<TripStatusValue>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [showEdit, setShowEdit] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
   const [showTripsImport, setShowTripsImport] = useState(false);
   const [showAddTrips, setShowAddTrips] = useState(false);
   const [showInvoiceImport, setShowInvoiceImport] = useState(false);
 
   // Fetch batch details
-  const {
-    data: batch,
-    isLoading: batchLoading,
-  } = useQuery({
+  const { data: batch, isLoading: batchLoading } = useQuery({
     queryKey: forecastingKeys.tripBatchDetail(batchId),
     queryFn: async () => {
       const result = await getTripBatch(batchId);
@@ -89,10 +72,7 @@ export default function TripBatchDetailPage() {
   }, [batchId, statusFilter]);
 
   // Fetch trips for this batch
-  const {
-    data: tripsData,
-    isLoading: tripsLoading,
-  } = useQuery({
+  const { data: tripsData, isLoading: tripsLoading } = useQuery({
     queryKey: [...forecastingKeys.tripsList(tripFilterParams), "withLoads"],
     queryFn: async () => {
       const result = await getTripsWithLoads(tripFilterParams);
@@ -122,23 +102,6 @@ export default function TripBatchDetailPage() {
     staleTime: 30 * 1000,
   });
 
-  // Delete batch mutation
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      const result = await deleteTripBatch(batchId);
-      if (!result.success) throw new Error(result.error);
-      return result.data;
-    },
-    onSuccess: (data) => {
-      toast.success(`Deleted batch with ${data.deletedTrips} trips`);
-      queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatches });
-      router.push("/trips");
-    },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete batch");
-    },
-  });
-
   // Bulk delete trips mutation
   const bulkDeleteMutation = useMutation({
     mutationFn: async (tripIds: string[]) => {
@@ -152,34 +115,27 @@ export default function TripBatchDetailPage() {
       invalidateAll();
     },
     onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete trips");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete trips"
+      );
     },
   });
 
   // Invalidation helper
   const invalidateAll = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatchDetail(batchId) });
+    queryClient.invalidateQueries({
+      queryKey: forecastingKeys.tripBatchDetail(batchId),
+    });
     queryClient.invalidateQueries({ queryKey: forecastingKeys.trips });
-    queryClient.invalidateQueries({ queryKey: ["filters", "statusCounts", batchId] });
+    queryClient.invalidateQueries({
+      queryKey: ["filters", "statusCounts", batchId],
+    });
   }, [queryClient, batchId]);
 
   // Handlers
   const handleBack = useCallback(() => {
     router.push("/trips");
   }, [router]);
-
-  const handleEditSuccess = useCallback(
-    () => {
-      queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatchDetail(batchId) });
-      queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatches });
-      setShowEdit(false);
-    },
-    [queryClient, batchId]
-  );
-
-  const handleDeleteConfirm = useCallback(() => {
-    deleteMutation.mutate();
-  }, [deleteMutation]);
 
   const handleImportSuccess = useCallback(() => {
     invalidateAll();
@@ -198,12 +154,12 @@ export default function TripBatchDetailPage() {
       <div className="space-y-6">
         {/* Header skeleton */}
         <div className="flex items-center gap-4">
-          <Skeleton className="h-9 w-9" />
+          <Skeleton className="h-9 w-9 rounded-lg" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-7 w-48" />
             <Skeleton className="h-4 w-32" />
           </div>
-          <Skeleton className="h-6 w-20" />
+          <Skeleton className="h-6 w-20 rounded-full" />
         </div>
 
         {/* Import section skeleton */}
@@ -238,14 +194,14 @@ export default function TripBatchDetailPage() {
   // Render not found state
   if (!batch) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="rounded-full bg-muted p-4 mb-4">
-          <Truck className="h-8 w-8 text-muted-foreground" />
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="rounded-full bg-muted p-5 mb-5">
+          <Truck className="h-10 w-10 text-muted-foreground" />
         </div>
-        <h3 className="text-lg font-semibold text-foreground mb-1">
+        <h3 className="text-lg font-semibold text-foreground mb-1.5">
           Batch not found
         </h3>
-        <p className="text-sm text-muted-foreground mb-4">
+        <p className="text-sm text-muted-foreground mb-5 max-w-sm">
           This batch may have been deleted or you don&apos;t have access to it.
         </p>
         <Button onClick={handleBack}>
@@ -260,12 +216,17 @@ export default function TripBatchDetailPage() {
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" onClick={handleBack}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleBack}
+          className="mt-0.5 shrink-0"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-foreground truncate">
+            <h1 className="text-2xl font-bold text-foreground truncate tracking-tight">
               {batch.name}
             </h1>
             <TripBatchStatusBadge status={batch.status} />
@@ -276,32 +237,9 @@ export default function TripBatchDetailPage() {
             </p>
           )}
         </div>
-
-        {/* Actions */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setShowEdit(true)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Batch
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => setShowDelete(true)}
-              className="text-red-600 focus:text-red-600"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete Batch
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
-      {/* Import Section */}
+      {/* Import Pipeline */}
       <TripBatchImportSection
         batch={batch}
         onImportTrips={() => setShowTripsImport(true)}
@@ -309,14 +247,14 @@ export default function TripBatchDetailPage() {
         onImportInvoice={() => setShowInvoiceImport(true)}
       />
 
+      {/* Summary Card (Hero KPIs) */}
+      <TripBatchSummaryCard batch={batch} />
+
       {/* Trip Summary Cards - shown when trips are imported */}
       <TripSummaryCards batch={batch} />
 
       {/* Invoice Summary Cards - shown when invoice is imported */}
       <InvoiceSummaryCards batch={batch} />
-
-      {/* Summary Card */}
-      <TripBatchSummaryCard batch={batch} />
 
       {/* Trips Table */}
       {trips.length > 0 || tripsLoading ? (
@@ -350,15 +288,15 @@ export default function TripBatchDetailPage() {
       ) : batch.status === "EMPTY" ? (
         // Empty state for new batch
         <Card>
-          <CardContent className="py-12">
+          <CardContent className="py-16">
             <div className="flex flex-col items-center justify-center text-center">
-              <div className="rounded-full bg-muted p-4 mb-4">
-                <Truck className="h-8 w-8 text-muted-foreground" />
+              <div className="rounded-full bg-muted p-5 mb-4">
+                <Truck className="h-10 w-10 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-semibold text-foreground mb-1">
+              <h3 className="text-lg font-semibold text-foreground mb-1.5">
                 No trips yet
               </h3>
-              <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+              <p className="text-sm text-muted-foreground mb-5 max-w-sm">
                 Import trips from your Amazon Scheduler CSV to get started.
               </p>
               <Button onClick={() => setShowTripsImport(true)}>
@@ -374,33 +312,20 @@ export default function TripBatchDetailPage() {
             <CardTitle>Trips</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
               <p className="text-sm text-muted-foreground mb-4">
                 No trips match the selected filter.
               </p>
-              <Button variant="outline" onClick={() => setStatusFilter("all")}>
+              <Button
+                variant="outline"
+                onClick={() => setStatusFilter("all")}
+              >
                 Clear Filter
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
-
-      {/* Edit Modal */}
-      <TripBatchCreateModal
-        open={showEdit}
-        onOpenChange={setShowEdit}
-        onSuccess={handleEditSuccess}
-        editBatch={batch}
-      />
-
-      {/* Delete Dialog */}
-      <TripBatchDeleteDialog
-        open={showDelete}
-        onOpenChange={setShowDelete}
-        batch={batch}
-        onSuccess={handleDeleteConfirm}
-      />
 
       {/* Trips Import Modal (Replace) */}
       <TripsImportModal

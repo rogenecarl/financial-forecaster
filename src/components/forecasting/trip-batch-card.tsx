@@ -2,17 +2,40 @@
 
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { TripBatchStatusBadge } from "./trip-batch-status-badge";
-import { Truck, Package, TrendingUp, TrendingDown } from "lucide-react";
+import {
+  Truck,
+  Package,
+  TrendingUp,
+  TrendingDown,
+  MoreVertical,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TripBatchSummary } from "@/actions/forecasting/trip-batches";
 
 interface TripBatchCardProps {
   batch: TripBatchSummary;
   onClick?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
-export function TripBatchCard({ batch, onClick }: TripBatchCardProps) {
+export function TripBatchCard({
+  batch,
+  onClick,
+  onEdit,
+  onDelete,
+}: TripBatchCardProps) {
   const formatCurrency = (value: number | null) => {
     if (value === null) return "-";
     return new Intl.NumberFormat("en-US", {
@@ -50,7 +73,49 @@ export function TripBatchCard({ batch, onClick }: TripBatchCardProps) {
               </p>
             )}
           </div>
-          <TripBatchStatusBadge status={batch.status} size="sm" />
+          <div className="flex items-center gap-1 shrink-0">
+            <TripBatchStatusBadge status={batch.status} size="sm" />
+            {(onEdit || onDelete) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {onEdit && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit();
+                      }}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit Batch
+                    </DropdownMenuItem>
+                  )}
+                  {onEdit && onDelete && <DropdownMenuSeparator />}
+                  {onDelete && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete();
+                      }}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Batch
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -59,13 +124,19 @@ export function TripBatchCard({ batch, onClick }: TripBatchCardProps) {
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Truck className="h-4 w-4" />
             <span>
-              <span className="font-medium text-foreground">{batch.tripCount}</span> trips
+              <span className="font-medium text-foreground">
+                {batch.tripCount}
+              </span>{" "}
+              trips
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Package className="h-4 w-4" />
             <span>
-              <span className="font-medium text-foreground">{batch.projectedLoads}</span> loads
+              <span className="font-medium text-foreground">
+                {batch.projectedLoads}
+              </span>{" "}
+              loads
             </span>
           </div>
           <div className="ml-auto font-semibold text-emerald-700">
@@ -106,7 +177,9 @@ export function TripBatchCard({ batch, onClick }: TripBatchCardProps) {
 
         {/* Dates row */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-          <span>Created {format(new Date(batch.createdAt), "MMM d, yyyy")}</span>
+          <span>
+            Created {format(new Date(batch.createdAt), "MMM d, yyyy")}
+          </span>
           {batch.invoiceImportedAt && (
             <span>
               Invoiced {format(new Date(batch.invoiceImportedAt), "MMM d")}

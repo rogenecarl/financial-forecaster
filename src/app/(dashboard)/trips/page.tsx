@@ -98,10 +98,16 @@ export default function TripBatchesPage() {
   const handleCreateSuccess = useCallback(
     (batch: TripBatchSummary) => {
       queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatches });
-      // Navigate to the new batch detail page
-      router.push(`/trips/${batch.id}`);
+      if (editBatch) {
+        // Editing - stay on list
+        setEditBatch(null);
+        setShowCreate(false);
+      } else {
+        // Creating - navigate to the new batch detail page
+        router.push(`/trips/${batch.id}`);
+      }
     },
-    [queryClient, router]
+    [queryClient, router, editBatch]
   );
 
   const handleDeleteConfirm = useCallback(() => {
@@ -242,6 +248,11 @@ export default function TripBatchesPage() {
               key={batch.id}
               batch={batch}
               onClick={() => handleBatchClick(batch)}
+              onEdit={() => {
+                setEditBatch(batch);
+                setShowCreate(true);
+              }}
+              onDelete={() => setDeletingBatch(batch)}
             />
           ))}
         </div>

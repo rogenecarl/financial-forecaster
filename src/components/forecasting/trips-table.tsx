@@ -22,7 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -50,6 +49,7 @@ import type { TripWithLoadsForTable } from "@/actions/forecasting/trips";
 import { updateTrip } from "@/actions/forecasting";
 import { toast } from "sonner";
 import { FORECASTING_CONSTANTS } from "@/config/forecasting";
+import { cn } from "@/lib/utils";
 
 interface TripsTableProps {
   trips: TripWithLoadsForTable[];
@@ -120,11 +120,17 @@ function countDeliveryStops(load: LoadType): number {
   return getStops(load).filter((s) => s.isDelivery).length;
 }
 
-export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionChange }: TripsTableProps) {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState<string>("");
+export function TripsTable({
+  trips,
+  loading,
+  onUpdate,
+  selectedIds,
+  onSelectionChange,
+}: TripsTableProps) {
   const [saving, setSaving] = useState(false);
-  const [notesTrip, setNotesTrip] = useState<TripWithLoadsForTable | null>(null);
+  const [notesTrip, setNotesTrip] = useState<TripWithLoadsForTable | null>(
+    null
+  );
   const [notesValue, setNotesValue] = useState("");
   const [expandedTrips, setExpandedTrips] = useState<Set<string>>(new Set());
 
@@ -157,49 +163,6 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
       }
       return newSet;
     });
-  };
-
-  const handleStartEdit = (trip: TripWithLoadsForTable) => {
-    setEditingId(trip.id);
-    setEditValue(trip.actualLoads?.toString() || "");
-  };
-
-  const handleSaveEdit = async (trip: TripWithLoadsForTable) => {
-    const value = editValue.trim();
-    const actualLoads = value === "" ? null : parseInt(value, 10);
-
-    if (value !== "" && (isNaN(actualLoads!) || actualLoads! < 0)) {
-      toast.error("Please enter a valid number");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const result = await updateTrip({
-        id: trip.id,
-        actualLoads,
-      });
-
-      if (result.success) {
-        toast.success("Updated actual loads");
-        onUpdate();
-      } else {
-        toast.error(result.error || "Failed to update");
-      }
-    } catch {
-      toast.error("Failed to update");
-    } finally {
-      setSaving(false);
-      setEditingId(null);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent, trip: TripWithLoadsForTable) => {
-    if (e.key === "Enter") {
-      handleSaveEdit(trip);
-    } else if (e.key === "Escape") {
-      setEditingId(null);
-    }
   };
 
   const handleOpenNotes = (trip: TripWithLoadsForTable) => {
@@ -268,17 +231,19 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
 
   if (loading) {
     return (
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead className="w-12"></TableHead>
               <TableHead className="w-[40px]"></TableHead>
               <TableHead>Trip ID</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="text-center">Projected Loads</TableHead>
               <TableHead className="text-center">Projected Stops</TableHead>
-              <TableHead className="text-center">Actual (Load Completed)</TableHead>
+              <TableHead className="text-center">
+                Actual (Load Completed)
+              </TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Projected Rev.</TableHead>
               <TableHead className="text-right">Actual Rev.</TableHead>
@@ -289,18 +254,42 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
           <TableBody>
             {[...Array(5)].map((_, i) => (
               <TableRow key={i}>
-                <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
-                <TableCell><Skeleton className="h-8 w-16 mx-auto" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-14 ml-auto" /></TableCell>
-                <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-4" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-4" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-24" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-20" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-8 mx-auto" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-8 mx-auto" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-8 w-16 mx-auto" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-16" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-16 ml-auto" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-16 ml-auto" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-14 ml-auto" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-8 w-8" />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -313,36 +302,49 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
     return (
       <div className="rounded-lg border p-8 text-center">
         <Truck className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-        <p className="text-sm text-muted-foreground">No trips for this period</p>
+        <p className="text-sm text-muted-foreground">
+          No trips for this period
+        </p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead className="w-12">
                 <Checkbox
                   checked={
-                    trips.length > 0 &&
-                    selectedIds.length === trips.length
+                    trips.length > 0 && selectedIds.length === trips.length
                   }
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
               <TableHead className="w-[40px]"></TableHead>
-              <TableHead>Trip ID</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead className="text-center">Projected Loads</TableHead>
-              <TableHead className="text-center">Projected Stops</TableHead>
-              <TableHead className="text-center">Actual (Load Completed)</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Projected Rev.</TableHead>
-              <TableHead className="text-right">Actual Rev.</TableHead>
-              <TableHead className="text-right">Variance</TableHead>
+              <TableHead className="font-semibold">Trip ID</TableHead>
+              <TableHead className="font-semibold">Date</TableHead>
+              <TableHead className="text-center font-semibold">
+                Projected Loads
+              </TableHead>
+              <TableHead className="text-center font-semibold">
+                Projected Stops
+              </TableHead>
+              <TableHead className="text-center font-semibold">
+                Actual (Load Completed)
+              </TableHead>
+              <TableHead className="font-semibold">Status</TableHead>
+              <TableHead className="text-right font-semibold">
+                Projected Rev.
+              </TableHead>
+              <TableHead className="text-right font-semibold">
+                Actual Rev.
+              </TableHead>
+              <TableHead className="text-right font-semibold">
+                Variance
+              </TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -356,10 +358,19 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
               return (
                 <Fragment key={trip.id}>
                   <TableRow
-                    className={`${isCanceled ? "opacity-50" : ""} ${hasLoads ? "cursor-pointer hover:bg-muted/50" : ""} ${isSelected ? "bg-blue-50" : ""}`}
+                    className={cn(
+                      "transition-colors",
+                      isCanceled && "opacity-50",
+                      hasLoads && "cursor-pointer",
+                      isSelected && "bg-blue-50/80 dark:bg-blue-950/20",
+                      !isSelected && hasLoads && "hover:bg-muted/40"
+                    )}
                     onClick={() => hasLoads && toggleTrip(trip.id)}
                   >
-                    <TableCell className="w-12" onClick={(e) => e.stopPropagation()}>
+                    <TableCell
+                      className="w-12"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={(checked) =>
@@ -370,14 +381,17 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                     <TableCell className="w-[40px]">
                       {hasLoads && (
                         <ChevronRight
-                          className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                          className={cn(
+                            "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                            isExpanded && "rotate-90"
+                          )}
                         />
                       )}
                     </TableCell>
-                    <TableCell className="font-mono text-sm">
+                    <TableCell className="font-mono text-sm font-medium">
                       {trip.tripId}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-muted-foreground">
                       {format(new Date(trip.scheduledDate), "MMM d")}
                     </TableCell>
                     <TableCell className="text-center font-medium">
@@ -390,7 +404,9 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                             </span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs">Total Load IDs for this trip</p>
+                            <p className="text-xs">
+                              Total Load IDs for this trip
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -405,39 +421,15 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                             </span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs">Delivery stops (excludes bobtail &amp; MSP)</p>
+                            <p className="text-xs">
+                              Delivery stops (excludes bobtail &amp; MSP)
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     </TableCell>
-                    <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                      {editingId === trip.id ? (
-                        <div className="flex items-center justify-center">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, trip)}
-                            onBlur={() => handleSaveEdit(trip)}
-                            className="w-16 h-8 text-center"
-                            autoFocus
-                            disabled={saving}
-                          />
-                          {saving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-                        </div>
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStartEdit(trip);
-                          }}
-                          className="w-16 h-8 border rounded px-2 text-center hover:bg-muted/50 transition-colors"
-                          disabled={isCanceled}
-                        >
-                          {trip.actualLoads ?? "-"}
-                        </button>
-                      )}
+                    <TableCell className="text-center tabular-nums">
+                      {trip.actualLoads ?? "-"}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -447,17 +439,24 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="space-y-0.5">
-                        <div className="text-[10px] text-muted-foreground">
-                          ${FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE} + ${FORECASTING_CONSTANTS.DTR_RATE.toFixed(2)}
+                        <div className="text-[10px] text-muted-foreground tabular-nums">
+                          $
+                          {FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE} + $
+                          {FORECASTING_CONSTANTS.DTR_RATE.toFixed(2)}
                         </div>
-                        <div className="font-medium text-emerald-700 tabular-nums">
-                          ${(FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE + FORECASTING_CONSTANTS.DTR_RATE).toFixed(2)}
+                        <div className="font-medium text-emerald-700 dark:text-emerald-400 tabular-nums">
+                          $
+                          {(
+                            FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE +
+                            FORECASTING_CONSTANTS.DTR_RATE
+                          ).toFixed(2)}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {trip.actualLoads !== null && trip.actualRevenue !== null ? (
-                        <span className="text-emerald-600 font-medium">
+                      {trip.actualLoads !== null &&
+                      trip.actualRevenue !== null ? (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                           {formatCurrency(trip.actualRevenue)}
                         </span>
                       ) : (
@@ -466,29 +465,46 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {(() => {
-                        const projectedRev = FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE + FORECASTING_CONSTANTS.DTR_RATE;
+                        const projectedRev =
+                          FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE +
+                          FORECASTING_CONSTANTS.DTR_RATE;
 
-                        // Canceled trip with actual revenue = TONU
-                        if (isCanceled && trip.actualRevenue !== null && trip.actualRevenue > 0) {
+                        if (
+                          isCanceled &&
+                          trip.actualRevenue !== null &&
+                          trip.actualRevenue > 0
+                        ) {
                           return (
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 text-xs">
+                            <Badge
+                              variant="outline"
+                              className="bg-amber-50 text-amber-700 border-amber-300 text-xs dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-700"
+                            >
                               TONU
                             </Badge>
                           );
                         }
 
-                        // No actual loads entered yet - don't calculate variance
                         if (trip.actualLoads === null) {
-                          return <span className="text-muted-foreground">-</span>;
+                          return (
+                            <span className="text-muted-foreground">-</span>
+                          );
                         }
 
-                        // Calculate variance
-                        const variance = (trip.actualRevenue ?? 0) - projectedRev;
+                        const variance =
+                          (trip.actualRevenue ?? 0) - projectedRev;
                         const isPositive = variance >= 0;
 
                         return (
-                          <span className={isPositive ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>
-                            {isPositive ? "+" : ""}{formatCurrency(variance)}
+                          <span
+                            className={cn(
+                              "font-medium",
+                              isPositive
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-red-600 dark:text-red-400"
+                            )}
+                          >
+                            {isPositive ? "+" : ""}
+                            {formatCurrency(variance)}
                           </span>
                         );
                       })()}
@@ -504,7 +520,12 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                               onClick={() => handleOpenNotes(trip)}
                             >
                               <MessageSquare
-                                className={`h-4 w-4 ${trip.notes ? "text-blue-500" : "text-muted-foreground"}`}
+                                className={cn(
+                                  "h-4 w-4",
+                                  trip.notes
+                                    ? "text-blue-500"
+                                    : "text-muted-foreground"
+                                )}
                               />
                             </Button>
                           </TooltipTrigger>
@@ -518,7 +539,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
 
                   {/* Expanded loads section */}
                   {isExpanded && hasLoads && (
-                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableRow className="bg-muted/20 hover:bg-muted/20">
                       <TableCell colSpan={12} className="p-0">
                         <div className="px-6 py-4 space-y-3">
                           {trip.loads.map((load) => (
@@ -530,19 +551,33 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                           ))}
 
                           {/* Revenue Summary */}
-                          <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                            <div className="text-xs space-y-1">
-                              <div className="flex justify-between text-emerald-700">
+                          <div className="mt-4 rounded-lg border bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-200 dark:border-emerald-900 p-3">
+                            <div className="text-xs space-y-1.5">
+                              <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                                 <span>Trip Accessorial:</span>
-                                <span>${FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE.toFixed(2)}</span>
+                                <span className="tabular-nums font-medium">
+                                  $
+                                  {FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE.toFixed(
+                                    2
+                                  )}
+                                </span>
                               </div>
-                              <div className="flex justify-between text-emerald-700">
+                              <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                                 <span>DTR:</span>
-                                <span>${FORECASTING_CONSTANTS.DTR_RATE.toFixed(2)}</span>
+                                <span className="tabular-nums font-medium">
+                                  $
+                                  {FORECASTING_CONSTANTS.DTR_RATE.toFixed(2)}
+                                </span>
                               </div>
-                              <div className="flex justify-between pt-1 border-t border-emerald-200 font-medium text-emerald-800">
+                              <div className="flex justify-between pt-1.5 border-t border-emerald-200 dark:border-emerald-800 font-semibold text-emerald-800 dark:text-emerald-300">
                                 <span>Projected Revenue:</span>
-                                <span>${(FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE + FORECASTING_CONSTANTS.DTR_RATE).toFixed(2)}</span>
+                                <span className="tabular-nums">
+                                  $
+                                  {(
+                                    FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE +
+                                    FORECASTING_CONSTANTS.DTR_RATE
+                                  ).toFixed(2)}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -559,18 +594,20 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
 
       {/* Notes Dialog */}
       <Dialog open={!!notesTrip} onOpenChange={() => setNotesTrip(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Trip Notes</DialogTitle>
             <DialogDescription>
-              {notesTrip?.tripId} - {notesTrip && format(new Date(notesTrip.scheduledDate), "MMM d, yyyy")}
+              {notesTrip?.tripId} -{" "}
+              {notesTrip &&
+                format(new Date(notesTrip.scheduledDate), "MMM d, yyyy")}
             </DialogDescription>
           </DialogHeader>
           <Textarea
             placeholder="Add notes about this trip..."
             value={notesValue}
             onChange={(e) => setNotesValue(e.target.value)}
-            className="min-h-[100px]"
+            className="min-h-[120px] resize-none"
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setNotesTrip(null)}>
@@ -600,20 +637,35 @@ function LoadCard({ load, formatTime }: LoadCardProps) {
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className={`rounded-lg border ${load.isBobtail ? "bg-amber-50/50 border-amber-200" : "bg-white border-slate-200"}`}>
+      <div
+        className={cn(
+          "rounded-lg border transition-colors",
+          load.isBobtail
+            ? "bg-amber-50/50 border-amber-200 dark:bg-amber-950/10 dark:border-amber-900"
+            : "bg-background border-border"
+        )}
+      >
         <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover:bg-muted/30 rounded-lg transition-colors">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               {load.isBobtail ? (
-                <Badge variant="outline" className="text-[10px] bg-amber-100 text-amber-700 border-amber-300">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700"
+                >
                   Bobtail
                 </Badge>
               ) : (
-                <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-700 border-blue-300">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700"
+                >
                   Delivery
                 </Badge>
               )}
-              <span className="font-mono text-xs">{load.loadId}</span>
+              <span className="font-mono text-xs font-medium">
+                {load.loadId}
+              </span>
             </div>
             {load.facilitySequence && (
               <span className="text-xs text-muted-foreground truncate max-w-[200px]">
@@ -624,9 +676,14 @@ function LoadCard({ load, formatTime }: LoadCardProps) {
           <div className="flex items-center gap-3 text-xs">
             <span className="text-muted-foreground">
               {stops.length} stops
-              {!load.isBobtail && ` • ${deliveryCount} deliveries`}
+              {!load.isBobtail && ` · ${deliveryCount} deliveries`}
             </span>
-            <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`} />
+            <ChevronRight
+              className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform duration-200",
+                isOpen && "rotate-90"
+              )}
+            />
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -635,39 +692,61 @@ function LoadCard({ load, formatTime }: LoadCardProps) {
               {stops.map((stop, idx) => (
                 <div
                   key={idx}
-                  className={`flex items-center gap-2 text-xs p-2 rounded ${
+                  className={cn(
+                    "flex items-center gap-2 text-xs p-2 rounded-md transition-colors",
                     stop.isDelivery
-                      ? "bg-emerald-50 border border-emerald-100"
-                      : "bg-slate-50 border border-slate-100"
-                  }`}
+                      ? "bg-emerald-50 border border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900"
+                      : "bg-slate-50 border border-slate-100 dark:bg-slate-900/50 dark:border-slate-800"
+                  )}
                 >
                   <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <MapPin className={`h-3 w-3 flex-shrink-0 ${stop.isDelivery ? "text-emerald-600" : "text-slate-500"}`} />
-                    <span className={`font-mono truncate ${stop.isDelivery ? "text-emerald-800 font-medium" : "text-slate-600"}`}>
+                    <MapPin
+                      className={cn(
+                        "h-3 w-3 flex-shrink-0",
+                        stop.isDelivery
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-slate-500"
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "font-mono truncate",
+                        stop.isDelivery
+                          ? "text-emerald-800 dark:text-emerald-300 font-medium"
+                          : "text-slate-600 dark:text-slate-400"
+                      )}
+                    >
                       {stop.name}
                     </span>
                     {!stop.isDelivery && (
-                      <span className="text-[10px] text-slate-400">(Warehouse)</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        (Warehouse)
+                      </span>
                     )}
                   </div>
                   {stop.plannedArr && (
                     <div className="flex items-center gap-1 text-muted-foreground flex-shrink-0">
                       <Clock className="h-3 w-3" />
-                      <span>{formatTime(stop.plannedArr)}</span>
+                      <span className="tabular-nums">
+                        {formatTime(stop.plannedArr)}
+                      </span>
                     </div>
                   )}
                 </div>
               ))}
             </div>
             {(deliveryCount > 0 || load.estimateDistance > 0) && (
-              <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+              <div className="mt-2.5 pt-2.5 border-t text-xs text-muted-foreground flex items-center gap-3">
                 {deliveryCount > 0 && (
-                  <span className="font-medium text-emerald-600">
-                    {deliveryCount} {deliveryCount === 1 ? "delivery" : "deliveries"}
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    {deliveryCount}{" "}
+                    {deliveryCount === 1 ? "delivery" : "deliveries"}
                   </span>
                 )}
                 {load.estimateDistance > 0 && (
-                  <span className={deliveryCount > 0 ? "ml-3" : ""}>Distance: {load.estimateDistance.toFixed(1)} mi</span>
+                  <span className="tabular-nums">
+                    Distance: {load.estimateDistance.toFixed(1)} mi
+                  </span>
                 )}
               </div>
             )}

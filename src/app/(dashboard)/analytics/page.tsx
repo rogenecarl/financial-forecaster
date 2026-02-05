@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart3, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -272,10 +273,10 @@ export default function AnalyticsPage() {
               </p>
               <div className="flex gap-2">
                 <Button variant="outline" asChild>
-                  <a href="/trips">Import Trips</a>
+                  <Link href="/trips">Import Trips</Link>
                 </Button>
                 <Button variant="outline" asChild>
-                  <a href="/amazon-invoices">Import Invoices</a>
+                  <Link href="/amazon-invoices">Import Invoices</Link>
                 </Button>
               </div>
             </div>

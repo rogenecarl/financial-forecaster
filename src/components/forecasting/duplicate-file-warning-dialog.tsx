@@ -1,7 +1,6 @@
 "use client";
 
-import { format } from "date-fns";
-import { AlertTriangle, Calendar, FileText, Package } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,26 +12,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export interface PreviousImportInfo {
-  importedAt: Date;
-  fileName: string;
-  itemCount: number;
-  itemType: "trips" | "invoices" | "transactions";
-}
-
 interface DuplicateFileWarningDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  previousImport: PreviousImportInfo;
-  onContinue: () => void;
+  batchName: string;
+  onConfirm: () => void;
   onCancel: () => void;
 }
 
 export function DuplicateFileWarningDialog({
   open,
   onOpenChange,
-  previousImport,
-  onContinue,
+  batchName,
+  onConfirm,
   onCancel,
 }: DuplicateFileWarningDialogProps) {
   const handleCancel = () => {
@@ -40,22 +32,9 @@ export function DuplicateFileWarningDialog({
     onOpenChange(false);
   };
 
-  const handleContinue = () => {
-    onContinue();
+  const handleConfirm = () => {
+    onConfirm();
     onOpenChange(false);
-  };
-
-  const getSkipMessage = () => {
-    switch (previousImport.itemType) {
-      case "trips":
-        return "Duplicate trips will be automatically skipped.";
-      case "invoices":
-        return "The invoice will be rejected if the invoice number already exists.";
-      case "transactions":
-        return "Duplicate transactions will be automatically skipped.";
-      default:
-        return "Duplicates will be automatically skipped.";
-    }
   };
 
   return (
@@ -70,44 +49,26 @@ export function DuplicateFileWarningDialog({
             <p>This file appears to have been imported before.</p>
 
             <div className="rounded-lg border bg-muted/50 p-4">
-              <h4 className="mb-2 text-sm font-semibold text-foreground">
-                Previous Import:
-              </h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>
-                    {format(new Date(previousImport.importedAt), "MMMM d, yyyy 'at' h:mm a")}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  <span>
-                    {previousImport.itemCount}{" "}
-                    {previousImport.itemType === "trips"
-                      ? "trips imported"
-                      : previousImport.itemType === "invoices"
-                      ? "invoices imported"
-                      : "transactions imported"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="truncate">{previousImport.fileName}</span>
-                </div>
-              </div>
+              <p className="text-sm">
+                Previously imported to:{" "}
+                <span className="font-semibold text-foreground">{batchName}</span>
+              </p>
             </div>
 
             <p className="text-sm">
               Do you want to continue anyway?
               <br />
-              <span className="text-muted-foreground">{getSkipMessage()}</span>
+              <span className="text-muted-foreground">
+                Duplicate items will be automatically skipped.
+              </span>
             </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={handleCancel}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleContinue}>Continue Import</AlertDialogAction>
+          <AlertDialogAction onClick={handleConfirm}>
+            Continue Import
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

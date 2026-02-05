@@ -5,7 +5,6 @@ import { requireAuth } from "@/lib/auth-server";
 import type { ActionResponse } from "@/types/api";
 import type { ImportInvoice, AmazonInvoice, AmazonInvoiceLineItem } from "@/schema/forecasting.schema";
 import { importInvoiceSchema } from "@/schema/forecasting.schema";
-import { FORECASTING_CONSTANTS } from "@/config/forecasting";
 
 // ============================================
 // TYPES
@@ -594,13 +593,25 @@ async function recalculateBatchActualsFromInvoice(
   fileHash?: string
 ): Promise<void> {
   try {
-    // Get all trips for this batch with their actual data
+    // Get the invoice for actual totals (this is the source of truth)
+    const invoice = await prisma.amazonInvoice.findFirst({
+      where: { id: invoiceId },
+      select: {
+        totalTourPay: true,
+        totalAccessorials: true,
+        totalAdjustments: true,
+        totalPay: true,
+      },
+    });
+
+    if (!invoice) return;
+
+    // Get all trips for this batch to count tours and loads
     const trips = await prisma.trip.findMany({
       where: { batchId },
       select: {
         tripStage: true,
         actualLoads: true,
-        actualRevenue: true,
       },
     });
 
@@ -611,34 +622,27 @@ async function recalculateBatchActualsFromInvoice(
 
     if (!batch) return;
 
-    // Calculate actuals from trips
-    const { DTR_RATE } = FORECASTING_CONSTANTS;
+    // Count tours and loads from matched trips
     let actualTours = 0;
     let actualLoads = 0;
-    let actualTourPay = 0;
-    let actualAccessorials = 0;
-    let actualAdjustments = 0;
 
     for (const trip of trips) {
-      const tripActualRevenue = toNumber(trip.actualRevenue);
       const tripActualLoads = trip.actualLoads || 0;
 
-      // Count completed tours (not adjustments-only)
+      // Count completed tours (not canceled/adjustments-only)
       if (trip.tripStage === "COMPLETED") {
         actualTours++;
-        // Estimate tour pay vs accessorials from actual revenue
-        // Tour pay is DTR_RATE, rest is accessorials
-        actualTourPay += DTR_RATE;
-        actualAccessorials += Math.max(0, tripActualRevenue - DTR_RATE);
-      } else if (trip.tripStage === "CANCELED" && tripActualRevenue > 0) {
-        // TONU or other adjustment
-        actualAdjustments += tripActualRevenue;
       }
 
       actualLoads += tripActualLoads;
     }
 
-    const actualTotal = actualTourPay + actualAccessorials + actualAdjustments;
+    // Use invoice totals directly (includes unmatched adjustments)
+    const actualTourPay = toNumber(invoice.totalTourPay);
+    const actualAccessorials = toNumber(invoice.totalAccessorials);
+    const actualAdjustments = toNumber(invoice.totalAdjustments);
+    const actualTotal = toNumber(invoice.totalPay);
+
     const projectedTotal = toNumber(batch.projectedTotal);
     const variance = actualTotal - projectedTotal;
     const variancePercent = projectedTotal !== 0 ? (variance / projectedTotal) * 100 : null;

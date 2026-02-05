@@ -2,13 +2,11 @@ import {
   LayoutDashboard,
   Receipt,
   FileText,
-  FileSpreadsheet,
   Truck,
   TrendingUp,
   GitCompare,
   BarChart3,
   Tags,
-  History,
   LineChart,
   type LucideIcon,
 } from "lucide-react";
@@ -61,12 +59,7 @@ export const dashboardNavigation: NavElement[] = [
     title: "Forecasting",
     items: [
       {
-        title: "Amazon Invoices",
-        href: "/amazon-invoices",
-        icon: FileSpreadsheet,
-      },
-      {
-        title: "Trips",
+        title: "Trip Management",
         href: "/trips",
         icon: Truck,
       },
@@ -79,11 +72,6 @@ export const dashboardNavigation: NavElement[] = [
         title: "Forecast vs Actual",
         href: "/forecast-vs-actual",
         icon: GitCompare,
-      },
-      {
-        title: "Import History",
-        href: "/import-history",
-        icon: History,
       },
     ],
   },
@@ -122,13 +110,9 @@ export const routeMeta: Record<string, { title: string; description?: string }> 
     title: "P&L Statement",
     description: "Financial performance summary",
   },
-  "/amazon-invoices": {
-    title: "Amazon Invoices",
-    description: "Import and analyze Amazon payment details",
-  },
   "/trips": {
-    title: "Trips",
-    description: "Manage scheduled trips and track actual loads",
+    title: "Trip Management",
+    description: "Organize trips and invoices into batches for easier tracking",
   },
   "/forecasting": {
     title: "Forecasting",
@@ -136,11 +120,7 @@ export const routeMeta: Record<string, { title: string; description?: string }> 
   },
   "/forecast-vs-actual": {
     title: "Forecast vs Actual",
-    description: "Compare predictions with actual Amazon payments",
-  },
-  "/import-history": {
-    title: "Import History",
-    description: "View all CSV import history",
+    description: "Compare batch projections with actual invoice payments",
   },
   "/analytics": {
     title: "Analytics",

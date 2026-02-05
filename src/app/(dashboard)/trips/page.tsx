@@ -1,159 +1,217 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { Upload, Truck, Package, CheckCircle, Clock, Construction } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Search, Truck, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { TripsImportModal, TripsTable, TripsBulkActions } from "@/components/forecasting";
+import { Input } from "@/components/ui/input";
 import {
-  TripStatusFilter,
-  type TripStatusValue,
-} from "@/components/filters";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
-  useTripsWithLoads,
-  useTripBatchOptions,
-  useTripStatusCounts,
-} from "@/hooks";
-import type { TripsFilterParams } from "@/actions/forecasting/trips";
+  TripBatchCard,
+  TripBatchCardSkeleton,
+  TripBatchCreateModal,
+  TripBatchDeleteDialog,
+} from "@/components/forecasting";
+import {
+  getTripBatches,
+  deleteTripBatch,
+  type TripBatchSummary,
+  type TripBatchFilters,
+} from "@/actions/forecasting/trip-batches";
+import type { BatchStatus } from "@/lib/generated/prisma/client";
+import { toast } from "sonner";
+import { forecastingKeys } from "@/hooks";
 
-export default function TripsPage() {
-  // Filter state - using batchId now instead of weekId/importBatchId
-  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<TripStatusValue>("all");
-  const [showImport, setShowImport] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+const STATUS_OPTIONS: { value: BatchStatus | "all"; label: string }[] = [
+  { value: "all", label: "All Statuses" },
+  { value: "EMPTY", label: "Empty" },
+  { value: "UPCOMING", label: "Upcoming" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "INVOICED", label: "Invoiced" },
+];
 
-  // Fetch filter options
-  const { batches, isLoading: batchesLoading, invalidate: invalidateBatches } = useTripBatchOptions();
-  const { statusCounts, isLoading: statusCountsLoading } = useTripStatusCounts(
-    selectedBatchId ?? undefined
-  );
+export default function TripBatchesPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  // Filter state
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<BatchStatus | "all">("all");
+
+  // Modal state
+  const [showCreate, setShowCreate] = useState(false);
+  const [editBatch, setEditBatch] = useState<TripBatchSummary | null>(null);
+  const [deletingBatch, setDeletingBatch] = useState<TripBatchSummary | null>(null);
 
   // Build filter params
-  const filterParams = useMemo<TripsFilterParams>(() => {
-    const params: TripsFilterParams = {};
+  const filters: TripBatchFilters = {
+    search: search || undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+  };
 
-    if (selectedBatchId) {
-      params.batchId = selectedBatchId;
-    }
-
-    if (selectedStatus !== "all") {
-      params.tripStage = selectedStatus;
-    }
-
-    return params;
-  }, [selectedBatchId, selectedStatus]);
-
-  // TanStack Query hook for trips data (with loads for detailed view)
+  // Fetch batches
   const {
-    trips,
-    stats,
-    isLoading: loading,
-    invalidate,
-    bulkDelete,
-    isBulkDeleting,
-  } = useTripsWithLoads(filterParams);
+    data: batches = [],
+    isLoading,
+  } = useQuery({
+    queryKey: [...forecastingKeys.tripBatchesList(), filters],
+    queryFn: async () => {
+      const result = await getTripBatches(filters);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    staleTime: 30 * 1000,
+  });
 
-  // Handle bulk delete
-  const handleBulkDelete = useCallback(() => {
-    bulkDelete(selectedIds);
-    setSelectedIds([]); // Clear selection immediately (optimistic)
-  }, [selectedIds, bulkDelete]);
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (batchId: string) => {
+      const result = await deleteTripBatch(batchId);
+      if (!result.success) throw new Error(result.error);
+      return result.data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Deleted batch with ${data.deletedTrips} trips`);
+      queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatches });
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Failed to delete batch");
+    },
+  });
 
-  // Handle import success - invalidate filters as well
-  const handleImportSuccess = useCallback(() => {
-    invalidate();
-    invalidateBatches();
-  }, [invalidate, invalidateBatches]);
+  // Handlers
+  const handleBatchClick = useCallback(
+    (batch: TripBatchSummary) => {
+      router.push(`/trips/${batch.id}`);
+    },
+    [router]
+  );
+
+  const handleCreateSuccess = useCallback(
+    (batch: TripBatchSummary) => {
+      queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatches });
+      // Navigate to the new batch detail page
+      router.push(`/trips/${batch.id}`);
+    },
+    [queryClient, router]
+  );
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (deletingBatch) {
+      deleteMutation.mutate(deletingBatch.id);
+    }
+  }, [deletingBatch, deleteMutation]);
+
+  const closeCreateModal = useCallback(() => {
+    setShowCreate(false);
+    setEditBatch(null);
+  }, []);
+
+  // Stats summary
+  const totalTrips = batches.reduce((sum, b) => sum + b.tripCount, 0);
+  const totalProjected = batches.reduce((sum, b) => sum + b.projectedTotal, 0);
+  const invoicedCount = batches.filter((b) => b.status === "INVOICED").length;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(value);
   };
-
-  // Calculate canceled and active trips
-  const canceledTrips = trips.filter((t) => t.tripStage === "CANCELED").length;
-  const activeTrips = trips.filter((t) => t.tripStage !== "CANCELED");
-  const activeTripsCount = activeTrips.length;
-  const activeProjectedLoads = activeTrips.reduce((sum, t) => sum + t.projectedLoads, 0);
-
-  // Exclude canceled trips from projected revenue (canceled trips don't generate projected revenue)
-  const projectedRevenue = activeTrips.reduce((sum, t) => sum + (t.projectedRevenue || 0), 0);
-  const actualRevenue = trips.reduce((sum, t) => sum + (t.actualRevenue || 0), 0);
-
-  // Get selected batch info for display
-  const selectedBatch = batches.find((b) => b.id === selectedBatchId);
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Trips</h1>
+          <h1 className="text-2xl font-bold text-foreground">Trip Management</h1>
           <p className="text-sm text-muted-foreground">
-            Manage scheduled trips and track actual loads
+            Organize trips and invoices into batches for easier tracking
           </p>
         </div>
-        <Button onClick={() => setShowImport(true)}>
-          <Upload className="mr-2 h-4 w-4" />
-          Import Trips
+        <Button onClick={() => setShowCreate(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Batch
         </Button>
       </div>
 
-      {/* Redesign Notice */}
-      <Alert className="border-amber-200 bg-amber-50/50">
-        <Construction className="h-4 w-4 text-amber-600" />
-        <AlertTitle className="text-amber-800">Trip Batch System Coming Soon</AlertTitle>
-        <AlertDescription className="text-amber-700">
-          Trip imports are being redesigned to use Trip Batches for better organization.
-          Create a Trip Batch first, then import trips to that batch.
-        </AlertDescription>
-      </Alert>
+      {/* Summary Stats */}
+      {batches.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-4">
+          <div className="rounded-lg border bg-card p-4">
+            <div className="text-sm text-muted-foreground">Total Batches</div>
+            <div className="text-2xl font-bold">{batches.length}</div>
+          </div>
+          <div className="rounded-lg border bg-card p-4">
+            <div className="text-sm text-muted-foreground">Total Trips</div>
+            <div className="text-2xl font-bold">{totalTrips}</div>
+          </div>
+          <div className="rounded-lg border bg-card p-4">
+            <div className="text-sm text-muted-foreground">Projected Revenue</div>
+            <div className="text-2xl font-bold text-emerald-700">
+              {formatCurrency(totalProjected)}
+            </div>
+          </div>
+          <div className="rounded-lg border bg-card p-4">
+            <div className="text-sm text-muted-foreground">Invoiced</div>
+            <div className="text-2xl font-bold text-purple-700">
+              {invoicedCount} / {batches.length}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        {/* Batch selector - simple select for now */}
-        {batches.length > 0 && (
-          <select
-            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-            value={selectedBatchId || ""}
-            onChange={(e) => setSelectedBatchId(e.target.value || null)}
-            disabled={batchesLoading}
-          >
-            <option value="">All Batches</option>
-            {batches.map((batch) => (
-              <option key={batch.id} value={batch.id}>
-                {batch.name}
-              </option>
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search batches..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as BatchStatus | "all")}
+        >
+          <SelectTrigger className="w-[160px]">
+            <Filter className="mr-2 h-4 w-4" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
             ))}
-          </select>
-        )}
-        <TripStatusFilter
-          statusCounts={statusCounts}
-          selectedStatus={selectedStatus}
-          onStatusChange={setSelectedStatus}
-          loading={statusCountsLoading}
-        />
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Active filter indicator */}
-      {(selectedBatchId || selectedStatus !== "all") && (
+      {(search || statusFilter !== "all") && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span>Filtering by:</span>
-          {selectedBatch && (
-            <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md text-xs font-medium">
-              {selectedBatch.name}
+          <span>Filtering:</span>
+          {search && (
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">
+              &quot;{search}&quot;
             </span>
           )}
-          {selectedStatus !== "all" && (
-            <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded-md text-xs font-medium">
-              {selectedStatus.replace("_", " ")}
+          {statusFilter !== "all" && (
+            <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-md text-xs font-medium">
+              {STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label}
             </span>
           )}
           <Button
@@ -161,8 +219,8 @@ export default function TripsPage() {
             size="sm"
             className="h-6 px-2 text-xs"
             onClick={() => {
-              setSelectedBatchId(null);
-              setSelectedStatus("all");
+              setSearch("");
+              setStatusFilter("all");
             }}
           >
             Clear all
@@ -170,200 +228,72 @@ export default function TripsPage() {
         </div>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Trips
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-12" /> : activeTripsCount}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Projected Loads
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-12" /> : activeProjectedLoads}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Actual Loads
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-12" /> : stats.actualLoads}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-red-50/50 border-red-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-red-600">
-              Canceled
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-700">
-              {loading ? <Skeleton className="h-8 w-12" /> : canceledTrips}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Revenue Cards */}
-      {!loading && trips.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card className="bg-emerald-50/50 border-emerald-200">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-emerald-700">Projected Revenue</p>
-                  <p className="text-xs text-emerald-600">Based on $452.09 DTR + $70/trip</p>
-                </div>
-                <p className="text-2xl font-bold text-emerald-700">{formatCurrency(projectedRevenue)}</p>
-              </div>
-              {canceledTrips > 0 && (
-                <p className="text-xs text-emerald-600 mt-2 pt-2 border-t border-emerald-200">
-                  Note: {canceledTrips} canceled {canceledTrips === 1 ? "trip is" : "trips are"} excluded from trip count and projected loads
-                </p>
-              )}
-            </CardContent>
-          </Card>
-          {actualRevenue > 0 && (
-            <Card className="bg-blue-50/50 border-blue-200">
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-700">Actual Revenue</p>
-                    <p className="text-xs text-blue-600">From completed trips</p>
-                  </div>
-                  <p className="text-2xl font-bold text-blue-700">{formatCurrency(actualRevenue)}</p>
-                </div>
-              </CardContent>
-            </Card>
+      {/* Batch Grid */}
+      {isLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <TripBatchCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : batches.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {batches.map((batch) => (
+            <TripBatchCard
+              key={batch.id}
+              batch={batch}
+              onClick={() => handleBatchClick(batch)}
+            />
+          ))}
+        </div>
+      ) : (
+        // Empty State
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="rounded-full bg-muted p-4 mb-4">
+            <Truck className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold text-foreground mb-1">
+            {search || statusFilter !== "all"
+              ? "No batches match your filters"
+              : "No trip batches yet"}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+            {search || statusFilter !== "all"
+              ? "Try adjusting your search or filters to find what you're looking for."
+              : "Create your first batch to start organizing your trips and tracking revenue."}
+          </p>
+          {search || statusFilter !== "all" ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+              }}
+            >
+              Clear Filters
+            </Button>
+          ) : (
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create First Batch
+            </Button>
           )}
         </div>
       )}
 
-      {/* Trips Table */}
-      {trips.length > 0 || loading ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Trip Schedule</CardTitle>
-            <CardDescription>
-              Update actual loads each night to track variance
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TripsTable
-              trips={trips}
-              loading={loading}
-              onUpdate={invalidate}
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        /* Empty State */
-        <Card>
-          <CardHeader>
-            <CardTitle>Trip Schedule</CardTitle>
-            <CardDescription>Import trips from Amazon Scheduler to track loads</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-muted p-4 mb-4">
-                <Truck className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold text-foreground mb-1">
-                No trips found
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                {(selectedBatchId || selectedStatus !== "all")
-                  ? "No trips found for the selected filters. Try changing or clearing the filters."
-                  : "Import your trip schedule from Amazon Scheduler CSV to track projected vs actual loads."}
-              </p>
-              {(selectedBatchId || selectedStatus !== "all") ? (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedBatchId(null);
-                    setSelectedStatus("all");
-                  }}
-                >
-                  Clear Filters
-                </Button>
-              ) : (
-                <Button onClick={() => setShowImport(true)}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Import Trips
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Info Card */}
-      <Card className="border-blue-200 bg-blue-50/50">
-        <CardContent className="py-4">
-          <div className="flex items-start gap-3">
-            <Package className="h-5 w-5 text-blue-600 mt-0.5" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-blue-800">
-                Update actual loads each night
-              </p>
-              <p className="text-xs text-blue-700">
-                Recording actual loads helps improve forecast accuracy and track variance from projected deliveries.
-                Click on the Actual column to edit the number of loads delivered.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <CheckCircle className="h-4 w-4 text-emerald-500" />
-          <span>Updated</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-amber-500" />
-          <span>Pending</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Truck className="h-4 w-4 text-blue-500" />
-          <span>Scheduled</span>
-        </div>
-      </div>
-
-      {/* Import Modal */}
-      <TripsImportModal
-        open={showImport}
-        onOpenChange={setShowImport}
-        onSuccess={handleImportSuccess}
+      {/* Create/Edit Modal */}
+      <TripBatchCreateModal
+        open={showCreate}
+        onOpenChange={closeCreateModal}
+        onSuccess={handleCreateSuccess}
+        editBatch={editBatch}
       />
 
-      {/* Bulk Actions */}
-      <TripsBulkActions
-        selectedCount={selectedIds.length}
-        onClearSelection={() => setSelectedIds([])}
-        onBulkDelete={handleBulkDelete}
-        isDeleting={isBulkDeleting}
+      {/* Delete Dialog */}
+      <TripBatchDeleteDialog
+        open={!!deletingBatch}
+        onOpenChange={(open) => !open && setDeletingBatch(null)}
+        batch={deletingBatch}
+        onSuccess={handleDeleteConfirm}
       />
     </div>
   );

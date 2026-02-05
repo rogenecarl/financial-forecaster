@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { format } from "date-fns";
 import {
   CheckCircle2,
-  FileText,
   Package,
   Truck,
   XCircle,
@@ -12,6 +10,8 @@ import {
   ChevronRight,
   SkipForward,
   DollarSign,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import {
   Dialog,
@@ -28,45 +28,60 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { formatCurrency, formatNumber } from "@/lib/utils";
 import { FORECASTING_CONSTANTS } from "@/config/forecasting";
 import type { TripImportResult } from "@/actions/forecasting/trip-batches";
+import type { TripsParseResult } from "@/lib/parsers/trips-parser";
 
 interface TripImportResultDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   result: TripImportResult;
-  fileName: string;
-  onViewTrips?: () => void;
+  parseStats: TripsParseResult["stats"];
+  warnings: string[];
+  onClose: () => void;
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value);
 }
 
 export function TripImportResultDialog({
   open,
   onOpenChange,
   result,
-  fileName,
-  onViewTrips,
+  parseStats,
+  warnings,
+  onClose,
 }: TripImportResultDialogProps) {
   const [showSkipped, setShowSkipped] = useState(false);
+  const [showWarnings, setShowWarnings] = useState(false);
 
   const { DTR_RATE, TRIP_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
 
+  const handleClose = () => {
+    onClose();
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-green-600">
             <CheckCircle2 className="h-5 w-5" />
             Import Complete
           </DialogTitle>
-          <DialogDescription className="space-y-1">
-            <div className="flex items-center gap-2 text-sm">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{fileName}</span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {format(new Date(), "MMM d, yyyy 'at' h:mm a")}
-            </div>
+          <DialogDescription>
+            Successfully processed {parseStats.totalRows} rows from the CSV file.
           </DialogDescription>
         </DialogHeader>
 
@@ -78,13 +93,24 @@ export function TripImportResultDialog({
               Import Summary
             </h4>
             <div className="space-y-2 text-sm">
+              {result.replaced > 0 && (
+                <div className="flex justify-between">
+                  <span className="flex items-center gap-1.5 text-blue-600">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Replaced:
+                  </span>
+                  <span className="font-medium text-blue-600">
+                    {formatNumber(result.replaced)} previous trips
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="flex items-center gap-1.5 text-green-600">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  Active Trips:
+                  Imported:
                 </span>
                 <span className="font-medium text-green-600">
-                  {formatNumber(result.imported - result.canceledCount)} trips
+                  {formatNumber(result.imported)} trips
                 </span>
               </div>
               <div className="flex justify-between">
@@ -92,7 +118,9 @@ export function TripImportResultDialog({
                   <Truck className="h-3.5 w-3.5" />
                   Projected Loads:
                 </span>
-                <span className="font-medium">{formatNumber(result.projectedLoads)} loads</span>
+                <span className="font-medium">
+                  {formatNumber(result.projectedLoads)} loads
+                </span>
               </div>
               {result.canceledCount > 0 && (
                 <div className="flex justify-between">
@@ -112,24 +140,19 @@ export function TripImportResultDialog({
                     Skipped:
                   </span>
                   <span className="font-medium text-amber-600">
-                    {formatNumber(result.skipped)} trips (already exist)
+                    {formatNumber(result.skipped)} trips (exist in other batches)
                   </span>
                 </div>
               )}
             </div>
-            {result.canceledCount > 0 && (
-              <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
-                Note: {result.canceledCount} canceled {result.canceledCount === 1 ? "trip is" : "trips are"} excluded from active trips and projected loads
-              </p>
-            )}
           </div>
 
           {/* Projected Revenue */}
-          {result.imported > 0 && (
+          {result.projectedTours > 0 && (
             <div className="rounded-lg border bg-green-50 p-4 dark:bg-green-950/20">
               <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-green-700 dark:text-green-400">
                 <DollarSign className="h-4 w-4" />
-                Projected Revenue (New Trips Only)
+                Projected Revenue (New Trips)
               </h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -160,6 +183,37 @@ export function TripImportResultDialog({
             </div>
           )}
 
+          {/* Warnings Collapsible */}
+          {warnings.length > 0 && (
+            <Collapsible open={showWarnings} onOpenChange={setShowWarnings}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-2 text-sm text-amber-600"
+                >
+                  {showWarnings ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  <AlertTriangle className="h-4 w-4" />
+                  Show warnings ({warnings.length})
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ScrollArea className="h-24 rounded-lg border bg-amber-50/50 p-2">
+                  <div className="space-y-1">
+                    {warnings.map((warning, idx) => (
+                      <p key={idx} className="text-xs text-amber-700">
+                        {warning}
+                      </p>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
           {/* Skipped Trips Collapsible */}
           {result.skipped > 0 && result.duplicateTripIds.length > 0 && (
             <Collapsible open={showSkipped} onOpenChange={setShowSkipped}>
@@ -183,7 +237,7 @@ export function TripImportResultDialog({
                       >
                         <span className="font-mono text-xs">{tripId}</span>
                         <span className="text-xs text-muted-foreground">
-                          already imported
+                          exists in another batch
                         </span>
                       </div>
                     ))}
@@ -194,13 +248,8 @@ export function TripImportResultDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          {onViewTrips && (
-            <Button variant="outline" onClick={onViewTrips}>
-              View Trips
-            </Button>
-          )}
-          <Button onClick={() => onOpenChange(false)}>Done</Button>
+        <DialogFooter>
+          <Button onClick={handleClose}>Done</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -7,3 +7,14 @@ export { ForecastCalculator } from "./forecast-calculator";
 export { WeekSummaryCard } from "./week-summary-card";
 export { VarianceSummaryCards } from "./variance-summary-cards";
 export { VarianceTrendChart } from "./variance-trend-chart";
+
+// Trip Batch Components (Phase 3)
+export { TripBatchStatusBadge } from "./trip-batch-status-badge";
+export { TripBatchCard } from "./trip-batch-card";
+export { TripBatchCardSkeleton } from "./trip-batch-card-skeleton";
+export { TripBatchCreateModal } from "./trip-batch-create-modal";
+export { TripBatchDeleteDialog } from "./trip-batch-delete-dialog";
+export { TripBatchSummaryCard } from "./trip-batch-summary-card";
+export { TripBatchImportSection } from "./trip-batch-import-section";
+export { TripSummaryCards } from "./trip-summary-cards";
+export { InvoiceSummaryCards } from "./invoice-summary-cards";

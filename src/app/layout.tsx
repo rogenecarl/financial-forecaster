@@ -24,7 +24,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Financial Forecaster | Peak Transport",
+  title: "Financial Forecaster",
   description: "Internal financial management system for Peak Transport LLC. Bookkeeping, Forecasting, and Reporting.",
 };
 

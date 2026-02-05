@@ -12,6 +12,8 @@ import {
   DollarSign,
   AlertTriangle,
   RefreshCw,
+  MapPin,
+  ClipboardList,
 } from "lucide-react";
 import {
   Dialog,
@@ -115,11 +117,11 @@ export function TripImportResultDialog({
               </div>
               <div className="flex justify-between">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <Truck className="h-3.5 w-3.5" />
-                  Projected Loads:
+                  <MapPin className="h-3.5 w-3.5" />
+                  Projected Stops:
                 </span>
                 <span className="font-medium">
-                  {formatNumber(result.projectedLoads)} loads
+                  {formatNumber(result.projectedStops)} stops
                 </span>
               </div>
               {result.canceledCount > 0 && (
@@ -147,6 +149,36 @@ export function TripImportResultDialog({
             </div>
           </div>
 
+          {/* Trip Summary */}
+          {result.projectedTours > 0 && (
+            <div className="rounded-lg border bg-blue-50 p-4 dark:bg-blue-950/20">
+              <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-400">
+                <ClipboardList className="h-4 w-4" />
+                Trip Summary
+              </h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Truck className="h-3.5 w-3.5" />
+                    Projected Loads:
+                  </span>
+                  <span className="font-medium">
+                    {formatNumber(result.activeLoadCount)} loads
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5" />
+                    Projected Stops:
+                  </span>
+                  <span className="font-medium">
+                    {formatNumber(result.projectedStops)} stops
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Projected Revenue */}
           {result.projectedTours > 0 && (
             <div className="rounded-lg border bg-green-50 p-4 dark:bg-green-950/20">
@@ -156,7 +188,7 @@ export function TripImportResultDialog({
               </h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tour Pay:</span>
+                  <span className="text-muted-foreground">Trip Completed Payout:</span>
                   <span className="font-medium">
                     {formatCurrency(result.projectedTourPay)}
                     <span className="ml-1 text-xs text-muted-foreground">
@@ -165,7 +197,7 @@ export function TripImportResultDialog({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Accessorials:</span>
+                  <span className="text-muted-foreground">Projected Loads Accessorial Payout:</span>
                   <span className="font-medium">
                     {formatCurrency(result.projectedAccessorials)}
                     <span className="ml-1 text-xs text-muted-foreground">

@@ -8,6 +8,7 @@ import {
   Minus,
   Truck,
   Package,
+  MapPin,
   DollarSign,
   BarChart3,
 } from "lucide-react";
@@ -54,8 +55,8 @@ export function TripBatchSummaryCard({
           <Skeleton className="h-5 w-32" />
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
+            {[...Array(5)].map((_, i) => (
               <div key={i} className="space-y-2">
                 <Skeleton className="h-4 w-20" />
                 <Skeleton className="h-8 w-16" />
@@ -103,7 +104,7 @@ export function TripBatchSummaryCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
           {/* Trips */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -120,11 +121,23 @@ export function TripBatchSummaryCard({
             </div>
           </div>
 
-          {/* Loads */}
+          {/* Projected Loads */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Package className="h-4 w-4" />
               <span>Loads</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold">{batch.loadCount}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">projected</p>
+          </div>
+
+          {/* Projected Stops */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              <span>Stops</span>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">{batch.projectedLoads}</span>

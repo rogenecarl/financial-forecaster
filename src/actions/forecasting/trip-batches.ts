@@ -340,6 +340,8 @@ export interface TripImportResult {
   // Projection snapshot for this import
   projectedTours: number;
   projectedLoads: number;
+  projectedStops: number; // Delivery stops from active trips (non-MSP, non-bobtail)
+  activeLoadCount: number; // Total Load IDs from active (non-canceled) trips
   projectedTourPay: number;
   projectedAccessorials: number;
   projectedTotal: number;
@@ -514,10 +516,11 @@ export async function importTripsToBatch(
 
     const projectedTours = activeTripsToImport.length;
     const projectedLoads = activeTripsToImport.reduce((sum, t) => sum + t.projectedLoads, 0);
+    const projectedStops = projectedLoads; // Delivery stops (non-MSP, non-bobtail)
+    const activeLoadCount = activeTripsToImport.reduce((sum, t) => sum + t.loads.length, 0);
     const projectedTourPay = projectedTours * DTR_RATE;
     const projectedAccessorials = projectedTours * TRIP_ACCESSORIAL_RATE;
     const projectedTotal = projectedTourPay + projectedAccessorials;
-    const loadCount = tripsToImport.reduce((sum, t) => sum + t.loads.length, 0);
 
     // Process inserts in chunks
     const CHUNK_SIZE = 10;
@@ -572,7 +575,7 @@ export async function importTripsToBatch(
     const totalProjectedTourPay = totalProjectedTours * DTR_RATE;
     const totalProjectedAccessorials = totalProjectedTours * TRIP_ACCESSORIAL_RATE;
     const totalProjectedTotal = totalProjectedTourPay + totalProjectedAccessorials;
-    const totalLoadCount = loadCount;
+    const totalLoadCount = activeLoadCount;
     const totalCanceledCount = canceledTripsToImport.length;
     const totalCompletedCount = tripsToImport.filter((t) => t.tripStage === "COMPLETED").length;
 
@@ -614,10 +617,12 @@ export async function importTripsToBatch(
         batchId,
         projectedTours,
         projectedLoads,
+        projectedStops,
+        activeLoadCount,
         projectedTourPay,
         projectedAccessorials,
         projectedTotal,
-        loadCount,
+        loadCount: activeLoadCount,
         canceledCount: canceledTripsToImport.length,
       },
     };

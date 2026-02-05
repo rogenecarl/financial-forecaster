@@ -11,6 +11,7 @@ import {
   Loader2,
   ChevronRight,
   MapPin,
+  Package,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -311,8 +312,9 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
               <TableHead className="w-[40px]"></TableHead>
               <TableHead>Trip ID</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead className="text-center">Projected</TableHead>
-              <TableHead className="text-center">Actual</TableHead>
+              <TableHead className="text-center">Projected Loads</TableHead>
+              <TableHead className="text-center">Projected Stops</TableHead>
+              <TableHead className="text-center">Actual (Load Completed)</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Projected Rev.</TableHead>
               <TableHead className="text-right">Actual Rev.</TableHead>
@@ -327,6 +329,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                 <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
                 <TableCell><Skeleton className="h-8 w-16 mx-auto" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-16" /></TableCell>
@@ -369,8 +372,9 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
               <TableHead className="w-[40px]"></TableHead>
               <TableHead>Trip ID</TableHead>
               <TableHead>Date</TableHead>
-              <TableHead className="text-center">Projected</TableHead>
-              <TableHead className="text-center">Actual</TableHead>
+              <TableHead className="text-center">Projected Loads</TableHead>
+              <TableHead className="text-center">Projected Stops</TableHead>
+              <TableHead className="text-center">Actual (Load Completed)</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Projected Rev.</TableHead>
               <TableHead className="text-right">Actual Rev.</TableHead>
@@ -413,7 +417,34 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                       {format(new Date(trip.scheduledDate), "MMM d")}
                     </TableCell>
                     <TableCell className="text-center font-medium">
-                      {trip.projectedLoads}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex items-center gap-1">
+                              <Package className="h-3.5 w-3.5 text-indigo-500" />
+                              {trip.loads?.length ?? 0}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Total Load IDs for this trip</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableCell>
+                    <TableCell className="text-center font-medium">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="h-3.5 w-3.5 text-emerald-500" />
+                              {trip.projectedLoads}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">Delivery stops (excludes bobtail &amp; MSP)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </TableCell>
                     <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                       {editingId === trip.id ? (
@@ -524,7 +555,7 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                   {/* Expanded loads section */}
                   {isExpanded && hasLoads && (
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableCell colSpan={11} className="p-0">
+                      <TableCell colSpan={12} className="p-0">
                         <div className="px-6 py-4 space-y-3">
                           {filterLoadsWithUniqueDeliveries(trip.loads).map((load) => (
                             <LoadCard

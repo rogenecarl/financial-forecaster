@@ -120,42 +120,6 @@ function countDeliveryStops(load: LoadType): number {
   return getStops(load).filter((s) => s.isDelivery).length;
 }
 
-/**
- * Filter loads to only show those that introduce NEW delivery stops.
- * This prevents showing duplicate delivery information when a stop appears in multiple loads.
- * For example: if Load A delivers to PY24719, and Load B picks up from PY24719 and returns to MSP,
- * Load B is hidden because PY24719 was already shown in Load A.
- *
- * Loads with more deliveries get priority - they "claim" their stops first.
- */
-function filterLoadsWithUniqueDeliveries(loads: LoadType[]): LoadType[] {
-  // First, filter to only loads with deliveries
-  const loadsWithDeliveries = loads.filter((load) => countDeliveryStops(load) > 0);
-
-  // Sort by delivery count descending - loads with more deliveries get priority
-  const sortedLoads = [...loadsWithDeliveries].sort(
-    (a, b) => countDeliveryStops(b) - countDeliveryStops(a)
-  );
-
-  // Build a map of which load first introduces each delivery stop
-  const deliveryStopFirstLoad = new Map<string, string>();
-  sortedLoads.forEach((load) => {
-    getStops(load)
-      .filter((s) => s.isDelivery)
-      .forEach((stop) => {
-        if (!deliveryStopFirstLoad.has(stop.name)) {
-          deliveryStopFirstLoad.set(stop.name, load.loadId);
-        }
-      });
-  });
-
-  // Only show loads that first introduce at least one delivery stop
-  return sortedLoads.filter((load) => {
-    const deliveryStops = getStops(load).filter((s) => s.isDelivery);
-    return deliveryStops.some((stop) => deliveryStopFirstLoad.get(stop.name) === load.loadId);
-  });
-}
-
 export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionChange }: TripsTableProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
@@ -292,8 +256,8 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 

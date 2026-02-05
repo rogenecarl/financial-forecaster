@@ -29,8 +29,8 @@ export function TripBatchSummaryCard({
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -129,24 +129,12 @@ export function TripBatchSummaryCard({
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">{batch.loadCount}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">projected</p>
-          </div>
-
-          {/* Projected Stops */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              <span>Stops</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{batch.projectedLoads}</span>
               {batch.actualLoads !== null && (
                 <span
                   className={cn(
                     "text-sm font-medium",
                     getVarianceColor(
-                      batch.actualLoads - batch.projectedLoads
+                      batch.actualLoads - batch.loadCount
                     )
                   )}
                 >
@@ -157,6 +145,18 @@ export function TripBatchSummaryCard({
             <p className="text-xs text-muted-foreground">
               {batch.actualLoads !== null ? "projected / actual" : "projected"}
             </p>
+          </div>
+
+          {/* Projected Stops */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              <span>Stops</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold">{batch.projectedLoads}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">projected</p>
           </div>
 
           {/* Projected Revenue */}

@@ -41,6 +41,7 @@ interface TripImportResultDialogProps {
   parseStats: TripsParseResult["stats"];
   warnings: string[];
   onClose: () => void;
+  mode?: "REPLACE" | "APPEND";
 }
 
 function formatCurrency(value: number): string {
@@ -63,8 +64,10 @@ export function TripImportResultDialog({
   parseStats,
   warnings,
   onClose,
+  mode = "REPLACE",
 }: TripImportResultDialogProps) {
   const [showSkipped, setShowSkipped] = useState(false);
+  const [showSkippedInBatch, setShowSkippedInBatch] = useState(false);
   const [showWarnings, setShowWarnings] = useState(false);
 
   const { DTR_RATE, TRIP_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
@@ -95,7 +98,7 @@ export function TripImportResultDialog({
               Import Summary
             </h4>
             <div className="space-y-2 text-sm">
-              {result.replaced > 0 && (
+              {mode === "REPLACE" && result.replaced > 0 && (
                 <div className="flex justify-between">
                   <span className="flex items-center gap-1.5 text-blue-600">
                     <RefreshCw className="h-3.5 w-3.5" />
@@ -109,7 +112,7 @@ export function TripImportResultDialog({
               <div className="flex justify-between">
                 <span className="flex items-center gap-1.5 text-green-600">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  Imported:
+                  {mode === "APPEND" ? "Added:" : "Imported:"}
                 </span>
                 <span className="font-medium text-green-600">
                   {formatNumber(result.imported)} trips
@@ -135,14 +138,25 @@ export function TripImportResultDialog({
                   </span>
                 </div>
               )}
+              {result.skippedInBatch > 0 && (
+                <div className="flex justify-between pt-2 border-t border-muted">
+                  <span className="flex items-center gap-1.5 text-amber-600">
+                    <SkipForward className="h-3.5 w-3.5" />
+                    Skipped (already in batch):
+                  </span>
+                  <span className="font-medium text-amber-600">
+                    {formatNumber(result.skippedInBatch)} trips
+                  </span>
+                </div>
+              )}
               {result.skipped > 0 && (
                 <div className="flex justify-between pt-2 border-t border-muted">
                   <span className="flex items-center gap-1.5 text-amber-600">
                     <SkipForward className="h-3.5 w-3.5" />
-                    Skipped:
+                    Skipped (in other batches):
                   </span>
                   <span className="font-medium text-amber-600">
-                    {formatNumber(result.skipped)} trips (exist in other batches)
+                    {formatNumber(result.skipped)} trips
                   </span>
                 </div>
               )}
@@ -246,7 +260,40 @@ export function TripImportResultDialog({
             </Collapsible>
           )}
 
-          {/* Skipped Trips Collapsible */}
+          {/* Skipped In-Batch Trips Collapsible */}
+          {result.skippedInBatch > 0 && result.duplicateInBatchTripIds.length > 0 && (
+            <Collapsible open={showSkippedInBatch} onOpenChange={setShowSkippedInBatch}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-start gap-2 text-sm text-amber-600">
+                  {showSkippedInBatch ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  Show skipped (already in batch) ({result.skippedInBatch})
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ScrollArea className="h-32 rounded-lg border bg-amber-50/50 p-2">
+                  <div className="space-y-1">
+                    {result.duplicateInBatchTripIds.map((tripId) => (
+                      <div
+                        key={tripId}
+                        className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-muted"
+                      >
+                        <span className="font-mono text-xs">{tripId}</span>
+                        <span className="text-xs text-amber-600">
+                          already in this batch
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Skipped Other-Batch Trips Collapsible */}
           {result.skipped > 0 && result.duplicateTripIds.length > 0 && (
             <Collapsible open={showSkipped} onOpenChange={setShowSkipped}>
               <CollapsibleTrigger asChild>
@@ -256,7 +303,7 @@ export function TripImportResultDialog({
                   ) : (
                     <ChevronRight className="h-4 w-4" />
                   )}
-                  Show skipped trips ({result.skipped})
+                  Show skipped (other batches) ({result.skipped})
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent>

@@ -62,6 +62,7 @@ export default function TripBatchDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [showTripsImport, setShowTripsImport] = useState(false);
+  const [showAddTrips, setShowAddTrips] = useState(false);
   const [showInvoiceImport, setShowInvoiceImport] = useState(false);
 
   // Fetch batch details
@@ -183,6 +184,7 @@ export default function TripBatchDetailPage() {
   const handleImportSuccess = useCallback(() => {
     invalidateAll();
     setShowTripsImport(false);
+    setShowAddTrips(false);
     setShowInvoiceImport(false);
   }, [invalidateAll]);
 
@@ -209,6 +211,7 @@ export default function TripBatchDetailPage() {
           batch={null}
           loading={true}
           onImportTrips={() => {}}
+          onAddTrips={() => {}}
           onImportInvoice={() => {}}
         />
 
@@ -302,6 +305,7 @@ export default function TripBatchDetailPage() {
       <TripBatchImportSection
         batch={batch}
         onImportTrips={() => setShowTripsImport(true)}
+        onAddTrips={() => setShowAddTrips(true)}
         onImportInvoice={() => setShowInvoiceImport(true)}
       />
 
@@ -398,13 +402,23 @@ export default function TripBatchDetailPage() {
         onSuccess={handleDeleteConfirm}
       />
 
-      {/* Trips Import Modal */}
+      {/* Trips Import Modal (Replace) */}
       <TripsImportModal
         open={showTripsImport}
         onOpenChange={setShowTripsImport}
         onSuccess={handleImportSuccess}
         batchId={batchId}
         batchName={batch.name}
+      />
+
+      {/* Trips Import Modal (Append) */}
+      <TripsImportModal
+        open={showAddTrips}
+        onOpenChange={setShowAddTrips}
+        onSuccess={handleImportSuccess}
+        batchId={batchId}
+        batchName={batch.name}
+        mode="APPEND"
       />
 
       {/* Invoice Import Modal */}

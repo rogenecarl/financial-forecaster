@@ -336,6 +336,8 @@ export interface TripImportResult {
   replaced: number; // How many trips were replaced (deleted before import)
   skipped: number; // Skipped because they exist in OTHER batches
   duplicateTripIds: string[];
+  skippedInBatch: number; // Duplicates in CURRENT batch (APPEND mode)
+  duplicateInBatchTripIds: string[]; // Their trip IDs
   batchId: string;
   // Projection snapshot for this import
   projectedTours: number;
@@ -438,7 +440,8 @@ function createLoadData(tripDbId: string, load: ImportTrip["loads"][0]) {
 export async function importTripsToBatch(
   batchId: string,
   trips: ImportTrip[],
-  fileHash?: string
+  fileHash?: string,
+  mode: "REPLACE" | "APPEND" = "REPLACE"
 ): Promise<ActionResponse<TripImportResult>> {
   try {
     const session = await requireAuth();
@@ -484,30 +487,46 @@ export async function importTripsToBatch(
       where: { batchId },
     });
 
-    // DELETE all existing trips in this batch first (REPLACE behavior)
-    // TripLoad will be cascade deleted due to onDelete: Cascade in schema
-    if (existingTripsInBatch > 0) {
+    // REPLACE mode: DELETE all existing trips first
+    // APPEND mode: Skip deletion, keep existing trips
+    if (mode === "REPLACE" && existingTripsInBatch > 0) {
       await prisma.trip.deleteMany({
         where: { batchId },
       });
     }
 
-    // Check for duplicate tripIds in OTHER batches (not this one)
+    // Check for duplicate tripIds in OTHER batches
     const tripIds = trips.map((t) => t.tripId);
     const existingTripsInOtherBatches = await prisma.trip.findMany({
       where: {
         userId,
         tripId: { in: tripIds },
-        batchId: { not: batchId }, // Exclude this batch (already cleared)
+        batchId: { not: batchId },
       },
       select: { id: true, tripId: true, batch: { select: { name: true } } },
     });
 
     const existingTripIdsInOtherBatches = new Set(existingTripsInOtherBatches.map((t) => t.tripId));
 
-    // Separate trips that can be imported from those that exist in other batches
-    const tripsToImport = trips.filter((t) => !existingTripIdsInOtherBatches.has(t.tripId));
+    // APPEND mode: also check for duplicate tripIds in THIS batch
+    let existingTripIdsInThisBatch = new Set<string>();
+    if (mode === "APPEND" && existingTripsInBatch > 0) {
+      const tripsInThisBatch = await prisma.trip.findMany({
+        where: {
+          batchId,
+          tripId: { in: tripIds },
+        },
+        select: { tripId: true },
+      });
+      existingTripIdsInThisBatch = new Set(tripsInThisBatch.map((t) => t.tripId));
+    }
+
+    // Separate trips: filter out other-batch duplicates AND in-batch duplicates (APPEND)
+    const tripsToImport = trips.filter(
+      (t) => !existingTripIdsInOtherBatches.has(t.tripId) && !existingTripIdsInThisBatch.has(t.tripId)
+    );
     const duplicateTrips = trips.filter((t) => existingTripIdsInOtherBatches.has(t.tripId));
+    const duplicateInBatchTrips = trips.filter((t) => existingTripIdsInThisBatch.has(t.tripId));
 
     // Calculate projections from trips to import (excluding canceled)
     const { DTR_RATE, TRIP_ACCESSORIAL_RATE } = FORECASTING_CONSTANTS;
@@ -570,22 +589,58 @@ export async function importTripsToBatch(
     }
 
     // Calculate final batch statistics
-    const totalProjectedTours = activeTripsToImport.length;
-    const totalProjectedLoads = activeTripsToImport.reduce((sum, t) => sum + t.projectedLoads, 0);
-    const totalProjectedTourPay = totalProjectedTours * DTR_RATE;
-    const totalProjectedAccessorials = totalProjectedTours * TRIP_ACCESSORIAL_RATE;
-    const totalProjectedTotal = totalProjectedTourPay + totalProjectedAccessorials;
-    const totalLoadCount = activeLoadCount;
-    const totalCanceledCount = canceledTripsToImport.length;
-    const totalCompletedCount = tripsToImport.filter((t) => t.tripStage === "COMPLETED").length;
+    // APPEND mode: query actual counts from DB (existing + new trips)
+    // REPLACE mode: use only imported trips (current behavior)
+    let totalTripCount: number;
+    let totalLoadCount: number;
+    let totalCanceledCount: number;
+    let totalCompletedCount: number;
+    let totalProjectedTours: number;
+    let totalProjectedLoads: number;
+    let totalProjectedTourPay: number;
+    let totalProjectedAccessorials: number;
+    let totalProjectedTotal: number;
+
+    if (mode === "APPEND") {
+      // Query all trips in this batch from DB for accurate totals
+      const allBatchTrips = await prisma.trip.findMany({
+        where: { batchId },
+        select: {
+          tripStage: true,
+          projectedLoads: true,
+          _count: { select: { loads: true } },
+        },
+      });
+
+      const allActiveTrips = allBatchTrips.filter((t) => t.tripStage !== "CANCELED");
+      totalTripCount = allBatchTrips.length;
+      totalLoadCount = allActiveTrips.reduce((sum, t) => sum + t._count.loads, 0);
+      totalCanceledCount = allBatchTrips.filter((t) => t.tripStage === "CANCELED").length;
+      totalCompletedCount = allBatchTrips.filter((t) => t.tripStage === "COMPLETED").length;
+      totalProjectedTours = allActiveTrips.length;
+      totalProjectedLoads = allActiveTrips.reduce((sum, t) => sum + t.projectedLoads, 0);
+      totalProjectedTourPay = totalProjectedTours * DTR_RATE;
+      totalProjectedAccessorials = totalProjectedTours * TRIP_ACCESSORIAL_RATE;
+      totalProjectedTotal = totalProjectedTourPay + totalProjectedAccessorials;
+    } else {
+      totalTripCount = tripsToImport.length;
+      totalLoadCount = activeLoadCount;
+      totalCanceledCount = canceledTripsToImport.length;
+      totalCompletedCount = tripsToImport.filter((t) => t.tripStage === "COMPLETED").length;
+      totalProjectedTours = activeTripsToImport.length;
+      totalProjectedLoads = activeTripsToImport.reduce((sum, t) => sum + t.projectedLoads, 0);
+      totalProjectedTourPay = totalProjectedTours * DTR_RATE;
+      totalProjectedAccessorials = totalProjectedTours * TRIP_ACCESSORIAL_RATE;
+      totalProjectedTotal = totalProjectedTourPay + totalProjectedAccessorials;
+    }
 
     // Determine new status
     let newStatus: BatchStatus = "UPCOMING";
-    if (tripsToImport.length === 0) {
+    if (totalTripCount === 0) {
       newStatus = "EMPTY";
-    } else if (totalCompletedCount > 0 && totalCompletedCount < activeTripsToImport.length) {
+    } else if (totalCompletedCount > 0 && totalCompletedCount < totalProjectedTours) {
       newStatus = "IN_PROGRESS";
-    } else if (totalCompletedCount === activeTripsToImport.length && activeTripsToImport.length > 0) {
+    } else if (totalCompletedCount === totalProjectedTours && totalProjectedTours > 0) {
       newStatus = "COMPLETED";
     }
 
@@ -595,7 +650,7 @@ export async function importTripsToBatch(
         tripFileHash: fileHash || null,
         tripsImportedAt: new Date(),
         status: newStatus,
-        tripCount: tripsToImport.length,
+        tripCount: totalTripCount,
         loadCount: totalLoadCount,
         canceledCount: totalCanceledCount,
         completedCount: totalCompletedCount,
@@ -611,9 +666,11 @@ export async function importTripsToBatch(
       success: true,
       data: {
         imported: tripsToImport.length,
-        replaced: existingTripsInBatch, // How many trips were replaced
-        skipped: duplicateTrips.length, // Skipped because they exist in OTHER batches
+        replaced: mode === "REPLACE" ? existingTripsInBatch : 0,
+        skipped: duplicateTrips.length,
         duplicateTripIds: duplicateTrips.map((t) => t.tripId),
+        skippedInBatch: duplicateInBatchTrips.length,
+        duplicateInBatchTripIds: duplicateInBatchTrips.map((t) => t.tripId),
         batchId,
         projectedTours,
         projectedLoads,

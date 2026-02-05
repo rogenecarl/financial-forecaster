@@ -35,6 +35,7 @@ interface TripsImportModalProps {
   onSuccess: () => void;
   batchId?: string;
   batchName?: string;
+  mode?: "REPLACE" | "APPEND";
 }
 
 type ImportStage = "select" | "parsing" | "importing" | "complete" | "error";
@@ -52,6 +53,7 @@ export function TripsImportModal({
   onSuccess,
   batchId,
   batchName,
+  mode = "REPLACE",
 }: TripsImportModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [stage, setStage] = useState<ImportStage>("select");
@@ -129,7 +131,7 @@ export function TripsImportModal({
     setStage("importing");
     setProgress(70);
 
-    const result = await importTripsToBatch(batchId, parsed.trips, fileHash);
+    const result = await importTripsToBatch(batchId, parsed.trips, fileHash, mode);
     setProgress(100);
 
     if (result.success && result.data) {
@@ -149,7 +151,7 @@ export function TripsImportModal({
         setStage("error");
       }
     }
-  }, [batchId]);
+  }, [batchId, mode]);
 
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     // Validate file type
@@ -244,9 +246,11 @@ export function TripsImportModal({
       <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Import Trips</DialogTitle>
+            <DialogTitle>{mode === "APPEND" ? "Add Trips" : "Import Trips"}</DialogTitle>
             <DialogDescription>
-              Upload an Amazon Scheduler CSV file
+              {mode === "APPEND"
+                ? "New trips will be added to existing ones. Duplicates will be skipped."
+                : "Upload an Amazon Scheduler CSV file. This will replace all existing trips."}
               {batchName && (
                 <span className="block mt-1 text-foreground font-medium">
                   to &quot;{batchName}&quot;
@@ -373,6 +377,7 @@ export function TripsImportModal({
           parseStats={parseResult.stats}
           warnings={parseResult.warnings}
           onClose={handleResultClose}
+          mode={mode}
         />
       )}
     </>

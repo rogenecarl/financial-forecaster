@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Clock,
   Lock,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TripBatchSummary } from "@/actions/forecasting/trip-batches";
@@ -20,6 +21,7 @@ interface TripBatchImportSectionProps {
   batch: TripBatchSummary | null;
   loading?: boolean;
   onImportTrips: () => void;
+  onAddTrips?: () => void;
   onImportInvoice: () => void;
 }
 
@@ -27,6 +29,7 @@ export function TripBatchImportSection({
   batch,
   loading = false,
   onImportTrips,
+  onAddTrips,
   onImportInvoice,
 }: TripBatchImportSectionProps) {
   if (loading) {
@@ -59,8 +62,8 @@ export function TripBatchImportSection({
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -116,10 +119,18 @@ export function TripBatchImportSection({
                 Locked
               </Button>
             ) : hasTrips ? (
-              <Button variant="outline" size="sm" onClick={onImportTrips}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Re-import
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={onImportTrips}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Re-import
+                </Button>
+                {onAddTrips && (
+                  <Button variant="outline" size="sm" onClick={onAddTrips}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Trip
+                  </Button>
+                )}
+              </div>
             ) : (
               <Button size="sm" onClick={onImportTrips}>
                 <Upload className="mr-2 h-4 w-4" />

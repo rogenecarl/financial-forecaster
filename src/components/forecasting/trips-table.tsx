@@ -557,18 +557,13 @@ export function TripsTable({ trips, loading, onUpdate, selectedIds, onSelectionC
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
                       <TableCell colSpan={12} className="p-0">
                         <div className="px-6 py-4 space-y-3">
-                          {filterLoadsWithUniqueDeliveries(trip.loads).map((load) => (
+                          {trip.loads.map((load) => (
                             <LoadCard
                               key={load.id}
                               load={load}
                               formatTime={formatTime}
                             />
                           ))}
-                          {filterLoadsWithUniqueDeliveries(trip.loads).length === 0 && (
-                            <p className="text-xs text-muted-foreground text-center py-2">
-                              No delivery loads (only warehouse movements)
-                            </p>
-                          )}
 
                           {/* Revenue Summary */}
                           <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">

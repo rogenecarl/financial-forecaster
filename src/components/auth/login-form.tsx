@@ -16,10 +16,12 @@ import { authClient } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
 import { getRoleRedirect } from "@/config/auth"
 import type { Role } from "@/types/auth"
+import { useSession } from "@/components/providers/session-provider"
 
 export function LoginInForm() {
     const [isLoading, setIsLoading] = useState(false)
     const router = useRouter()
+    const { refetch } = useSession()
 
     const form = useForm<z.infer<typeof SignInSchema>>({
         resolver: zodResolver(SignInSchema),
@@ -51,9 +53,9 @@ export function LoginInForm() {
                 const user = data.user as { role?: Role };
                 const redirectPath = getRoleRedirect(user.role);
 
-                // Refresh server components and navigate
-                router.refresh();
-                router.push(redirectPath);
+                // Update session state immediately, then navigate
+                await refetch();
+                router.replace(redirectPath);
             }
         } catch (error) {
             toast.error("An unexpected error occurred", { id: toastId });

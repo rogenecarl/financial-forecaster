@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore, useCallback } from "react";
+import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
 import { cn } from "@/lib/utils";
@@ -9,38 +9,12 @@ interface DashboardShellProps {
   children: React.ReactNode;
 }
 
-const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
-
-// Custom hook for localStorage with SSR support
-function useLocalStorage(key: string, defaultValue: boolean) {
-  const subscribe = useCallback((callback: () => void) => {
-    window.addEventListener("storage", callback);
-    return () => window.removeEventListener("storage", callback);
-  }, []);
-
-  const getSnapshot = useCallback(() => {
-    const stored = localStorage.getItem(key);
-    return stored !== null ? stored === "true" : defaultValue;
-  }, [key, defaultValue]);
-
-  const getServerSnapshot = useCallback(() => defaultValue, [defaultValue]);
-
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-}
-
 export function DashboardShell({ children }: DashboardShellProps) {
-  const storedCollapsed = useLocalStorage(SIDEBAR_COLLAPSED_KEY, false);
-  const [isCollapsed, setIsCollapsed] = useState(storedCollapsed);
-
-  // Save collapsed state to localStorage
-  const handleCollapsedChange = (collapsed: boolean) => {
-    setIsCollapsed(collapsed);
-    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
-  };
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar isCollapsed={isCollapsed} onCollapsedChange={handleCollapsedChange} />
+      <Sidebar isCollapsed={isCollapsed} onCollapsedChange={setIsCollapsed} />
       <div
         className={cn(
           "flex-1 flex flex-col transition-all duration-300",

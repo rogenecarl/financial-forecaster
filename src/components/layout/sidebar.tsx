@@ -157,19 +157,23 @@ export function Sidebar({ isCollapsed, onCollapsedChange }: SidebarProps) {
         )}
       >
         {/* Header */}
-        <div className="flex h-16 items-center justify-between border-b border-border px-4">
-          <Link
-            href="/dashboard"
-            className={cn(
-              "flex items-center gap-2 transition-opacity",
-              isCollapsed && "opacity-0 pointer-events-none"
-            )}
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
-              <DollarSign className="h-4 w-4" />
-            </div>
-            <span className="font-semibold tracking-tight">Financial Forecaster</span>
-          </Link>
+        <div
+          className={cn(
+            "flex h-16 items-center border-b border-border",
+            isCollapsed ? "justify-center px-2" : "justify-between px-4"
+          )}
+        >
+          {!isCollapsed && (
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-2"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
+                <DollarSign className="h-4 w-4" />
+              </div>
+              <span className="font-semibold tracking-tight">Financial Forecaster</span>
+            </Link>
+          )}
           <Button
             variant="ghost"
             size="icon-sm"

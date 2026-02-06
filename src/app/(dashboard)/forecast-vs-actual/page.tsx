@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUpRight,
   ArrowDownRight,
@@ -30,8 +29,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { getTripBatches, type TripBatchSummary } from "@/actions/forecasting/trip-batches";
-import { forecastingKeys } from "@/hooks";
+import type { TripBatchSummary } from "@/actions/forecasting/trip-batches";
+import { useTripBatches } from "@/hooks";
 import { cn } from "@/lib/utils";
 
 type FilterStatus = "all" | "INVOICED";
@@ -40,17 +39,9 @@ export default function ForecastVsActualPage() {
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("INVOICED");
 
   // Fetch all batches
-  const { data: batches = [], isLoading } = useQuery({
-    queryKey: [...forecastingKeys.tripBatchesList(), { status: statusFilter === "all" ? undefined : statusFilter }],
-    queryFn: async () => {
-      const result = await getTripBatches(
-        statusFilter === "all" ? undefined : { status: "INVOICED" }
-      );
-      if (!result.success) throw new Error(result.error);
-      return result.data;
-    },
-    staleTime: 30 * 1000,
-  });
+  const { batches, isLoading } = useTripBatches(
+    statusFilter === "all" ? undefined : { status: "INVOICED" }
+  );
 
   // Calculate aggregate stats for invoiced batches
   const aggregateStats = useMemo(() => {

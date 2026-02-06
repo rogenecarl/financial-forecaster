@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,20 +22,14 @@ import { QuarterSelector } from "@/components/reports/quarter-selector";
 import { DateRangeSelector } from "@/components/reports/date-range-selector";
 import { CategorySelector } from "@/components/reports/category-selector";
 
+import type { WeekOption, MonthOption, QuarterOption } from "@/actions/reports/report-data";
 import {
-  getPLReportData,
-  getTransactionExportData,
-  getForecastExportData,
-  getCPAPackageData,
-  type WeekOption,
-  type MonthOption,
-  type QuarterOption,
-} from "@/actions/reports/report-data";
-
-import { generatePLPdf } from "@/lib/export/pdf-export";
-import { generateForecastExcel } from "@/lib/export/excel-export";
-import { generateTransactionsCsv } from "@/lib/export/csv-export";
-import { generateCPAPackageZip } from "@/lib/export/zip-export";
+  useGenerateWeeklyPL,
+  useGenerateMonthlyPL,
+  useExportTransactions,
+  useExportForecast,
+  useGenerateCPAPackage,
+} from "@/hooks";
 
 // ============================================
 // TYPES
@@ -67,33 +61,30 @@ export default function ReportsPage() {
     endDate: Date | null;
   }>({ startDate: null, endDate: null });
 
-  // Loading states
-  const [generatingWeeklyPL, setGeneratingWeeklyPL] = useState(false);
-  const [generatingMonthlyPL, setGeneratingMonthlyPL] = useState(false);
-  const [generatingTransactions, setGeneratingTransactions] = useState(false);
-  const [generatingForecast, setGeneratingForecast] = useState(false);
-  const [generatingCPA, setGeneratingCPA] = useState(false);
+  // Mutation hooks
+  const weeklyPL = useGenerateWeeklyPL();
+  const monthlyPL = useGenerateMonthlyPL();
+  const transactionsExport = useExportTransactions();
+  const forecastExport = useExportForecast();
+  const cpaPackage = useGenerateCPAPackage();
 
   // Recent exports (stored in localStorage)
-  const [recentExports, setRecentExports] = useState<RecentExport[]>([]);
-
-  // Load recent exports from localStorage
-  useEffect(() => {
+  const [recentExports, setRecentExports] = useState<RecentExport[]>(() => {
+    if (typeof window === "undefined") return [];
     const stored = localStorage.getItem("recentExports");
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        setRecentExports(
-          parsed.map((e: RecentExport) => ({
-            ...e,
-            generatedAt: new Date(e.generatedAt),
-          }))
-        );
+        return parsed.map((e: RecentExport) => ({
+          ...e,
+          generatedAt: new Date(e.generatedAt),
+        }));
       } catch {
-        // Ignore invalid stored data
+        return [];
       }
     }
-  }, []);
+    return [];
+  });
 
   // Add to recent exports
   const addRecentExport = useCallback(
@@ -118,149 +109,59 @@ export default function ReportsPage() {
   // HANDLERS
   // ============================================
 
-  const handleGenerateWeeklyPL = async () => {
+  const handleGenerateWeeklyPL = () => {
     if (!selectedWeek) {
       toast.error("Please select a week");
       return;
     }
-
-    setGeneratingWeeklyPL(true);
-    try {
-      const result = await getPLReportData(
-        "week",
-        new Date(selectedWeek.weekStart),
-        new Date(selectedWeek.weekEnd)
-      );
-
-      if (!result.success) {
-        toast.error(result.error || "Failed to generate report");
-        return;
-      }
-
-      generatePLPdf(result.data);
-      addRecentExport(`PL_Week_${selectedWeek.label}.pdf`, "pdf");
-      toast.success("Weekly P&L Report generated successfully");
-    } catch (error) {
-      console.error("Error generating weekly P&L:", error);
-      toast.error("Failed to generate report");
-    } finally {
-      setGeneratingWeeklyPL(false);
-    }
+    weeklyPL.generate(selectedWeek, {
+      onSuccess: () => addRecentExport(`PL_Week_${selectedWeek.label}.pdf`, "pdf"),
+    });
   };
 
-  const handleGenerateMonthlyPL = async () => {
+  const handleGenerateMonthlyPL = () => {
     if (!selectedMonth) {
       toast.error("Please select a month");
       return;
     }
-
-    setGeneratingMonthlyPL(true);
-    try {
-      const result = await getPLReportData(
-        "month",
-        new Date(selectedMonth.monthStart),
-        new Date(selectedMonth.monthEnd)
-      );
-
-      if (!result.success) {
-        toast.error(result.error || "Failed to generate report");
-        return;
-      }
-
-      generatePLPdf(result.data);
-      addRecentExport(`PL_${selectedMonth.label}.pdf`, "pdf");
-      toast.success("Monthly P&L Report generated successfully");
-    } catch (error) {
-      console.error("Error generating monthly P&L:", error);
-      toast.error("Failed to generate report");
-    } finally {
-      setGeneratingMonthlyPL(false);
-    }
+    monthlyPL.generate(selectedMonth, {
+      onSuccess: () => addRecentExport(`PL_${selectedMonth.label}.pdf`, "pdf"),
+    });
   };
 
-  const handleExportTransactions = async () => {
-    setGeneratingTransactions(true);
-    try {
-      const result = await getTransactionExportData(
-        transactionDateRange.startDate || undefined,
-        transactionDateRange.endDate || undefined,
-        selectedCategories.length > 0 ? selectedCategories : undefined
-      );
-
-      if (!result.success) {
-        toast.error(result.error || "Failed to export transactions");
-        return;
+  const handleExportTransactions = () => {
+    transactionsExport.exportData(
+      {
+        startDate: transactionDateRange.startDate || undefined,
+        endDate: transactionDateRange.endDate || undefined,
+        categories: selectedCategories.length > 0 ? selectedCategories : undefined,
+      },
+      {
+        onSuccess: () => addRecentExport(`Transactions_Export.csv`, "csv"),
       }
-
-      if (result.data.transactions.length === 0) {
-        toast.error("No transactions found for the selected filters");
-        return;
-      }
-
-      generateTransactionsCsv(result.data);
-      addRecentExport(`Transactions_Export.csv`, "csv");
-      toast.success(`Exported ${result.data.totalCount} transactions`);
-    } catch (error) {
-      console.error("Error exporting transactions:", error);
-      toast.error("Failed to export transactions");
-    } finally {
-      setGeneratingTransactions(false);
-    }
+    );
   };
 
-  const handleExportForecast = async () => {
-    setGeneratingForecast(true);
-    try {
-      const result = await getForecastExportData(
-        forecastDateRange.startDate || undefined,
-        forecastDateRange.endDate || undefined
-      );
-
-      if (!result.success) {
-        toast.error(result.error || "Failed to export forecast data");
-        return;
+  const handleExportForecast = () => {
+    forecastExport.exportData(
+      {
+        startDate: forecastDateRange.startDate || undefined,
+        endDate: forecastDateRange.endDate || undefined,
+      },
+      {
+        onSuccess: () => addRecentExport(`Forecast_Summary.xlsx`, "xlsx"),
       }
-
-      if (result.data.batches.length === 0) {
-        toast.error("No forecast data found for the selected period");
-        return;
-      }
-
-      generateForecastExcel(result.data);
-      addRecentExport(`Forecast_Summary.xlsx`, "xlsx");
-      toast.success(`Exported ${result.data.batches.length} batches of forecast data`);
-    } catch (error) {
-      console.error("Error exporting forecast:", error);
-      toast.error("Failed to export forecast data");
-    } finally {
-      setGeneratingForecast(false);
-    }
+    );
   };
 
-  const handleGenerateCPAPackage = async () => {
+  const handleGenerateCPAPackage = () => {
     if (!selectedQuarter) {
       toast.error("Please select a quarter");
       return;
     }
-
-    setGeneratingCPA(true);
-    try {
-      const result = await getCPAPackageData(selectedQuarter);
-
-      if (!result.success) {
-        toast.error(result.error || "Failed to generate CPA package");
-        return;
-      }
-
-      await generateCPAPackageZip(result.data);
-      addRecentExport(`CPA_Package_${selectedQuarter.label}.zip`, "zip");
-      toast.success("CPA Package generated successfully");
-    } catch (error) {
-      console.error("Error generating CPA package:", error);
-      toast.error("Failed to generate CPA package");
-    } finally {
-      setGeneratingCPA(false);
-    }
+    cpaPackage.generate(selectedQuarter, {
+      onSuccess: () => addRecentExport(`CPA_Package_${selectedQuarter.label}.zip`, "zip"),
+    });
   };
 
   // ============================================
@@ -296,14 +197,14 @@ export default function ReportsPage() {
                 <WeekSelector
                   value={selectedWeek}
                   onChange={setSelectedWeek}
-                  disabled={generatingWeeklyPL}
+                  disabled={weeklyPL.isPending}
                 />
               </div>
               <Button
                 onClick={handleGenerateWeeklyPL}
-                disabled={!selectedWeek || generatingWeeklyPL}
+                disabled={!selectedWeek || weeklyPL.isPending}
               >
-                {generatingWeeklyPL ? (
+                {weeklyPL.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Generating...
@@ -334,14 +235,14 @@ export default function ReportsPage() {
                 <MonthSelector
                   value={selectedMonth}
                   onChange={setSelectedMonth}
-                  disabled={generatingMonthlyPL}
+                  disabled={monthlyPL.isPending}
                 />
               </div>
               <Button
                 onClick={handleGenerateMonthlyPL}
-                disabled={!selectedMonth || generatingMonthlyPL}
+                disabled={!selectedMonth || monthlyPL.isPending}
               >
-                {generatingMonthlyPL ? (
+                {monthlyPL.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Generating...
@@ -372,7 +273,7 @@ export default function ReportsPage() {
                 <DateRangeSelector
                   value={transactionDateRange}
                   onChange={setTransactionDateRange}
-                  disabled={generatingTransactions}
+                  disabled={transactionsExport.isPending}
                 />
               </div>
               <div>
@@ -382,16 +283,16 @@ export default function ReportsPage() {
                 <CategorySelector
                   value={selectedCategories}
                   onChange={setSelectedCategories}
-                  disabled={generatingTransactions}
+                  disabled={transactionsExport.isPending}
                 />
               </div>
             </div>
             <Button
               onClick={handleExportTransactions}
-              disabled={generatingTransactions}
+              disabled={transactionsExport.isPending}
               className="w-full sm:w-auto"
             >
-              {generatingTransactions ? (
+              {transactionsExport.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Exporting...
@@ -420,15 +321,15 @@ export default function ReportsPage() {
               <DateRangeSelector
                 value={forecastDateRange}
                 onChange={setForecastDateRange}
-                disabled={generatingForecast}
+                disabled={forecastExport.isPending}
               />
             </div>
             <Button
               onClick={handleExportForecast}
-              disabled={generatingForecast}
+              disabled={forecastExport.isPending}
               className="w-full sm:w-auto"
             >
-              {generatingForecast ? (
+              {forecastExport.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Exporting...
@@ -459,15 +360,15 @@ export default function ReportsPage() {
             <QuarterSelector
               value={selectedQuarter}
               onChange={setSelectedQuarter}
-              disabled={generatingCPA}
+              disabled={cpaPackage.isPending}
             />
           </div>
           <Button
             onClick={handleGenerateCPAPackage}
-            disabled={!selectedQuarter || generatingCPA}
+            disabled={!selectedQuarter || cpaPackage.isPending}
             size="lg"
           >
-            {generatingCPA ? (
+            {cpaPackage.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Generating...

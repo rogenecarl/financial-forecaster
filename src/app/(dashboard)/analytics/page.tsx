@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
 import { BarChart3, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,10 +16,7 @@ import {
   HistoricalComparisonCard,
   YearlySummaryCard,
 } from "@/components/analytics";
-import {
-  getAnalyticsData,
-  getHistoricalComparison,
-} from "@/actions/analytics";
+import { useAnalyticsData, useHistoricalComparison } from "@/hooks";
 
 export default function AnalyticsPage() {
   const currentYear = new Date().getFullYear();
@@ -29,13 +25,10 @@ export default function AnalyticsPage() {
 
   // Fetch analytics data
   const {
-    data: analyticsResult,
+    data: analyticsData,
     isLoading: analyticsLoading,
     refetch: refetchAnalytics,
-  } = useQuery({
-    queryKey: ["analytics", selectedYear],
-    queryFn: () => getAnalyticsData(selectedYear),
-  });
+  } = useAnalyticsData(selectedYear);
 
   // Compute quarter number for comparison
   const quarterNumber = useMemo(() => {
@@ -45,15 +38,9 @@ export default function AnalyticsPage() {
 
   // Fetch historical comparison
   const {
-    data: comparisonResult,
+    data: comparisonData,
     isLoading: comparisonLoading,
-  } = useQuery({
-    queryKey: ["historicalComparison", selectedYear, quarterNumber],
-    queryFn: () => getHistoricalComparison(selectedYear, undefined, quarterNumber),
-  });
-
-  const analyticsData = analyticsResult?.success ? analyticsResult.data : null;
-  const comparisonData = comparisonResult?.success ? comparisonResult.data : null;
+  } = useHistoricalComparison(selectedYear, { quarter: quarterNumber });
 
   // Derive available years from data
   const availableYears = analyticsData?.availableYears ?? [currentYear];

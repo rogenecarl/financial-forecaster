@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Truck } from "lucide-react";
@@ -30,16 +30,16 @@ import {
   TripStatusFilter,
   type TripStatusValue,
 } from "@/components/filters";
-import { getTripBatch } from "@/actions/forecasting/trip-batches";
 import { getInvoiceLineItemsForBatch } from "@/actions/forecasting/amazon-invoices";
-import {
-  getTripsWithLoads,
-  bulkDeleteTrips,
-  type TripsFilterParams,
-} from "@/actions/forecasting/trips";
-import { getTripStatusCounts } from "@/actions/filters";
+import { bulkDeleteTrips } from "@/actions/forecasting/trips";
 import { toast } from "sonner";
-import { forecastingKeys } from "@/hooks";
+import {
+  useTripBatch,
+  useTripBatchTrips,
+  useTripStatusCounts,
+  forecastingKeys,
+  filterKeys,
+} from "@/hooks";
 
 export default function TripBatchDetailPage() {
   const router = useRouter();
@@ -55,55 +55,19 @@ export default function TripBatchDetailPage() {
   const [showInvoiceImport, setShowInvoiceImport] = useState(false);
 
   // Fetch batch details
-  const { data: batch, isLoading: batchLoading } = useQuery({
-    queryKey: forecastingKeys.tripBatchDetail(batchId),
-    queryFn: async () => {
-      const result = await getTripBatch(batchId);
-      if (!result.success) throw new Error(result.error);
-      return result.data;
-    },
-    staleTime: 30 * 1000,
-  });
-
-  // Build trip filter params
-  const tripFilterParams = useMemo<TripsFilterParams>(() => {
-    const params: TripsFilterParams = { batchId };
-    if (statusFilter !== "all") {
-      params.tripStage = statusFilter;
-    }
-    return params;
-  }, [batchId, statusFilter]);
+  const { batch, isLoading: batchLoading, invalidate: invalidateBatch } = useTripBatch(batchId);
 
   // Fetch trips for this batch
-  const { data: tripsData, isLoading: tripsLoading } = useQuery({
-    queryKey: [...forecastingKeys.tripsList(tripFilterParams), "withLoads"],
-    queryFn: async () => {
-      const result = await getTripsWithLoads(tripFilterParams);
-      if (!result.success) throw new Error(result.error);
-      return result.data;
-    },
-    staleTime: 30 * 1000,
-  });
-
-  const trips = tripsData?.trips ?? [];
-  const stats = tripsData?.stats ?? {
-    totalTrips: 0,
-    projectedLoads: 0,
-    actualLoads: 0,
-    updatedCount: 0,
-    completion: 0,
-  };
+  const tripStage = statusFilter !== "all" ? statusFilter : undefined;
+  const {
+    trips,
+    stats,
+    isLoading: tripsLoading,
+    invalidate: invalidateTrips,
+  } = useTripBatchTrips(batchId, tripStage);
 
   // Fetch status counts for filters
-  const { data: statusCounts = [] } = useQuery({
-    queryKey: ["filters", "statusCounts", batchId],
-    queryFn: async () => {
-      const result = await getTripStatusCounts(batchId);
-      if (!result.success) throw new Error(result.error);
-      return result.data;
-    },
-    staleTime: 30 * 1000,
-  });
+  const { statusCounts } = useTripStatusCounts(batchId);
 
   // Fetch invoice line items (only when batch is invoiced)
   const { data: invoiceLineItems = [], isLoading: invoiceLoading } = useQuery({
@@ -138,14 +102,12 @@ export default function TripBatchDetailPage() {
 
   // Invalidation helper
   const invalidateAll = useCallback(() => {
+    invalidateBatch();
+    invalidateTrips();
     queryClient.invalidateQueries({
-      queryKey: forecastingKeys.tripBatchDetail(batchId),
+      queryKey: filterKeys.statusCounts(batchId),
     });
-    queryClient.invalidateQueries({ queryKey: forecastingKeys.trips });
-    queryClient.invalidateQueries({
-      queryKey: ["filters", "statusCounts", batchId],
-    });
-  }, [queryClient, batchId]);
+  }, [invalidateBatch, invalidateTrips, queryClient, batchId]);
 
   // Handlers
   const handleBack = useCallback(() => {

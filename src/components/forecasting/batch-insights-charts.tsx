@@ -44,8 +44,8 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -248,12 +248,7 @@ function PerTripRevenueChart({ trips }: { trips: TripWithLoadsForTable[] }) {
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 mt-3 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-[3px] bg-blue-500" />
-            Projected (
-            {formatCurrency(
-              FORECASTING_CONSTANTS.DTR_RATE +
-                FORECASTING_CONSTANTS.TRIP_ACCESSORIAL_RATE
-            )}
-            /trip)
+            Projected
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-[3px] bg-emerald-500" />

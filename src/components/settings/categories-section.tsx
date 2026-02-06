@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -30,7 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react";
-import { getCategories, deleteCategory } from "@/actions/settings";
+import { useCategories, useDeleteCategory } from "@/hooks";
 import { CategoryForm } from "./category-form";
 import type { Category } from "@/lib/generated/prisma/client";
 
@@ -48,37 +46,13 @@ const TYPE_LABELS: Record<CategoryType, string> = {
 const TYPE_ORDER: CategoryType[] = ["REVENUE", "CONTRA_REVENUE", "COGS", "OPERATING_EXPENSE", "EQUITY", "UNCATEGORIZED"];
 
 export function CategoriesSection() {
-  const queryClient = useQueryClient();
   const [editCategory, setEditCategory] = useState<Category | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
   const [formOpen, setFormOpen] = useState(false);
 
-  const { data: categoriesResult, isLoading } = useQuery({
-    queryKey: ["categories"],
-    queryFn: () => getCategories(),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteCategory(id),
-    onSuccess: (result) => {
-      if (result.success) {
-        toast.success("Category deleted");
-        queryClient.invalidateQueries({ queryKey: ["categories"] });
-      } else {
-        toast.error(result.error || "Failed to delete category");
-      }
-      setDeleteDialogOpen(false);
-      setCategoryToDelete(null);
-    },
-    onError: () => {
-      toast.error("Failed to delete category");
-      setDeleteDialogOpen(false);
-      setCategoryToDelete(null);
-    },
-  });
-
-  const categories = categoriesResult?.success ? categoriesResult.data : [];
+  const { categories, isLoading } = useCategories();
+  const { deleteCategory: deleteCategoryMutation, isPending: isDeleting } = useDeleteCategory();
 
   // Group categories by type
   const groupedCategories = TYPE_ORDER.reduce(
@@ -256,10 +230,16 @@ export function CategoriesSection() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => categoryToDelete && deleteMutation.mutate(categoryToDelete.id)}
+              onClick={() => {
+                if (categoryToDelete) {
+                  deleteCategoryMutation(categoryToDelete.id);
+                  setDeleteDialogOpen(false);
+                  setCategoryToDelete(null);
+                }
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {isDeleting ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

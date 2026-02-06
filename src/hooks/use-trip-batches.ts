@@ -234,7 +234,7 @@ export function useUpdateTripBatch() {
 }
 
 /**
- * Hook to delete a trip batch
+ * Hook to delete a trip batch with optimistic UI
  */
 export function useDeleteTripBatch() {
   const queryClient = useQueryClient();
@@ -245,13 +245,36 @@ export function useDeleteTripBatch() {
       if (!result.success) throw new Error(result.error);
       return result.data;
     },
-    onSuccess: (data) => {
-      toast.success(`Deleted batch with ${data.deletedTrips} trips`);
+    onMutate: async (batchId) => {
+      // Cancel in-flight list queries
+      await queryClient.cancelQueries({ queryKey: forecastingKeys.tripBatchesList() });
+
+      // Snapshot for rollback
+      const previousBatches = queryClient.getQueriesData<TripBatchSummary[]>({
+        queryKey: forecastingKeys.tripBatchesList(),
+      });
+
+      // Optimistically remove the batch from all list queries
+      queryClient.setQueriesData<TripBatchSummary[]>(
+        { queryKey: forecastingKeys.tripBatchesList() },
+        (old) => old?.filter((b) => b.id !== batchId) ?? []
+      );
+
+      return { previousBatches };
+    },
+    onError: (err, _, context) => {
+      // Roll back optimistic update
+      if (context?.previousBatches) {
+        for (const [queryKey, data] of context.previousBatches) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+      toast.error(err instanceof Error ? err.message : "Failed to delete batch");
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure consistency
       queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatches });
       queryClient.invalidateQueries({ queryKey: forecastingKeys.trips });
-    },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete batch");
     },
   });
 

@@ -50,5 +50,20 @@ export {
   useHistoricalComparison,
   useAvailableYears,
 } from "./use-analytics"
+export { useDashboardData, dashboardKeys, type DashboardData } from "./use-dashboard"
+export {
+  useCategories,
+  useCreateCategory,
+  useUpdateCategory,
+  useDeleteCategory,
+  categoryKeys,
+} from "./use-categories"
+export {
+  useGenerateWeeklyPL,
+  useGenerateMonthlyPL,
+  useExportTransactions,
+  useExportForecast,
+  useGenerateCPAPackage,
+} from "./use-reports"
 // Re-export useSession for direct access if needed
 export { useSession } from "@/components/providers"

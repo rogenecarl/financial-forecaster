@@ -1,5 +1,6 @@
-import { getServerUser } from "@/lib/auth-server";
-import { getDashboardData } from "@/actions/dashboard/dashboard";
+"use client";
+
+import { useAuth, useDashboardData } from "@/hooks";
 import { MetricCard, MetricCardGrid } from "@/components/dashboard/metric-card";
 import { WeeklyForecastWidget } from "@/components/dashboard/weekly-forecast-widget";
 import { NextWeekPreviewCard } from "@/components/dashboard/next-week-preview-card";
@@ -23,16 +24,15 @@ function formatContributionMargin(value: number): string {
   return `$${value.toFixed(0)}/truck/day`;
 }
 
-export default async function DashboardPage() {
-  const user = await getServerUser();
+export default function DashboardPage() {
+  const { user } = useAuth();
   const firstName = user?.name?.split(" ")[0] || "there";
 
-  // Fetch all dashboard data
-  const dashboardResult = await getDashboardData();
-  const dashboardData = dashboardResult.success ? dashboardResult.data : null;
+  const { data: dashboardData, isLoading } = useDashboardData();
 
   const metrics = dashboardData?.metrics;
   const hasMetrics = metrics !== undefined && metrics !== null;
+  const loading = isLoading || !dashboardData;
 
   return (
     <div className="space-y-6">
@@ -63,7 +63,7 @@ export default async function DashboardPage() {
           value={hasMetrics ? formatCurrency(metrics.cashOnHand) : "$0.00"}
           description="Current balance"
           iconName="dollar-sign"
-          loading={!hasMetrics}
+          loading={loading}
         />
         <MetricCard
           title="Weekly Revenue"
@@ -77,7 +77,7 @@ export default async function DashboardPage() {
               : null
           }
           trendValue={hasMetrics ? metrics.revenueChange : null}
-          loading={!hasMetrics}
+          loading={loading}
         />
         <MetricCard
           title="Weekly Profit"
@@ -95,7 +95,7 @@ export default async function DashboardPage() {
               : null
           }
           trendValue={hasMetrics ? metrics.profitChange : null}
-          loading={!hasMetrics}
+          loading={loading}
         />
         <MetricCard
           title="Contribution"
@@ -106,14 +106,14 @@ export default async function DashboardPage() {
           }
           description={hasMetrics ? `${metrics.truckCount} trucks active` : "0 trucks"}
           iconName="truck"
-          loading={!hasMetrics}
+          loading={loading}
         />
       </MetricCardGrid>
 
       {/* Year to Date Summary */}
       <YearToDateSummary
         data={dashboardData?.yearToDate || null}
-        loading={!dashboardData}
+        loading={loading}
       />
 
       {/* Main Content Grid */}
@@ -123,13 +123,13 @@ export default async function DashboardPage() {
           {/* Cash Flow Trend */}
           <CashFlowChart
             data={dashboardData?.cashFlowTrend || []}
-            loading={!dashboardData}
+            loading={loading}
           />
 
           {/* Recent Transactions */}
           <RecentTransactions
             transactions={dashboardData?.recentTransactions || []}
-            loading={!dashboardData}
+            loading={loading}
           />
         </div>
 
@@ -138,18 +138,18 @@ export default async function DashboardPage() {
           {/* This Week's Forecast */}
           <WeeklyForecastWidget
             data={dashboardData?.thisWeekForecast || null}
-            loading={!dashboardData}
+            loading={loading}
           />
 
           {/* Next Week Preview & Model Accuracy */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <NextWeekPreviewCard
               data={dashboardData?.nextWeekForecast || null}
-              loading={!dashboardData}
+              loading={loading}
             />
             <ModelAccuracyWidget
               data={dashboardData?.modelAccuracy || null}
-              loading={!dashboardData}
+              loading={loading}
             />
           </div>
 
@@ -161,7 +161,7 @@ export default async function DashboardPage() {
       {/* Forecast vs Actual Table */}
       <ForecastVsActualTable
         data={dashboardData?.forecastVsActual || []}
-        loading={!dashboardData}
+        loading={loading}
       />
     </div>
   );

@@ -3,8 +3,6 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { createCategorySchema, type CategoryFormData } from "@/schema/settings.schema";
-import { createCategory, updateCategory } from "@/actions/settings";
+import { useCreateCategory, useUpdateCategory } from "@/hooks";
 import type { Category } from "@/lib/generated/prisma/client";
 
 const PRESET_COLORS = [
@@ -64,7 +62,6 @@ interface CategoryFormProps {
 }
 
 export function CategoryForm({ open, onClose, category }: CategoryFormProps) {
-  const queryClient = useQueryClient();
   const isEditing = !!category;
 
   const form = useForm<CategoryFormData>({
@@ -95,29 +92,21 @@ export function CategoryForm({ open, onClose, category }: CategoryFormProps) {
     }
   }, [category, form]);
 
-  const mutation = useMutation({
-    mutationFn: (data: CategoryFormData) => {
-      if (isEditing && category) {
-        return updateCategory({ id: category.id, ...data });
-      }
-      return createCategory(data);
-    },
-    onSuccess: (result) => {
-      if (result.success) {
-        toast.success(isEditing ? "Category updated" : "Category created");
-        queryClient.invalidateQueries({ queryKey: ["categories"] });
-        onClose();
-      } else {
-        toast.error(result.error || "Failed to save category");
-      }
-    },
-    onError: () => {
-      toast.error("Failed to save category");
-    },
-  });
+  const { createCategoryAsync, isPending: isCreating } = useCreateCategory();
+  const { updateCategoryAsync, isPending: isUpdating } = useUpdateCategory();
+  const isPending = isCreating || isUpdating;
 
-  const onSubmit = (data: CategoryFormData) => {
-    mutation.mutate(data);
+  const onSubmit = async (data: CategoryFormData) => {
+    try {
+      if (isEditing && category) {
+        await updateCategoryAsync({ id: category.id, ...data });
+      } else {
+        await createCategoryAsync(data);
+      }
+      onClose();
+    } catch {
+      // Error toast is handled by the hooks
+    }
   };
 
   return (
@@ -243,8 +232,8 @@ export function CategoryForm({ open, onClose, category }: CategoryFormProps) {
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending && (
+              <Button type="submit" disabled={isPending}>
+                {isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 {isEditing ? "Update" : "Create"}

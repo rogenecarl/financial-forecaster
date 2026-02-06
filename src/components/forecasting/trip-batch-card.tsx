@@ -134,9 +134,17 @@ export function TripBatchCard({
             <Package className="h-4 w-4" />
             <span>
               <span className="font-medium text-foreground">
-                {batch.projectedLoads}
+                {batch.loadCount}
               </span>{" "}
               loads
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <span>
+              <span className="font-medium text-foreground">
+                {batch.projectedLoads}
+              </span>{" "}
+              stops
             </span>
           </div>
           <div className="ml-auto font-semibold text-emerald-700">

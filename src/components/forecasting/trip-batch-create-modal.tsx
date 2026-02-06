@@ -16,15 +16,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
-  createTripBatch,
-  updateTripBatch,
+  useCreateTripBatch,
+  useUpdateTripBatch,
   type TripBatchSummary,
-} from "@/actions/forecasting/trip-batches";
+} from "@/hooks";
 
 interface TripBatchCreateModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: (batch: TripBatchSummary) => void;
+  onSuccess: () => void;
   editBatch?: TripBatchSummary | null;
 }
 
@@ -36,11 +36,15 @@ export function TripBatchCreateModal({
 }: TripBatchCreateModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [saving, setSaving] = useState(false);
+
+  const { createBatchAsync, isPending: isCreating } = useCreateTripBatch();
+  const { updateBatchAsync, isPending: isUpdating } = useUpdateTripBatch();
+  const isPending = isCreating || isUpdating;
 
   const isEditing = !!editBatch;
 
-  // Reset form when modal opens/closes or editBatch changes
+  // Reset form state when dialog opens — valid pattern for dialog forms
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       if (editBatch) {
@@ -52,6 +56,7 @@ export function TripBatchCreateModal({
       }
     }
   }, [open, editBatch]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,33 +66,25 @@ export function TripBatchCreateModal({
       return;
     }
 
-    setSaving(true);
     try {
-      let result;
       if (isEditing) {
-        result = await updateTripBatch({
+        await updateBatchAsync({
           id: editBatch.id,
           name: name.trim(),
           description: description.trim() || undefined,
         });
+        toast.success("Batch updated");
       } else {
-        result = await createTripBatch({
+        await createBatchAsync({
           name: name.trim(),
           description: description.trim() || undefined,
         });
+        toast.success("Batch created");
       }
-
-      if (result.success && result.data) {
-        toast.success(isEditing ? "Batch updated" : "Batch created");
-        onSuccess(result.data);
-        onOpenChange(false);
-      } else if (!result.success) {
-        toast.error(result.error || "Failed to save batch");
-      }
+      onSuccess();
+      onOpenChange(false);
     } catch {
-      toast.error("Failed to save batch");
-    } finally {
-      setSaving(false);
+      // Error toasts handled by the hooks
     }
   };
 
@@ -137,12 +134,12 @@ export function TripBatchCreateModal({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={saving}
+              disabled={isPending}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={saving || !name.trim()}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" disabled={isPending || !name.trim()}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isEditing ? "Save Changes" : "Create Batch"}
             </Button>
           </DialogFooter>

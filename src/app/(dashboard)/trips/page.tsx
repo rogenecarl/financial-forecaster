@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Truck, Filter } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,15 +19,9 @@ import {
   TripBatchCreateModal,
   TripBatchDeleteDialog,
 } from "@/components/forecasting";
-import {
-  getTripBatches,
-  deleteTripBatch,
-  type TripBatchSummary,
-  type TripBatchFilters,
-} from "@/actions/forecasting/trip-batches";
+import type { TripBatchSummary, TripBatchFilters } from "@/actions/forecasting/trip-batches";
 import type { BatchStatus } from "@/lib/generated/prisma/client";
-import { toast } from "sonner";
-import { forecastingKeys } from "@/hooks";
+import { useTripBatches } from "@/hooks";
 
 const STATUS_OPTIONS: { value: BatchStatus | "all"; label: string }[] = [
   { value: "all", label: "All Statuses" },
@@ -40,7 +34,6 @@ const STATUS_OPTIONS: { value: BatchStatus | "all"; label: string }[] = [
 
 export default function TripBatchesPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   // Filter state
   const [search, setSearch] = useState("");
@@ -58,34 +51,7 @@ export default function TripBatchesPage() {
   };
 
   // Fetch batches
-  const {
-    data: batches = [],
-    isLoading,
-  } = useQuery({
-    queryKey: [...forecastingKeys.tripBatchesList(), filters],
-    queryFn: async () => {
-      const result = await getTripBatches(filters);
-      if (!result.success) throw new Error(result.error);
-      return result.data;
-    },
-    staleTime: 30 * 1000,
-  });
-
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (batchId: string) => {
-      const result = await deleteTripBatch(batchId);
-      if (!result.success) throw new Error(result.error);
-      return result.data;
-    },
-    onSuccess: (data) => {
-      toast.success(`Deleted batch with ${data.deletedTrips} trips`);
-      queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatches });
-    },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed to delete batch");
-    },
-  });
+  const { batches, isLoading } = useTripBatches(filters);
 
   // Handlers
   const handleBatchClick = useCallback(
@@ -95,26 +61,10 @@ export default function TripBatchesPage() {
     [router]
   );
 
-  const handleCreateSuccess = useCallback(
-    (batch: TripBatchSummary) => {
-      queryClient.invalidateQueries({ queryKey: forecastingKeys.tripBatches });
-      if (editBatch) {
-        // Editing - stay on list
-        setEditBatch(null);
-        setShowCreate(false);
-      } else {
-        // Creating - navigate to the new batch detail page
-        router.push(`/trips/${batch.id}`);
-      }
-    },
-    [queryClient, router, editBatch]
-  );
-
-  const handleDeleteConfirm = useCallback(() => {
-    if (deletingBatch) {
-      deleteMutation.mutate(deletingBatch.id);
-    }
-  }, [deletingBatch, deleteMutation]);
+  const handleCreateSuccess = useCallback(() => {
+    setEditBatch(null);
+    setShowCreate(false);
+  }, []);
 
   const closeCreateModal = useCallback(() => {
     setShowCreate(false);
@@ -304,7 +254,7 @@ export default function TripBatchesPage() {
         open={!!deletingBatch}
         onOpenChange={(open) => !open && setDeletingBatch(null)}
         batch={deletingBatch}
-        onSuccess={handleDeleteConfirm}
+        onSuccess={() => setDeletingBatch(null)}
       />
     </div>
   );

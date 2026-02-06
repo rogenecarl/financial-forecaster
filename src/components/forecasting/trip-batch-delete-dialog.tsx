@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -12,10 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import {
-  deleteTripBatch,
-  type TripBatchSummary,
-} from "@/actions/forecasting/trip-batches";
+import { useDeleteTripBatch, type TripBatchSummary } from "@/hooks";
 
 interface TripBatchDeleteDialogProps {
   open: boolean;
@@ -30,28 +26,20 @@ export function TripBatchDeleteDialog({
   batch,
   onSuccess,
 }: TripBatchDeleteDialogProps) {
-  const [deleting, setDeleting] = useState(false);
+  const { deleteBatchAsync, isPending } = useDeleteTripBatch();
 
   const handleDelete = async () => {
     if (!batch) return;
 
-    setDeleting(true);
     try {
-      const result = await deleteTripBatch(batch.id);
-
-      if (result.success && result.data) {
-        toast.success(
-          `Deleted batch "${batch.name}" with ${result.data.deletedTrips} trips and ${result.data.deletedInvoices} invoices`
-        );
-        onSuccess();
-        onOpenChange(false);
-      } else if (!result.success) {
-        toast.error(result.error || "Failed to delete batch");
-      }
+      const result = await deleteBatchAsync(batch.id);
+      toast.success(
+        `Deleted batch "${batch.name}" with ${result.deletedTrips} trips and ${result.deletedInvoices} invoices`
+      );
+      onSuccess();
+      onOpenChange(false);
     } catch {
-      toast.error("Failed to delete batch");
-    } finally {
-      setDeleting(false);
+      // Error toast is handled by the hook's onError
     }
   };
 
@@ -100,16 +88,16 @@ export function TripBatchDeleteDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={deleting}
+            disabled={isPending}
           >
             Cancel
           </Button>
           <Button
             variant="destructive"
             onClick={handleDelete}
-            disabled={deleting}
+            disabled={isPending}
           >
-            {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Delete Batch
           </Button>
         </AlertDialogFooter>

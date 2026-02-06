@@ -4,8 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
+import { getRoleRedirect } from "@/config/auth";
 
 export function Navbar() {
+  const { isAuthenticated, role } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState("");
 
@@ -104,22 +107,36 @@ export function Navbar() {
 
           {/* Right Side */}
           <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="hidden sm:block text-sm font-medium text-neutral-400 hover:text-white transition-colors"
-            >
-              Sign in
-            </Link>
+            {isAuthenticated ? (
+              <Button
+                size="sm"
+                asChild
+                className="relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-black hover:from-emerald-300 hover:to-teal-400 font-semibold px-5 h-10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Link href={getRoleRedirect(role)}>
+                  <span className="relative z-10">Dashboard</span>
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="hidden sm:block text-sm font-medium text-neutral-400 hover:text-white transition-colors"
+                >
+                  Sign in
+                </Link>
 
-            <Button
-              size="sm"
-              asChild
-              className="relative overflow-hidden rounded-xl bg-white text-black hover:bg-neutral-100 font-semibold px-5 h-10 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <Link href="/login">
-                <span className="relative z-10">Get Started</span>
-              </Link>
-            </Button>
+                <Button
+                  size="sm"
+                  asChild
+                  className="relative overflow-hidden rounded-xl bg-white text-black hover:bg-neutral-100 font-semibold px-5 h-10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <Link href="/login">
+                    <span className="relative z-10">Get Started</span>
+                  </Link>
+                </Button>
+              </>
+            )}
           </div>
         </nav>
       </div>

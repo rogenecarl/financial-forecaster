@@ -2,26 +2,21 @@
 
 import { useAuth, useDashboardData } from "@/hooks";
 import { MetricCard, MetricCardGrid } from "@/components/dashboard/metric-card";
+import { RevenuePipeline } from "@/components/dashboard/revenue-pipeline";
+import { ActiveBatches } from "@/components/dashboard/active-batches";
+import { PLQuickView } from "@/components/dashboard/pl-quick-view";
+import { VarianceSnapshot } from "@/components/dashboard/variance-snapshot";
 import { WeeklyForecastWidget } from "@/components/dashboard/weekly-forecast-widget";
-import { NextWeekPreviewCard } from "@/components/dashboard/next-week-preview-card";
-import { ModelAccuracyWidget } from "@/components/dashboard/model-accuracy-widget";
-import { YearToDateSummary } from "@/components/dashboard/year-to-date-summary";
-import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { CashFlowChart } from "@/components/dashboard/cash-flow-chart";
-import { ForecastVsActualTable } from "@/components/dashboard/forecast-vs-actual-table";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(value);
-}
-
-function formatRevenuePerTrip(value: number): string {
-  return `$${value.toFixed(2)}/trip`;
 }
 
 export default function DashboardPage() {
@@ -36,14 +31,14 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+      {/* Welcome Header + Date */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
             Welcome back, {firstName}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Here&apos;s an overview of your financial performance
+            Here&apos;s your financial overview
           </p>
         </div>
         <p className="text-sm text-muted-foreground">
@@ -56,111 +51,104 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Metrics Grid */}
+      {/* KPI Cards */}
       <MetricCardGrid>
         <MetricCard
-          title="Cash on Hand"
-          value={hasMetrics ? formatCurrency(metrics.cashOnHand) : "$0.00"}
-          description="Current balance"
-          iconName="dollar-sign"
-          loading={loading}
-        />
-        <MetricCard
-          title="Weekly Revenue"
-          value={hasMetrics ? formatCurrency(metrics.weeklyRevenue) : "$0.00"}
-          iconName="trending-up"
-          trend={
-            hasMetrics && metrics.revenueChange !== null
-              ? metrics.revenueChange >= 0
-                ? "up"
-                : "down"
-              : null
-          }
-          trendValue={hasMetrics ? metrics.revenueChange : null}
-          loading={loading}
-        />
-        <MetricCard
-          title="Weekly Profit"
-          value={hasMetrics ? formatCurrency(metrics.weeklyProfit) : "$0.00"}
-          iconName={
-            hasMetrics && metrics.weeklyProfit >= 0
-              ? "trending-up"
-              : "trending-down"
-          }
-          trend={
-            hasMetrics && metrics.profitChange !== null
-              ? metrics.profitChange >= 0
-                ? "up"
-                : "down"
-              : null
-          }
-          trendValue={hasMetrics ? metrics.profitChange : null}
-          loading={loading}
-        />
-        <MetricCard
-          title="Forecast/Trip"
-          value={
+          title="Revenue Earned"
+          value={hasMetrics ? formatCurrency(metrics.revenueEarned) : "$0"}
+          description={
             hasMetrics
-              ? formatRevenuePerTrip(metrics.forecastRevenuePerTrip)
-              : "$0.00/trip"
+              ? `From ${metrics.revenueEarnedBatchCount} invoiced ${metrics.revenueEarnedBatchCount === 1 ? "batch" : "batches"}`
+              : "No invoiced batches yet"
           }
-          description={hasMetrics ? `${metrics.forecastTripsPerWeek} trips/week` : "No forecast"}
-          iconName="truck"
+          iconName="dollar-sign"
+          accent="emerald"
+          loading={loading}
+        />
+        <MetricCard
+          title="In Pipeline"
+          value={hasMetrics ? formatCurrency(metrics.inPipeline) : "$0"}
+          description={
+            hasMetrics
+              ? `${metrics.inPipelineBatchCount} active ${metrics.inPipelineBatchCount === 1 ? "batch" : "batches"}`
+              : "No active batches"
+          }
+          iconName="trending-up"
+          accent="blue"
+          loading={loading}
+        />
+        <MetricCard
+          title="Uncategorized"
+          value={hasMetrics ? String(metrics.uncategorizedCount) : "0"}
+          description={
+            hasMetrics && metrics.uncategorizedCount > 0
+              ? "Transactions need review"
+              : "All categorized"
+          }
+          iconName="receipt"
+          accent="gold"
+          loading={loading}
+        />
+        <MetricCard
+          title="Forecast Accuracy"
+          value={
+            hasMetrics && metrics.forecastAccuracy !== null
+              ? `${metrics.forecastAccuracy.toFixed(1)}%`
+              : "—"
+          }
+          description={
+            hasMetrics && metrics.forecastAccuracy !== null
+              ? `Last ${metrics.forecastAccuracyBatchCount} invoiced ${metrics.forecastAccuracyBatchCount === 1 ? "batch" : "batches"}`
+              : "No invoiced data yet"
+          }
+          iconName="target"
+          accent="purple"
           loading={loading}
         />
       </MetricCardGrid>
 
-      {/* Year to Date Summary */}
-      <YearToDateSummary
-        data={dashboardData?.yearToDate || null}
+      {/* Revenue Pipeline — full width */}
+      <RevenuePipeline
+        data={dashboardData?.revenuePipeline ?? null}
         loading={loading}
       />
 
-      {/* Main Content Grid */}
+      {/* Active Batches (2/3) | P&L Quick View (1/3) */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column - Charts */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Cash Flow Trend */}
-          <CashFlowChart
-            data={dashboardData?.cashFlowTrend || []}
-            loading={loading}
-          />
-
-          {/* Recent Transactions */}
-          <RecentTransactions
-            transactions={dashboardData?.recentTransactions || []}
+        <div className="lg:col-span-2">
+          <ActiveBatches
+            data={dashboardData?.activeBatches ?? []}
             loading={loading}
           />
         </div>
-
-        {/* Right Column - Forecasts & Quick Actions */}
-        <div className="space-y-6">
-          {/* This Week's Forecast */}
-          <WeeklyForecastWidget
-            data={dashboardData?.thisWeekForecast || null}
+        <div>
+          <PLQuickView
+            data={dashboardData?.plQuickView ?? null}
             loading={loading}
           />
+        </div>
+      </div>
 
-          {/* Next Week Preview & Model Accuracy */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-            <NextWeekPreviewCard
-              data={dashboardData?.nextWeekForecast || null}
-              loading={loading}
-            />
-            <ModelAccuracyWidget
-              data={dashboardData?.modelAccuracy || null}
-              loading={loading}
-            />
-          </div>
-
-          {/* Quick Actions */}
+      {/* Cash Flow Chart (2/3) | Forecast Widget + Quick Actions (1/3) */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <CashFlowChart
+            data={dashboardData?.cashFlowTrend ?? []}
+            loading={loading}
+          />
+        </div>
+        <div className="space-y-6">
+          <WeeklyForecastWidget
+            data={dashboardData?.thisWeekForecast ?? null}
+            loading={loading}
+          />
           <QuickActions />
         </div>
       </div>
 
-      {/* Forecast vs Actual Table */}
-      <ForecastVsActualTable
-        data={dashboardData?.forecastVsActual || []}
+      {/* Variance Snapshot — full width */}
+      <VarianceSnapshot
+        data={dashboardData?.varianceSnapshot ?? []}
         loading={loading}
       />
     </div>

@@ -3,20 +3,20 @@
 import prisma from "@/lib/db";
 import { requireAuth } from "@/lib/auth-server";
 import type { ActionResponse } from "@/types/api";
-import { startOfWeek, endOfWeek, subWeeks, addWeeks, format, startOfYear, getWeek } from "date-fns";
+import { startOfWeek, endOfWeek, subWeeks, format } from "date-fns";
 
 // ============================================
 // TYPES
 // ============================================
 
 export interface DashboardMetrics {
-  cashOnHand: number;
-  weeklyRevenue: number;
-  weeklyProfit: number;
-  forecastRevenuePerTrip: number;
-  forecastTripsPerWeek: number;
-  revenueChange: number | null;
-  profitChange: number | null;
+  revenueEarned: number;
+  revenueEarnedBatchCount: number;
+  inPipeline: number;
+  inPipelineBatchCount: number;
+  uncategorizedCount: number;
+  forecastAccuracy: number | null;
+  forecastAccuracyBatchCount: number;
 }
 
 export interface RecentTransaction {
@@ -41,16 +41,6 @@ export interface ThisWeekForecast {
   loadsTotal: number;
 }
 
-export interface ForecastVsActualWeek {
-  weekStart: Date;
-  weekEnd: Date;
-  weekLabel: string;
-  forecast: number;
-  actual: number | null;
-  variance: number | null;
-  accuracy: number | null;
-}
-
 export interface CashFlowDataPoint {
   week: string;
   weekStart: Date;
@@ -59,28 +49,42 @@ export interface CashFlowDataPoint {
   profit: number;
 }
 
-export interface NextWeekForecast {
-  weekNumber: number;
-  weekStart: Date;
-  weekEnd: Date;
-  projectedTotal: number;
-  hasTrips: boolean;
-  tripCount: number;
+export interface RevenuePipelineData {
+  projected: number;
+  invoiced: number;
+  deposited: number;
+  projectedBatchCount: number;
+  invoicedBatchCount: number;
+  depositedBatchCount: number;
 }
 
-export interface ModelAccuracy {
-  accuracy: number;
-  weekCount: number;
+export interface ActiveBatchItem {
+  id: string;
+  name: string;
+  type: "trip" | "transaction";
+  status: string;
+  itemCount: number;
+  actionNeeded: string;
+  total: number;
 }
 
-export interface YearToDateData {
-  year: number;
-  totalRevenue: number;
-  totalProjected: number;
-  accuracy: number;
-  tripsCompleted: number;
-  loadsDelivered: number;
-  canceledCount: number;
+export interface PLQuickViewData {
+  batchName: string;
+  batchId: string;
+  netRevenue: number;
+  grossProfit: number;
+  operatingIncome: number;
+  operatingMargin: number;
+  transactionCount: number;
+}
+
+export interface VarianceSnapshotItem {
+  batchId: string;
+  batchName: string;
+  projected: number;
+  actual: number;
+  variance: number;
+  variancePercent: number;
 }
 
 // ============================================
@@ -104,106 +108,69 @@ export async function getDashboardMetrics(): Promise<ActionResponse<DashboardMet
     const session = await requireAuth();
     const userId = session.user.id;
 
-    const now = new Date();
-    const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const currentWeekEnd = endOfWeek(now, { weekStartsOn: 1 });
-    const previousWeekStart = subWeeks(currentWeekStart, 1);
-    const previousWeekEnd = subWeeks(currentWeekEnd, 1);
-
-    // Get cash on hand (latest balance from transactions)
-    const latestTransaction = await prisma.transaction.findFirst({
-      where: { userId },
-      orderBy: { postingDate: "desc" },
-      select: { balance: true },
-    });
-    const cashOnHand = toNumber(latestTransaction?.balance);
-
-    // Get this week's transactions for revenue/expenses
-    const thisWeekTransactions = await prisma.transaction.findMany({
-      where: {
-        userId,
-        postingDate: {
-          gte: currentWeekStart,
-          lte: currentWeekEnd,
+    const [
+      invoicedBatches,
+      pipelineBatches,
+      uncategorizedAgg,
+    ] = await Promise.all([
+      // Revenue Earned: all INVOICED trip batches
+      prisma.tripBatch.findMany({
+        where: { userId, status: "INVOICED" },
+        orderBy: { updatedAt: "desc" },
+        select: { projectedTotal: true, actualTotal: true },
+      }),
+      // In Pipeline: active trip batches (not yet invoiced, not empty)
+      prisma.tripBatch.findMany({
+        where: {
+          userId,
+          status: { in: ["UPCOMING", "IN_PROGRESS", "COMPLETED"] },
         },
-      },
-      include: { category: true },
-    });
+        select: { projectedTotal: true },
+      }),
+      // Uncategorized transactions across all batches
+      prisma.transactionBatch.aggregate({
+        where: { userId },
+        _sum: { uncategorizedCount: true },
+      }),
+    ]);
 
-    // Get previous week's transactions for comparison
-    const prevWeekTransactions = await prisma.transaction.findMany({
-      where: {
-        userId,
-        postingDate: {
-          gte: previousWeekStart,
-          lte: previousWeekEnd,
-        },
-      },
-      include: { category: true },
-    });
+    // Revenue Earned
+    const revenueEarned = invoicedBatches.reduce(
+      (sum, b) => sum + toNumber(b.actualTotal), 0
+    );
 
-    // Calculate weekly revenue and profit using multi-tier P&L categories
-    // REVENUE and CONTRA_REVENUE count towards revenue
-    // COGS and OPERATING_EXPENSE count towards expenses
-    // EQUITY and UNCATEGORIZED are excluded from P&L
-    let weeklyRevenue = 0;
-    let weeklyExpenses = 0;
-    for (const txn of thisWeekTransactions) {
-      const amount = toNumber(txn.amount);
-      const type = txn.category?.type;
-      if (type === "REVENUE") {
-        weeklyRevenue += amount;
-      } else if (type === "CONTRA_REVENUE") {
-        weeklyRevenue += amount; // Contra-revenue adds (refunds are positive)
-      } else if (type === "COGS" || type === "OPERATING_EXPENSE") {
-        weeklyExpenses += Math.abs(amount);
-      }
+    // In Pipeline
+    const inPipeline = pipelineBatches.reduce(
+      (sum, b) => sum + toNumber(b.projectedTotal), 0
+    );
+
+    // Forecast Accuracy (avg across invoiced batches with actuals)
+    let forecastAccuracy: number | null = null;
+    const accuracyBatches = invoicedBatches
+      .filter((b) => b.actualTotal !== null)
+      .slice(0, 4);
+    if (accuracyBatches.length > 0) {
+      const accuracies = accuracyBatches.map((b) => {
+        const projected = toNumber(b.projectedTotal);
+        const actual = toNumber(b.actualTotal);
+        if (projected > 0) {
+          return Math.max(0, (1 - Math.abs(actual - projected) / projected) * 100);
+        }
+        return 0;
+      });
+      forecastAccuracy = accuracies.reduce((s, a) => s + a, 0) / accuracies.length;
     }
-    const weeklyProfit = weeklyRevenue - weeklyExpenses;
-
-    // Calculate previous week for comparison
-    let prevRevenue = 0;
-    let prevExpenses = 0;
-    for (const txn of prevWeekTransactions) {
-      const amount = toNumber(txn.amount);
-      const type = txn.category?.type;
-      if (type === "REVENUE") {
-        prevRevenue += amount;
-      } else if (type === "CONTRA_REVENUE") {
-        prevRevenue += amount;
-      } else if (type === "COGS" || type === "OPERATING_EXPENSE") {
-        prevExpenses += Math.abs(amount);
-      }
-    }
-    const prevProfit = prevRevenue - prevExpenses;
-
-    // Calculate percentage changes
-    const revenueChange = prevRevenue > 0
-      ? ((weeklyRevenue - prevRevenue) / prevRevenue) * 100
-      : null;
-    const profitChange = prevProfit !== 0
-      ? ((weeklyProfit - prevProfit) / Math.abs(prevProfit)) * 100
-      : null;
-
-    // Get default forecast for per-trip revenue info
-    const defaultForecast = await prisma.forecast.findFirst({
-      where: { userId, isDefault: true },
-      select: { numberOfTrips: true, revenuePerTrip: true },
-    });
-
-    const forecastTripsPerWeek = defaultForecast?.numberOfTrips || 7;
-    const forecastRevenuePerTrip = toNumber(defaultForecast?.revenuePerTrip) || 522.09;
 
     return {
       success: true,
       data: {
-        cashOnHand,
-        weeklyRevenue,
-        weeklyProfit,
-        forecastRevenuePerTrip,
-        forecastTripsPerWeek,
-        revenueChange,
-        profitChange,
+        revenueEarned,
+        revenueEarnedBatchCount: invoicedBatches.length,
+        inPipeline,
+        inPipelineBatchCount: pipelineBatches.length,
+        uncategorizedCount: uncategorizedAgg._sum.uncategorizedCount ?? 0,
+        forecastAccuracy,
+        forecastAccuracyBatchCount: accuracyBatches.length,
       },
     };
   } catch (error) {
@@ -260,32 +227,21 @@ export async function getThisWeekForecast(): Promise<ActionResponse<ThisWeekFore
     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
 
-    // Get trips for this week (across all batches)
     const trips = await prisma.trip.findMany({
       where: {
         userId,
-        scheduledDate: {
-          gte: weekStart,
-          lte: weekEnd,
-        },
+        scheduledDate: { gte: weekStart, lte: weekEnd },
       },
     });
 
-    // Calculate totals
     const tripsTotal = trips.length;
     const tripsCompleted = trips.filter(
       (t) => t.tripStage === "COMPLETED" || t.actualLoads !== null
     ).length;
-
     const loadsTotal = trips.reduce((sum, t) => sum + t.projectedLoads, 0);
     const loadsDelivered = trips.reduce((sum, t) => sum + (t.actualLoads || 0), 0);
-
-    // Calculate from trips
     const projectedTotal = trips.reduce((sum, t) => sum + toNumber(t.projectedRevenue), 0);
-
-    // Sum actual revenue from trips with actual loads
     const currentTotal = trips.reduce((sum, t) => sum + toNumber(t.actualRevenue), 0);
-
     const progressPercent =
       projectedTotal > 0 ? Math.min(100, (currentTotal / projectedTotal) * 100) : 0;
 
@@ -310,74 +266,6 @@ export async function getThisWeekForecast(): Promise<ActionResponse<ThisWeekFore
 }
 
 // ============================================
-// GET FORECAST VS ACTUAL (LAST 4 WEEKS)
-// ============================================
-
-export async function getForecastVsActual(
-  weekCount: number = 4
-): Promise<ActionResponse<ForecastVsActualWeek[]>> {
-  try {
-    const session = await requireAuth();
-    const userId = session.user.id;
-
-    const now = new Date();
-    const weeks: ForecastVsActualWeek[] = [];
-
-    for (let i = 1; i <= weekCount; i++) {
-      const weekDate = subWeeks(now, i);
-      const weekStart = startOfWeek(weekDate, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(weekDate, { weekStartsOn: 1 });
-      const weekLabel = `${format(weekStart, "MMM d")}-${format(weekEnd, "d")}`;
-
-      // Get trips for this week (across all batches)
-      const trips = await prisma.trip.findMany({
-        where: {
-          userId,
-          scheduledDate: {
-            gte: weekStart,
-            lte: weekEnd,
-          },
-        },
-      });
-
-      if (trips.length > 0) {
-        const forecast = trips.reduce(
-          (sum, t) => sum + toNumber(t.projectedRevenue),
-          0
-        );
-        const actualSum = trips
-          .filter((t) => t.actualRevenue !== null)
-          .reduce((sum, t) => sum + toNumber(t.actualRevenue), 0);
-        const hasActual = trips.some((t) => t.actualRevenue !== null);
-        const actual = hasActual ? actualSum : null;
-        const variance = actual !== null ? actual - forecast : null;
-
-        let accuracy: number | null = null;
-        if (actual !== null && forecast > 0) {
-          const varianceAbs = Math.abs(actual - forecast);
-          accuracy = Math.max(0, Math.round((1 - varianceAbs / forecast) * 100));
-        }
-
-        weeks.push({
-          weekStart,
-          weekEnd,
-          weekLabel,
-          forecast,
-          actual,
-          variance,
-          accuracy,
-        });
-      }
-    }
-
-    return { success: true, data: weeks };
-  } catch (error) {
-    console.error("Failed to get forecast vs actual:", error);
-    return { success: false, error: "Failed to load forecast comparison" };
-  }
-}
-
-// ============================================
 // GET CASH FLOW TREND (8 WEEKS)
 // ============================================
 
@@ -397,14 +285,10 @@ export async function getCashFlowTrend(
       const weekEnd = endOfWeek(weekDate, { weekStartsOn: 1 });
       const weekLabel = format(weekStart, "MMM d");
 
-      // Get transactions for this week
       const transactions = await prisma.transaction.findMany({
         where: {
           userId,
-          postingDate: {
-            gte: weekStart,
-            lte: weekEnd,
-          },
+          postingDate: { gte: weekStart, lte: weekEnd },
         },
         include: { category: true },
       });
@@ -415,10 +299,8 @@ export async function getCashFlowTrend(
       for (const txn of transactions) {
         const amount = toNumber(txn.amount);
         const type = txn.category?.type;
-        if (type === "REVENUE") {
+        if (type === "REVENUE" || type === "CONTRA_REVENUE") {
           revenue += amount;
-        } else if (type === "CONTRA_REVENUE") {
-          revenue += amount; // Contra-revenue adds (refunds are positive)
         } else if (type === "COGS" || type === "OPERATING_EXPENSE") {
           expenses += Math.abs(amount);
         }
@@ -441,182 +323,226 @@ export async function getCashFlowTrend(
 }
 
 // ============================================
-// GET NEXT WEEK'S FORECAST
+// GET REVENUE PIPELINE
 // ============================================
 
-export async function getNextWeekForecast(): Promise<ActionResponse<NextWeekForecast | null>> {
+export async function getRevenuePipeline(): Promise<ActionResponse<RevenuePipelineData>> {
   try {
     const session = await requireAuth();
     const userId = session.user.id;
 
-    const now = new Date();
-    const nextWeekDate = addWeeks(now, 1);
-    const weekStart = startOfWeek(nextWeekDate, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(nextWeekDate, { weekStartsOn: 1 });
-    const weekNumber = getWeek(weekStart, { weekStartsOn: 1 });
-
-    // Get trips for next week (across all batches)
-    const trips = await prisma.trip.findMany({
+    // Projected: active trip batches (IN_PROGRESS, COMPLETED)
+    const activeTripBatches = await prisma.tripBatch.findMany({
       where: {
         userId,
-        scheduledDate: {
-          gte: weekStart,
-          lte: weekEnd,
-        },
+        status: { in: ["IN_PROGRESS", "COMPLETED", "UPCOMING"] },
       },
+      select: { projectedTotal: true },
     });
+    const projected = activeTripBatches.reduce(
+      (sum, b) => sum + toNumber(b.projectedTotal), 0
+    );
 
-    const hasTrips = trips.length > 0;
-    const tripCount = trips.length;
+    // Invoiced: INVOICED trip batches
+    const invoicedTripBatches = await prisma.tripBatch.findMany({
+      where: { userId, status: "INVOICED" },
+      select: { actualTotal: true },
+    });
+    const invoiced = invoicedTripBatches.reduce(
+      (sum, b) => sum + toNumber(b.actualTotal), 0
+    );
 
-    // Calculate projected total from trips
-    const projectedTotal = hasTrips
-      ? trips.reduce((sum, t) => sum + toNumber(t.projectedRevenue), 0)
-      : 0;
+    // Deposited: RECONCILED transaction batches
+    const reconciledTxnBatches = await prisma.transactionBatch.findMany({
+      where: { userId, status: "RECONCILED" },
+      select: { netRevenue: true },
+    });
+    const deposited = reconciledTxnBatches.reduce(
+      (sum, b) => sum + toNumber(b.netRevenue), 0
+    );
 
     return {
       success: true,
       data: {
-        weekNumber,
-        weekStart,
-        weekEnd,
-        projectedTotal,
-        hasTrips,
-        tripCount,
+        projected,
+        invoiced,
+        deposited,
+        projectedBatchCount: activeTripBatches.length,
+        invoicedBatchCount: invoicedTripBatches.length,
+        depositedBatchCount: reconciledTxnBatches.length,
       },
     };
   } catch (error) {
-    console.error("Failed to get next week forecast:", error);
-    return { success: false, error: "Failed to load next week forecast" };
+    console.error("Failed to get revenue pipeline:", error);
+    return { success: false, error: "Failed to load revenue pipeline" };
   }
 }
 
 // ============================================
-// GET MODEL ACCURACY (LAST N WEEKS AVERAGE)
+// GET ACTIVE BATCHES (NEEDING ATTENTION)
 // ============================================
 
-export async function getModelAccuracy(
-  weekCount: number = 4
-): Promise<ActionResponse<ModelAccuracy>> {
+export async function getActiveBatches(): Promise<ActionResponse<ActiveBatchItem[]>> {
   try {
     const session = await requireAuth();
     const userId = session.user.id;
 
-    const now = new Date();
-    const accuracies: number[] = [];
+    const items: ActiveBatchItem[] = [];
 
-    for (let i = 1; i <= weekCount; i++) {
-      const weekDate = subWeeks(now, i);
-      const weekStart = startOfWeek(weekDate, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(weekDate, { weekStartsOn: 1 });
+    // Trip batches: IN_PROGRESS or COMPLETED (awaiting invoice)
+    const tripBatches = await prisma.tripBatch.findMany({
+      where: {
+        userId,
+        status: { in: ["IN_PROGRESS", "COMPLETED"] },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        tripCount: true,
+        projectedTotal: true,
+      },
+    });
 
-      // Get trips for this week (across all batches)
-      const trips = await prisma.trip.findMany({
-        where: {
-          userId,
-          scheduledDate: {
-            gte: weekStart,
-            lte: weekEnd,
-          },
-        },
+    for (const batch of tripBatches) {
+      items.push({
+        id: batch.id,
+        name: batch.name,
+        type: "trip",
+        status: batch.status,
+        itemCount: batch.tripCount,
+        actionNeeded: batch.status === "COMPLETED"
+          ? "Import invoice"
+          : "Update trip actuals",
+        total: toNumber(batch.projectedTotal),
       });
-
-      const hasActualData = trips.some((t) => t.actualRevenue !== null);
-      if (trips.length > 0 && hasActualData) {
-        const forecast = trips.reduce((sum, t) => sum + toNumber(t.projectedRevenue), 0);
-        const actual = trips
-          .filter((t) => t.actualRevenue !== null)
-          .reduce((sum, t) => sum + toNumber(t.actualRevenue), 0);
-
-        if (forecast > 0) {
-          const varianceAbs = Math.abs(actual - forecast);
-          const weekAccuracy = Math.max(0, (1 - varianceAbs / forecast) * 100);
-          accuracies.push(weekAccuracy);
-        }
-      }
     }
 
-    const averageAccuracy =
-      accuracies.length > 0
-        ? accuracies.reduce((sum, a) => sum + a, 0) / accuracies.length
-        : 0;
-
-    return {
-      success: true,
-      data: {
-        accuracy: averageAccuracy,
-        weekCount: accuracies.length,
+    // Transaction batches: ACTIVE with uncategorized transactions
+    const txnBatches = await prisma.transactionBatch.findMany({
+      where: {
+        userId,
+        status: "ACTIVE",
+        uncategorizedCount: { gt: 0 },
       },
-    };
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        transactionCount: true,
+        uncategorizedCount: true,
+        netRevenue: true,
+      },
+    });
+
+    for (const batch of txnBatches) {
+      items.push({
+        id: batch.id,
+        name: batch.name,
+        type: "transaction",
+        status: batch.status,
+        itemCount: batch.uncategorizedCount,
+        actionNeeded: `${batch.uncategorizedCount} uncategorized`,
+        total: toNumber(batch.netRevenue),
+      });
+    }
+
+    return { success: true, data: items };
   } catch (error) {
-    console.error("Failed to get model accuracy:", error);
-    return { success: false, error: "Failed to load model accuracy" };
+    console.error("Failed to get active batches:", error);
+    return { success: false, error: "Failed to load active batches" };
   }
 }
 
 // ============================================
-// GET YEAR-TO-DATE DATA
+// GET P&L QUICK VIEW
 // ============================================
 
-export async function getYearToDateData(): Promise<ActionResponse<YearToDateData>> {
+export async function getPLQuickView(): Promise<ActionResponse<PLQuickViewData | null>> {
   try {
     const session = await requireAuth();
     const userId = session.user.id;
 
-    const now = new Date();
-    const year = now.getFullYear();
-    const yearStart = startOfYear(now);
-
-    // Get all trips for this year (across all batches)
-    const trips = await prisma.trip.findMany({
-      where: {
-        userId,
-        scheduledDate: {
-          gte: yearStart,
-          lte: now,
-        },
+    const batch = await prisma.transactionBatch.findFirst({
+      where: { userId, status: "RECONCILED" },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        netRevenue: true,
+        grossProfit: true,
+        operatingIncome: true,
+        operatingMargin: true,
+        transactionCount: true,
       },
     });
 
-    // Calculate totals from trips
-    const totalProjected = trips.reduce((sum, t) => sum + toNumber(t.projectedRevenue), 0);
-    const totalRevenue = trips
-      .filter((t) => t.actualRevenue !== null)
-      .reduce((sum, t) => sum + toNumber(t.actualRevenue), 0);
-
-    // Calculate YTD accuracy
-    let accuracy = 0;
-    if (totalProjected > 0 && totalRevenue > 0) {
-      const varianceAbs = Math.abs(totalRevenue - totalProjected);
-      accuracy = Math.max(0, (1 - varianceAbs / totalProjected) * 100);
+    if (!batch) {
+      return { success: true, data: null };
     }
-
-    // Count completed trips
-    const tripsCompleted = trips.filter(
-      (t) => t.tripStage === "COMPLETED" || t.actualLoads !== null
-    ).length;
-
-    // Sum loads delivered
-    const loadsDelivered = trips.reduce((sum, t) => sum + (t.actualLoads || 0), 0);
-
-    // Count canceled trips
-    const canceledCount = trips.filter((t) => t.tripStage === "CANCELED").length;
 
     return {
       success: true,
       data: {
-        year,
-        totalRevenue,
-        totalProjected,
-        accuracy,
-        tripsCompleted,
-        loadsDelivered,
-        canceledCount,
+        batchId: batch.id,
+        batchName: batch.name,
+        netRevenue: toNumber(batch.netRevenue),
+        grossProfit: toNumber(batch.grossProfit),
+        operatingIncome: toNumber(batch.operatingIncome),
+        operatingMargin: batch.operatingMargin,
+        transactionCount: batch.transactionCount,
       },
     };
   } catch (error) {
-    console.error("Failed to get year-to-date data:", error);
-    return { success: false, error: "Failed to load year-to-date data" };
+    console.error("Failed to get P&L quick view:", error);
+    return { success: false, error: "Failed to load P&L data" };
+  }
+}
+
+// ============================================
+// GET VARIANCE SNAPSHOT
+// ============================================
+
+export async function getVarianceSnapshot(): Promise<ActionResponse<VarianceSnapshotItem[]>> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    const batches = await prisma.tripBatch.findMany({
+      where: {
+        userId,
+        status: "INVOICED",
+        actualTotal: { not: null },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 4,
+      select: {
+        id: true,
+        name: true,
+        projectedTotal: true,
+        actualTotal: true,
+        variance: true,
+        variancePercent: true,
+      },
+    });
+
+    const items: VarianceSnapshotItem[] = batches.map((b) => ({
+      batchId: b.id,
+      batchName: b.name,
+      projected: toNumber(b.projectedTotal),
+      actual: toNumber(b.actualTotal),
+      variance: toNumber(b.variance),
+      variancePercent: b.variancePercent ?? 0,
+    }));
+
+    return { success: true, data: items };
+  } catch (error) {
+    console.error("Failed to get variance snapshot:", error);
+    return { success: false, error: "Failed to load variance data" };
   }
 }
 
@@ -628,11 +554,11 @@ export interface DashboardData {
   metrics: DashboardMetrics;
   recentTransactions: RecentTransaction[];
   thisWeekForecast: ThisWeekForecast | null;
-  forecastVsActual: ForecastVsActualWeek[];
   cashFlowTrend: CashFlowDataPoint[];
-  nextWeekForecast: NextWeekForecast | null;
-  modelAccuracy: ModelAccuracy | null;
-  yearToDate: YearToDateData | null;
+  revenuePipeline: RevenuePipelineData | null;
+  activeBatches: ActiveBatchItem[];
+  plQuickView: PLQuickViewData | null;
+  varianceSnapshot: VarianceSnapshotItem[];
 }
 
 export async function getDashboardData(): Promise<ActionResponse<DashboardData>> {
@@ -641,20 +567,20 @@ export async function getDashboardData(): Promise<ActionResponse<DashboardData>>
       metricsResult,
       transactionsResult,
       forecastResult,
-      comparisonResult,
       cashFlowResult,
-      nextWeekResult,
-      accuracyResult,
-      ytdResult,
+      pipelineResult,
+      activeBatchesResult,
+      plResult,
+      varianceResult,
     ] = await Promise.all([
       getDashboardMetrics(),
       getRecentTransactions(5),
       getThisWeekForecast(),
-      getForecastVsActual(4),
       getCashFlowTrend(8),
-      getNextWeekForecast(),
-      getModelAccuracy(4),
-      getYearToDateData(),
+      getRevenuePipeline(),
+      getActiveBatches(),
+      getPLQuickView(),
+      getVarianceSnapshot(),
     ]);
 
     if (!metricsResult.success) {
@@ -667,11 +593,11 @@ export async function getDashboardData(): Promise<ActionResponse<DashboardData>>
         metrics: metricsResult.data,
         recentTransactions: transactionsResult.success ? transactionsResult.data : [],
         thisWeekForecast: forecastResult.success ? forecastResult.data : null,
-        forecastVsActual: comparisonResult.success ? comparisonResult.data : [],
         cashFlowTrend: cashFlowResult.success ? cashFlowResult.data : [],
-        nextWeekForecast: nextWeekResult.success ? nextWeekResult.data : null,
-        modelAccuracy: accuracyResult.success ? accuracyResult.data : null,
-        yearToDate: ytdResult.success ? ytdResult.data : null,
+        revenuePipeline: pipelineResult.success ? pipelineResult.data : null,
+        activeBatches: activeBatchesResult.success ? activeBatchesResult.data : [],
+        plQuickView: plResult.success ? plResult.data : null,
+        varianceSnapshot: varianceResult.success ? varianceResult.data : [],
       },
     };
   } catch (error) {

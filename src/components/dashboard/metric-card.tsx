@@ -13,10 +13,11 @@ import {
   CreditCard,
   PiggyBank,
   Receipt,
+  Target,
+  Percent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Map of icon names to icon components
 const iconMap = {
   "dollar-sign": DollarSign,
   "trending-up": TrendingUp,
@@ -28,15 +29,34 @@ const iconMap = {
   "piggy-bank": PiggyBank,
   receipt: Receipt,
   minus: Minus,
+  target: Target,
+  percent: Percent,
 } as const;
 
 export type MetricIconName = keyof typeof iconMap;
+
+type AccentColor = "emerald" | "blue" | "gold" | "purple";
+
+const accentBorderMap: Record<AccentColor, string> = {
+  emerald: "border-t-emerald-500",
+  blue: "border-t-blue-500",
+  gold: "border-t-amber-500",
+  purple: "border-t-purple-500",
+};
+
+const accentIconBgMap: Record<AccentColor, string> = {
+  emerald: "bg-emerald-50 text-emerald-600",
+  blue: "bg-blue-50 text-blue-600",
+  gold: "bg-amber-50 text-amber-600",
+  purple: "bg-purple-50 text-purple-600",
+};
 
 interface MetricCardProps {
   title: string;
   value: string;
   description?: string;
   iconName?: MetricIconName;
+  accent?: AccentColor;
   trend?: "up" | "down" | "neutral" | null;
   trendValue?: number | null;
   loading?: boolean;
@@ -60,6 +80,7 @@ export function MetricCard({
   value,
   description,
   iconName,
+  accent,
   trend,
   trendValue,
   loading = false,
@@ -67,10 +88,10 @@ export function MetricCard({
 }: MetricCardProps) {
   if (loading) {
     return (
-      <Card className={className}>
+      <Card className={cn(accent && "border-t-3", accent && accentBorderMap[accent], className)}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-4 rounded" />
+          <Skeleton className="h-8 w-8 rounded-md" />
         </CardHeader>
         <CardContent>
           <Skeleton className="h-8 w-28 mb-2" />
@@ -83,30 +104,33 @@ export function MetricCard({
   const Icon = iconName ? iconMap[iconName] : null;
 
   return (
-    <Card className={className}>
+    <Card className={cn(accent && "border-t-3", accent && accentBorderMap[accent], className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
-        {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+        {Icon && accent ? (
+          <div className={cn("rounded-md p-2", accentIconBgMap[accent])}>
+            <Icon className="h-4 w-4" />
+          </div>
+        ) : Icon ? (
+          <Icon className="h-4 w-4 text-muted-foreground" />
+        ) : null}
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {(description || trendValue !== null) && (
+        <div className="text-2xl font-bold font-[family-name:var(--font-display)]">
+          {value}
+        </div>
+        {trend != null && trendValue != null && (
           <div className={cn("flex items-center gap-1 text-xs", getTrendColor(trend))}>
-            {trend && trendValue !== null && <TrendIcon trend={trend} />}
+            <TrendIcon trend={trend} />
             <span>
-              {trendValue !== null && trendValue !== undefined && (
-                <>
-                  {trendValue > 0 ? "+" : ""}
-                  {trendValue.toFixed(1)}% vs last week
-                </>
-              )}
-              {description && !trendValue && description}
+              {trendValue > 0 ? "+" : ""}
+              {trendValue.toFixed(1)}% vs last week
             </span>
           </div>
         )}
-        {description && trendValue !== null && (
+        {description && (
           <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
         )}
       </CardContent>

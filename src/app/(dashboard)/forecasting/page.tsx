@@ -38,8 +38,8 @@ export default function ForecastingPage() {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -86,25 +86,25 @@ export default function ForecastingPage() {
                   )}
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <p className="text-muted-foreground">Trucks</p>
-                      <p className="font-medium">{scenario.truckCount}</p>
+                      <p className="text-muted-foreground">Trips/Week</p>
+                      <p className="font-medium">{scenario.numberOfTrips}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Revenue</p>
-                      <p className="font-medium text-emerald-600">
+                      <p className="text-muted-foreground">Per Trip</p>
+                      <p className="font-medium font-mono">
+                        {formatCurrency(scenario.revenuePerTrip)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Weekly</p>
+                      <p className="font-medium text-emerald-600 font-mono">
                         {formatCurrency(scenario.weeklyRevenue)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Costs</p>
-                      <p className="font-medium text-red-600">
-                        {formatCurrency(scenario.weeklyLaborCost + scenario.weeklyOverhead)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Profit</p>
-                      <p className={`font-medium ${scenario.weeklyProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                        {formatCurrency(scenario.weeklyProfit)}
+                      <p className="text-muted-foreground">Annual</p>
+                      <p className="font-medium font-mono">
+                        {formatCurrency(scenario.annualRevenue)}
                       </p>
                     </div>
                   </div>

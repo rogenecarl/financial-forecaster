@@ -473,6 +473,191 @@ export async function getTransactionsByCategory(
 }
 
 // ============================================
+// BATCH P&L STATEMENT
+// ============================================
+
+export async function getBatchPLStatement(
+  batchId: string
+): Promise<ActionResponse<PLStatement>> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    // Fetch all transactions in the batch with their categories
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        userId,
+        transactionBatchId: batchId,
+      },
+      include: {
+        category: true,
+      },
+    });
+
+    // Initialize section groups
+    const revenueGroups = new Map<string, { category: NonNullable<typeof transactions[0]["category"]>; transactions: typeof transactions }>();
+    const contraRevenueGroups = new Map<string, { category: NonNullable<typeof transactions[0]["category"]>; transactions: typeof transactions }>();
+    const cogsGroups = new Map<string, { category: NonNullable<typeof transactions[0]["category"]>; transactions: typeof transactions }>();
+    const opexGroups = new Map<string, { category: NonNullable<typeof transactions[0]["category"]>; transactions: typeof transactions }>();
+
+    let uncategorizedCount = 0;
+    let uncategorizedAmount = 0;
+    let equityCount = 0;
+    let equityAmount = 0;
+
+    for (const txn of transactions) {
+      if (!txn.categoryId || !txn.category) {
+        uncategorizedCount++;
+        uncategorizedAmount += Number(txn.amount);
+        continue;
+      }
+
+      const category = txn.category;
+      const key = txn.categoryId;
+
+      switch (category.type) {
+        case "REVENUE":
+          if (!revenueGroups.has(key)) revenueGroups.set(key, { category, transactions: [] });
+          revenueGroups.get(key)!.transactions.push(txn);
+          break;
+        case "CONTRA_REVENUE":
+          if (!contraRevenueGroups.has(key)) contraRevenueGroups.set(key, { category, transactions: [] });
+          contraRevenueGroups.get(key)!.transactions.push(txn);
+          break;
+        case "COGS":
+          if (!cogsGroups.has(key)) cogsGroups.set(key, { category, transactions: [] });
+          cogsGroups.get(key)!.transactions.push(txn);
+          break;
+        case "OPERATING_EXPENSE":
+          if (!opexGroups.has(key)) opexGroups.set(key, { category, transactions: [] });
+          opexGroups.get(key)!.transactions.push(txn);
+          break;
+        case "EQUITY":
+          equityCount++;
+          equityAmount += Number(txn.amount);
+          break;
+        case "UNCATEGORIZED":
+          uncategorizedCount++;
+          uncategorizedAmount += Number(txn.amount);
+          break;
+      }
+    }
+
+    // Helper to convert groups to line items
+    const groupsToSection = (
+      groups: Map<string, { category: NonNullable<typeof transactions[0]["category"]>; transactions: typeof transactions }>
+    ): PLSection => {
+      const items: PLLineItem[] = [];
+      let total = 0;
+
+      for (const [, group] of groups) {
+        const amount = group.transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+        total += amount;
+
+        items.push({
+          categoryId: group.category.id,
+          categoryName: group.category.name,
+          categoryColor: group.category.color,
+          categoryType: group.category.type as PLLineItem["categoryType"],
+          amount,
+          transactionCount: group.transactions.length,
+          percentage: 0,
+        });
+      }
+
+      for (const item of items) {
+        item.percentage = total !== 0 ? (Math.abs(item.amount) / Math.abs(total)) * 100 : 0;
+      }
+      items.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+
+      return { items, total };
+    };
+
+    const revenue = groupsToSection(revenueGroups);
+    const contraRevenue = groupsToSection(contraRevenueGroups);
+    const cogs = groupsToSection(cogsGroups);
+    const operatingExpenses = groupsToSection(opexGroups);
+
+    const netRevenue = revenue.total + contraRevenue.total;
+    const grossProfit = netRevenue + cogs.total;
+    const operatingIncome = grossProfit + operatingExpenses.total;
+    const operatingMargin = netRevenue !== 0 ? (operatingIncome / netRevenue) * 100 : 0;
+
+    // Use batch date range for period info
+    const dates = transactions.map((t) => new Date(t.postingDate));
+    const minDate = dates.length > 0 ? new Date(Math.min(...dates.map((d) => d.getTime()))) : new Date();
+    const maxDate = dates.length > 0 ? new Date(Math.max(...dates.map((d) => d.getTime()))) : new Date();
+
+    const statement: PLStatement = {
+      period: {
+        type: "custom",
+        startDate: minDate,
+        endDate: maxDate,
+      },
+      revenue,
+      contraRevenue,
+      netRevenue,
+      cogs,
+      grossProfit,
+      operatingExpenses,
+      operatingIncome,
+      operatingMargin,
+      uncategorizedCount,
+      uncategorizedAmount,
+      equityCount,
+      equityAmount,
+    };
+
+    return { success: true, data: statement };
+  } catch (error) {
+    console.error("Failed to generate batch P&L statement:", error);
+    return { success: false, error: "Failed to generate batch P&L statement" };
+  }
+}
+
+// ============================================
+// GET TRANSACTIONS BY CATEGORY IN BATCH
+// ============================================
+
+export async function getTransactionsByCategoryInBatch(
+  categoryId: string,
+  batchId: string
+): Promise<ActionResponse<CategoryTransaction[]>> {
+  try {
+    const session = await requireAuth();
+    const userId = session.user.id;
+
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        userId,
+        categoryId,
+        transactionBatchId: batchId,
+      },
+      select: {
+        id: true,
+        postingDate: true,
+        description: true,
+        amount: true,
+        type: true,
+        details: true,
+      },
+      orderBy: { postingDate: "desc" },
+    });
+
+    return {
+      success: true,
+      data: transactions.map((t) => ({
+        ...t,
+        amount: Number(t.amount),
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to fetch batch category transactions:", error);
+    return { success: false, error: "Failed to fetch transactions" };
+  }
+}
+
+// ============================================
 // GET AVAILABLE DATE RANGE
 // ============================================
 

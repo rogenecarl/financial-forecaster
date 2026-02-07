@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CategorySelect } from "./category-select";
-import { generateImportPreview, importTransactions } from "@/actions/transactions";
+import { generateImportPreview, importTransactions, type ImportMode } from "@/actions/transactions";
 import { getCategories } from "@/actions/settings/categories";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -43,6 +43,8 @@ interface ImportPreviewProps {
   fileName: string;
   fileType: "CSV" | "XLSX";
   onComplete: () => void;
+  transactionBatchId?: string;
+  mode?: ImportMode;
 }
 
 export function ImportPreview({
@@ -52,6 +54,8 @@ export function ImportPreview({
   fileName,
   fileType,
   onComplete,
+  transactionBatchId,
+  mode = "APPEND",
 }: ImportPreviewProps) {
   const [previewItems, setPreviewItems] = useState<ImportPreviewItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -80,7 +84,7 @@ export function ImportPreview({
 
       setLoading(true);
       try {
-        const result = await generateImportPreview(transactions);
+        const result = await generateImportPreview(transactions, transactionBatchId, mode);
         if (result.success && result.data) {
           setPreviewItems(result.data);
           // Select all non-duplicates by default
@@ -100,7 +104,7 @@ export function ImportPreview({
     }
 
     generatePreview();
-  }, [open, transactions]);
+  }, [open, transactions, transactionBatchId, mode]);
 
   const handleImport = async () => {
     const itemsToImport = previewItems.filter((item) =>
@@ -114,10 +118,13 @@ export function ImportPreview({
 
     setImporting(true);
     try {
-      const result = await importTransactions(itemsToImport, fileName, fileType);
+      const result = await importTransactions(itemsToImport, fileName, fileType, transactionBatchId, mode);
 
       if (result.success) {
         let message = `Imported ${result.data.totalImported} transactions`;
+        if (result.data.totalReplaced > 0) {
+          message += ` (replaced ${result.data.totalReplaced} existing)`;
+        }
         if (result.data.categoriesCreated > 0) {
           message += ` (${result.data.categoriesCreated} new categories created)`;
         }
@@ -213,9 +220,11 @@ export function ImportPreview({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Preview Import</DialogTitle>
+          <DialogTitle>{mode === "REPLACE" ? "Preview Re-import" : "Preview Import"}</DialogTitle>
           <DialogDescription>
-            Review and categorize transactions before importing
+            {mode === "REPLACE"
+              ? "Existing transactions in this batch will be replaced. Review before proceeding."
+              : "Review and categorize transactions before importing"}
           </DialogDescription>
         </DialogHeader>
 

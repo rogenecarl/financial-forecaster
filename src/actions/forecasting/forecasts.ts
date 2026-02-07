@@ -3,12 +3,7 @@
 import prisma from "@/lib/db";
 import { requireAuth } from "@/lib/auth-server";
 import type { ActionResponse } from "@/types/api";
-import type {
-  Forecast,
-  CreateForecast,
-  UpdateForecast,
-  ForecastInput,
-} from "@/schema/forecasting.schema";
+import type { Forecast, CreateForecast, UpdateForecast } from "@/schema/forecasting.schema";
 import { createForecastSchema, updateForecastSchema } from "@/schema/forecasting.schema";
 import { calculateForecast } from "@/lib/forecast-calculations";
 
@@ -24,6 +19,40 @@ function toNumber(value: any): number {
   return Number(value) || 0;
 }
 
+function serializeForecast(f: {
+  id: string;
+  userId: string;
+  name: string;
+  description: string | null;
+  isDefault: boolean;
+  numberOfTrips: number;
+  dtrRate: unknown;
+  avgAccessorialPerTrip: unknown;
+  revenuePerTrip: unknown;
+  weeklyRevenue: unknown;
+  monthlyRevenue: unknown;
+  annualRevenue: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+}): Forecast {
+  return {
+    id: f.id,
+    userId: f.userId,
+    name: f.name,
+    description: f.description,
+    isDefault: f.isDefault,
+    numberOfTrips: f.numberOfTrips,
+    dtrRate: toNumber(f.dtrRate),
+    avgAccessorialPerTrip: toNumber(f.avgAccessorialPerTrip),
+    revenuePerTrip: toNumber(f.revenuePerTrip),
+    weeklyRevenue: toNumber(f.weeklyRevenue),
+    monthlyRevenue: toNumber(f.monthlyRevenue),
+    annualRevenue: toNumber(f.annualRevenue),
+    createdAt: f.createdAt,
+    updatedAt: f.updatedAt,
+  };
+}
+
 // ============================================
 // GET FORECASTS (Saved Scenarios)
 // ============================================
@@ -37,33 +66,7 @@ export async function getForecasts(): Promise<ActionResponse<Forecast[]>> {
       orderBy: [{ isDefault: "desc" }, { name: "asc" }],
     });
 
-    const result: Forecast[] = forecasts.map((f) => ({
-      id: f.id,
-      userId: f.userId,
-      name: f.name,
-      description: f.description,
-      isDefault: f.isDefault,
-      truckCount: f.truckCount,
-      nightsPerWeek: f.nightsPerWeek,
-      toursPerTruck: f.toursPerTruck,
-      avgLoadsPerTour: toNumber(f.avgLoadsPerTour),
-      dtrRate: toNumber(f.dtrRate),
-      avgAccessorialRate: toNumber(f.avgAccessorialRate),
-      hourlyWage: toNumber(f.hourlyWage),
-      hoursPerNight: toNumber(f.hoursPerNight),
-      overtimeMultiplier: toNumber(f.overtimeMultiplier),
-      payrollTaxRate: toNumber(f.payrollTaxRate),
-      workersCompRate: toNumber(f.workersCompRate),
-      weeklyRevenue: toNumber(f.weeklyRevenue),
-      weeklyLaborCost: toNumber(f.weeklyLaborCost),
-      weeklyOverhead: toNumber(f.weeklyOverhead),
-      weeklyProfit: toNumber(f.weeklyProfit),
-      contributionMargin: toNumber(f.contributionMargin),
-      createdAt: f.createdAt,
-      updatedAt: f.updatedAt,
-    }));
-
-    return { success: true, data: result };
+    return { success: true, data: forecasts.map(serializeForecast) };
   } catch (error) {
     console.error("Failed to get forecasts:", error);
     return { success: false, error: "Failed to load forecasts" };
@@ -89,33 +92,7 @@ export async function getDefaultForecast(): Promise<ActionResponse<Forecast | nu
       return { success: true, data: null };
     }
 
-    const result: Forecast = {
-      id: forecast.id,
-      userId: forecast.userId,
-      name: forecast.name,
-      description: forecast.description,
-      isDefault: forecast.isDefault,
-      truckCount: forecast.truckCount,
-      nightsPerWeek: forecast.nightsPerWeek,
-      toursPerTruck: forecast.toursPerTruck,
-      avgLoadsPerTour: toNumber(forecast.avgLoadsPerTour),
-      dtrRate: toNumber(forecast.dtrRate),
-      avgAccessorialRate: toNumber(forecast.avgAccessorialRate),
-      hourlyWage: toNumber(forecast.hourlyWage),
-      hoursPerNight: toNumber(forecast.hoursPerNight),
-      overtimeMultiplier: toNumber(forecast.overtimeMultiplier),
-      payrollTaxRate: toNumber(forecast.payrollTaxRate),
-      workersCompRate: toNumber(forecast.workersCompRate),
-      weeklyRevenue: toNumber(forecast.weeklyRevenue),
-      weeklyLaborCost: toNumber(forecast.weeklyLaborCost),
-      weeklyOverhead: toNumber(forecast.weeklyOverhead),
-      weeklyProfit: toNumber(forecast.weeklyProfit),
-      contributionMargin: toNumber(forecast.contributionMargin),
-      createdAt: forecast.createdAt,
-      updatedAt: forecast.updatedAt,
-    };
-
-    return { success: true, data: result };
+    return { success: true, data: serializeForecast(forecast) };
   } catch (error) {
     console.error("Failed to get default forecast:", error);
     return { success: false, error: "Failed to load forecast" };
@@ -133,10 +110,7 @@ export async function createForecast(data: CreateForecast): Promise<ActionRespon
     const validated = createForecastSchema.parse(data);
 
     // Calculate results
-    const results = calculateForecast({
-      ...validated,
-      includeOvertime: false,
-    });
+    const results = calculateForecast(validated);
 
     // If setting as default, unset other defaults
     if (validated.isDefault) {
@@ -152,52 +126,17 @@ export async function createForecast(data: CreateForecast): Promise<ActionRespon
         name: validated.name,
         description: validated.description || null,
         isDefault: validated.isDefault,
-        truckCount: validated.truckCount,
-        nightsPerWeek: validated.nightsPerWeek,
-        toursPerTruck: validated.toursPerTruck,
-        avgLoadsPerTour: validated.avgLoadsPerTour,
+        numberOfTrips: validated.numberOfTrips,
         dtrRate: validated.dtrRate,
-        avgAccessorialRate: validated.avgAccessorialRate,
-        hourlyWage: validated.hourlyWage,
-        hoursPerNight: validated.hoursPerNight,
-        overtimeMultiplier: validated.overtimeMultiplier,
-        payrollTaxRate: validated.payrollTaxRate,
-        workersCompRate: validated.workersCompRate,
+        avgAccessorialPerTrip: validated.avgAccessorialPerTrip,
+        revenuePerTrip: results.revenuePerTrip,
         weeklyRevenue: results.weeklyRevenue,
-        weeklyLaborCost: results.laborCost + results.payrollTax + results.workersComp,
-        weeklyOverhead: validated.weeklyOverhead,
-        weeklyProfit: results.weeklyProfit,
-        contributionMargin: results.contributionMargin,
+        monthlyRevenue: results.monthlyRevenue,
+        annualRevenue: results.annualRevenue,
       },
     });
 
-    const result: Forecast = {
-      id: forecast.id,
-      userId: forecast.userId,
-      name: forecast.name,
-      description: forecast.description,
-      isDefault: forecast.isDefault,
-      truckCount: forecast.truckCount,
-      nightsPerWeek: forecast.nightsPerWeek,
-      toursPerTruck: forecast.toursPerTruck,
-      avgLoadsPerTour: toNumber(forecast.avgLoadsPerTour),
-      dtrRate: toNumber(forecast.dtrRate),
-      avgAccessorialRate: toNumber(forecast.avgAccessorialRate),
-      hourlyWage: toNumber(forecast.hourlyWage),
-      hoursPerNight: toNumber(forecast.hoursPerNight),
-      overtimeMultiplier: toNumber(forecast.overtimeMultiplier),
-      payrollTaxRate: toNumber(forecast.payrollTaxRate),
-      workersCompRate: toNumber(forecast.workersCompRate),
-      weeklyRevenue: toNumber(forecast.weeklyRevenue),
-      weeklyLaborCost: toNumber(forecast.weeklyLaborCost),
-      weeklyOverhead: toNumber(forecast.weeklyOverhead),
-      weeklyProfit: toNumber(forecast.weeklyProfit),
-      contributionMargin: toNumber(forecast.contributionMargin),
-      createdAt: forecast.createdAt,
-      updatedAt: forecast.updatedAt,
-    };
-
-    return { success: true, data: result };
+    return { success: true, data: serializeForecast(forecast) };
   } catch (error) {
     console.error("Failed to create forecast:", error);
     return { success: false, error: "Failed to create forecast" };
@@ -222,24 +161,12 @@ export async function updateForecast(data: UpdateForecast): Promise<ActionRespon
       return { success: false, error: "Forecast not found" };
     }
 
-    // Calculate new results if parameters changed
-    const input: ForecastInput = {
-      truckCount: validated.truckCount ?? existing.truckCount,
-      nightsPerWeek: validated.nightsPerWeek ?? existing.nightsPerWeek,
-      toursPerTruck: validated.toursPerTruck ?? existing.toursPerTruck,
-      avgLoadsPerTour: validated.avgLoadsPerTour ?? toNumber(existing.avgLoadsPerTour),
+    // Calculate new results
+    const results = calculateForecast({
+      numberOfTrips: validated.numberOfTrips ?? existing.numberOfTrips,
       dtrRate: validated.dtrRate ?? toNumber(existing.dtrRate),
-      avgAccessorialRate: validated.avgAccessorialRate ?? toNumber(existing.avgAccessorialRate),
-      hourlyWage: validated.hourlyWage ?? toNumber(existing.hourlyWage),
-      hoursPerNight: validated.hoursPerNight ?? toNumber(existing.hoursPerNight),
-      includeOvertime: false,
-      overtimeMultiplier: validated.overtimeMultiplier ?? toNumber(existing.overtimeMultiplier),
-      payrollTaxRate: validated.payrollTaxRate ?? toNumber(existing.payrollTaxRate),
-      workersCompRate: validated.workersCompRate ?? toNumber(existing.workersCompRate),
-      weeklyOverhead: validated.weeklyOverhead ?? toNumber(existing.weeklyOverhead),
-    };
-
-    const results = calculateForecast(input);
+      avgAccessorialPerTrip: validated.avgAccessorialPerTrip ?? toNumber(existing.avgAccessorialPerTrip),
+    });
 
     // If setting as default, unset other defaults
     if (validated.isDefault) {
@@ -255,52 +182,17 @@ export async function updateForecast(data: UpdateForecast): Promise<ActionRespon
         ...(validated.name !== undefined ? { name: validated.name } : {}),
         ...(validated.description !== undefined ? { description: validated.description } : {}),
         ...(validated.isDefault !== undefined ? { isDefault: validated.isDefault } : {}),
-        ...(validated.truckCount !== undefined ? { truckCount: validated.truckCount } : {}),
-        ...(validated.nightsPerWeek !== undefined ? { nightsPerWeek: validated.nightsPerWeek } : {}),
-        ...(validated.toursPerTruck !== undefined ? { toursPerTruck: validated.toursPerTruck } : {}),
-        ...(validated.avgLoadsPerTour !== undefined ? { avgLoadsPerTour: validated.avgLoadsPerTour } : {}),
+        ...(validated.numberOfTrips !== undefined ? { numberOfTrips: validated.numberOfTrips } : {}),
         ...(validated.dtrRate !== undefined ? { dtrRate: validated.dtrRate } : {}),
-        ...(validated.avgAccessorialRate !== undefined ? { avgAccessorialRate: validated.avgAccessorialRate } : {}),
-        ...(validated.hourlyWage !== undefined ? { hourlyWage: validated.hourlyWage } : {}),
-        ...(validated.hoursPerNight !== undefined ? { hoursPerNight: validated.hoursPerNight } : {}),
-        ...(validated.overtimeMultiplier !== undefined ? { overtimeMultiplier: validated.overtimeMultiplier } : {}),
-        ...(validated.payrollTaxRate !== undefined ? { payrollTaxRate: validated.payrollTaxRate } : {}),
-        ...(validated.workersCompRate !== undefined ? { workersCompRate: validated.workersCompRate } : {}),
-        ...(validated.weeklyOverhead !== undefined ? { weeklyOverhead: validated.weeklyOverhead } : {}),
+        ...(validated.avgAccessorialPerTrip !== undefined ? { avgAccessorialPerTrip: validated.avgAccessorialPerTrip } : {}),
+        revenuePerTrip: results.revenuePerTrip,
         weeklyRevenue: results.weeklyRevenue,
-        weeklyLaborCost: results.laborCost + results.payrollTax + results.workersComp,
-        weeklyProfit: results.weeklyProfit,
-        contributionMargin: results.contributionMargin,
+        monthlyRevenue: results.monthlyRevenue,
+        annualRevenue: results.annualRevenue,
       },
     });
 
-    const result: Forecast = {
-      id: forecast.id,
-      userId: forecast.userId,
-      name: forecast.name,
-      description: forecast.description,
-      isDefault: forecast.isDefault,
-      truckCount: forecast.truckCount,
-      nightsPerWeek: forecast.nightsPerWeek,
-      toursPerTruck: forecast.toursPerTruck,
-      avgLoadsPerTour: toNumber(forecast.avgLoadsPerTour),
-      dtrRate: toNumber(forecast.dtrRate),
-      avgAccessorialRate: toNumber(forecast.avgAccessorialRate),
-      hourlyWage: toNumber(forecast.hourlyWage),
-      hoursPerNight: toNumber(forecast.hoursPerNight),
-      overtimeMultiplier: toNumber(forecast.overtimeMultiplier),
-      payrollTaxRate: toNumber(forecast.payrollTaxRate),
-      workersCompRate: toNumber(forecast.workersCompRate),
-      weeklyRevenue: toNumber(forecast.weeklyRevenue),
-      weeklyLaborCost: toNumber(forecast.weeklyLaborCost),
-      weeklyOverhead: toNumber(forecast.weeklyOverhead),
-      weeklyProfit: toNumber(forecast.weeklyProfit),
-      contributionMargin: toNumber(forecast.contributionMargin),
-      createdAt: forecast.createdAt,
-      updatedAt: forecast.updatedAt,
-    };
-
-    return { success: true, data: result };
+    return { success: true, data: serializeForecast(forecast) };
   } catch (error) {
     console.error("Failed to update forecast:", error);
     return { success: false, error: "Failed to update forecast" };
@@ -331,4 +223,3 @@ export async function deleteForecast(id: string): Promise<ActionResponse<void>> 
     return { success: false, error: "Failed to delete forecast" };
   }
 }
-

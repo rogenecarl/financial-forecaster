@@ -390,7 +390,7 @@ export const ModelName = {
   Verification: 'Verification',
   Category: 'Category',
   Transaction: 'Transaction',
-  ImportBatch: 'ImportBatch',
+  TransactionBatch: 'TransactionBatch',
   TripBatch: 'TripBatch',
   CategoryRule: 'CategoryRule',
   AmazonInvoice: 'AmazonInvoice',
@@ -413,7 +413,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "category" | "transaction" | "importBatch" | "tripBatch" | "categoryRule" | "amazonInvoice" | "amazonInvoiceLineItem" | "trip" | "tripLoad" | "forecast"
+    modelProps: "user" | "session" | "account" | "verification" | "category" | "transaction" | "transactionBatch" | "tripBatch" | "categoryRule" | "amazonInvoice" | "amazonInvoiceLineItem" | "trip" | "tripLoad" | "forecast"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -861,77 +861,77 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
-    ImportBatch: {
-      payload: Prisma.$ImportBatchPayload<ExtArgs>
-      fields: Prisma.ImportBatchFieldRefs
+    TransactionBatch: {
+      payload: Prisma.$TransactionBatchPayload<ExtArgs>
+      fields: Prisma.TransactionBatchFieldRefs
       operations: {
         findUnique: {
-          args: Prisma.ImportBatchFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload> | null
+          args: Prisma.TransactionBatchFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload> | null
         }
         findUniqueOrThrow: {
-          args: Prisma.ImportBatchFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          args: Prisma.TransactionBatchFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload>
         }
         findFirst: {
-          args: Prisma.ImportBatchFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload> | null
+          args: Prisma.TransactionBatchFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload> | null
         }
         findFirstOrThrow: {
-          args: Prisma.ImportBatchFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          args: Prisma.TransactionBatchFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload>
         }
         findMany: {
-          args: Prisma.ImportBatchFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload>[]
+          args: Prisma.TransactionBatchFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload>[]
         }
         create: {
-          args: Prisma.ImportBatchCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          args: Prisma.TransactionBatchCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload>
         }
         createMany: {
-          args: Prisma.ImportBatchCreateManyArgs<ExtArgs>
+          args: Prisma.TransactionBatchCreateManyArgs<ExtArgs>
           result: BatchPayload
         }
         createManyAndReturn: {
-          args: Prisma.ImportBatchCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload>[]
+          args: Prisma.TransactionBatchCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload>[]
         }
         delete: {
-          args: Prisma.ImportBatchDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          args: Prisma.TransactionBatchDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload>
         }
         update: {
-          args: Prisma.ImportBatchUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          args: Prisma.TransactionBatchUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload>
         }
         deleteMany: {
-          args: Prisma.ImportBatchDeleteManyArgs<ExtArgs>
+          args: Prisma.TransactionBatchDeleteManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateMany: {
-          args: Prisma.ImportBatchUpdateManyArgs<ExtArgs>
+          args: Prisma.TransactionBatchUpdateManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateManyAndReturn: {
-          args: Prisma.ImportBatchUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload>[]
+          args: Prisma.TransactionBatchUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload>[]
         }
         upsert: {
-          args: Prisma.ImportBatchUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          args: Prisma.TransactionBatchUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TransactionBatchPayload>
         }
         aggregate: {
-          args: Prisma.ImportBatchAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateImportBatch>
+          args: Prisma.TransactionBatchAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTransactionBatch>
         }
         groupBy: {
-          args: Prisma.ImportBatchGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.ImportBatchGroupByOutputType>[]
+          args: Prisma.TransactionBatchGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TransactionBatchGroupByOutputType>[]
         }
         count: {
-          args: Prisma.ImportBatchCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.ImportBatchCountAggregateOutputType> | number
+          args: Prisma.TransactionBatchCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TransactionBatchCountAggregateOutputType> | number
         }
       }
     }
@@ -1569,7 +1569,7 @@ export const TransactionScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   categoryId: 'categoryId',
-  importBatchId: 'importBatchId',
+  transactionBatchId: 'transactionBatchId',
   details: 'details',
   postingDate: 'postingDate',
   description: 'description',
@@ -1589,18 +1589,25 @@ export const TransactionScalarFieldEnum = {
 export type TransactionScalarFieldEnum = (typeof TransactionScalarFieldEnum)[keyof typeof TransactionScalarFieldEnum]
 
 
-export const ImportBatchScalarFieldEnum = {
+export const TransactionBatchScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
-  fileName: 'fileName',
-  fileType: 'fileType',
-  recordCount: 'recordCount',
+  name: 'name',
+  description: 'description',
   status: 'status',
-  errorMessage: 'errorMessage',
-  createdAt: 'createdAt'
+  lastImportFileName: 'lastImportFileName',
+  lastImportedAt: 'lastImportedAt',
+  transactionCount: 'transactionCount',
+  uncategorizedCount: 'uncategorizedCount',
+  netRevenue: 'netRevenue',
+  grossProfit: 'grossProfit',
+  operatingIncome: 'operatingIncome',
+  operatingMargin: 'operatingMargin',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 } as const
 
-export type ImportBatchScalarFieldEnum = (typeof ImportBatchScalarFieldEnum)[keyof typeof ImportBatchScalarFieldEnum]
+export type TransactionBatchScalarFieldEnum = (typeof TransactionBatchScalarFieldEnum)[keyof typeof TransactionBatchScalarFieldEnum]
 
 
 export const TripBatchScalarFieldEnum = {
@@ -1761,22 +1768,13 @@ export const ForecastScalarFieldEnum = {
   name: 'name',
   description: 'description',
   isDefault: 'isDefault',
-  truckCount: 'truckCount',
-  nightsPerWeek: 'nightsPerWeek',
-  toursPerTruck: 'toursPerTruck',
-  avgLoadsPerTour: 'avgLoadsPerTour',
+  numberOfTrips: 'numberOfTrips',
   dtrRate: 'dtrRate',
-  avgAccessorialRate: 'avgAccessorialRate',
-  hourlyWage: 'hourlyWage',
-  hoursPerNight: 'hoursPerNight',
-  overtimeMultiplier: 'overtimeMultiplier',
-  payrollTaxRate: 'payrollTaxRate',
-  workersCompRate: 'workersCompRate',
+  avgAccessorialPerTrip: 'avgAccessorialPerTrip',
+  revenuePerTrip: 'revenuePerTrip',
   weeklyRevenue: 'weeklyRevenue',
-  weeklyLaborCost: 'weeklyLaborCost',
-  weeklyOverhead: 'weeklyOverhead',
-  weeklyProfit: 'weeklyProfit',
-  contributionMargin: 'contributionMargin',
+  monthlyRevenue: 'monthlyRevenue',
+  annualRevenue: 'annualRevenue',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -1934,6 +1932,20 @@ export type ListEnumReviewStatusFieldRefInput<$PrismaModel> = FieldRefInputType<
 
 
 /**
+ * Reference to a field of type 'TransactionBatchStatus'
+ */
+export type EnumTransactionBatchStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TransactionBatchStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'TransactionBatchStatus[]'
+ */
+export type ListEnumTransactionBatchStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TransactionBatchStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'BatchStatus'
  */
 export type EnumBatchStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BatchStatus'>
@@ -2075,7 +2087,7 @@ export type GlobalOmitConfig = {
   verification?: Prisma.VerificationOmit
   category?: Prisma.CategoryOmit
   transaction?: Prisma.TransactionOmit
-  importBatch?: Prisma.ImportBatchOmit
+  transactionBatch?: Prisma.TransactionBatchOmit
   tripBatch?: Prisma.TripBatchOmit
   categoryRule?: Prisma.CategoryRuleOmit
   amazonInvoice?: Prisma.AmazonInvoiceOmit

@@ -16,7 +16,7 @@ export {
   applyCategoryRules,
   generateImportPreview,
   importTransactions,
-  getImportHistory,
+  type ImportMode,
   type ImportResult,
   type DuplicateCheckResult,
 } from "./import";
@@ -27,6 +27,8 @@ export {
   comparePeriods,
   getTransactionDateRange,
   getTransactionsByCategory,
+  getBatchPLStatement,
+  getTransactionsByCategoryInBatch,
   type PLSummary,
   type TransactionDateRange,
   type CategoryTransaction,
@@ -39,3 +41,16 @@ export {
   type PatternSuggestion,
   type RuleSuggestion,
 } from "./rule-learning";
+
+export {
+  createTransactionBatch,
+  updateTransactionBatch,
+  deleteTransactionBatch,
+  getTransactionBatch,
+  getTransactionBatches,
+  recalculateBatchFinancials,
+  type TransactionBatchSummary,
+  type TransactionBatchFilters,
+  type CreateTransactionBatchInput,
+  type UpdateTransactionBatchInput,
+} from "./transaction-batches";

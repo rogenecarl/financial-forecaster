@@ -41,6 +41,23 @@ export {
   type TripWithLoadsForTable,
 } from "./use-trip-batches"
 export {
+  // Transaction Batch query hooks
+  useTransactionBatches,
+  useTransactionBatch,
+  useBatchPLStatement,
+  // Transaction Batch mutation hooks
+  useCreateTransactionBatch,
+  useUpdateTransactionBatch,
+  useDeleteTransactionBatch,
+  // Query keys
+  transactionBatchKeys,
+  // Types
+  type TransactionBatchSummary,
+  type TransactionBatchFilters,
+  type CreateTransactionBatchInput,
+  type UpdateTransactionBatchInput,
+} from "./use-transaction-batches"
+export {
   useAnalyticsData,
   useYearlySummary,
   useMonthlyBreakdown,
@@ -58,12 +75,5 @@ export {
   useDeleteCategory,
   categoryKeys,
 } from "./use-categories"
-export {
-  useGenerateWeeklyPL,
-  useGenerateMonthlyPL,
-  useExportTransactions,
-  useExportForecast,
-  useGenerateCPAPackage,
-} from "./use-reports"
 // Re-export useSession for direct access if needed
 export { useSession } from "@/components/providers"

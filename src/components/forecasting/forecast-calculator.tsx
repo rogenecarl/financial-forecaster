@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { TrendingUp, Users, DollarSign, Calculator, Save, Loader2 } from "lucide-react";
+import { TrendingUp, DollarSign, Save, Loader2, Calculator } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,25 +20,16 @@ import { calculateForecast, generateScalingTable } from "@/lib/forecast-calculat
 import { createForecast } from "@/actions/forecasting";
 import type { ForecastInput, CreateForecast } from "@/schema/forecasting.schema";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface ForecastCalculatorProps {
   onSave?: () => void;
 }
 
 const defaultInputs: ForecastInput = {
-  truckCount: 2,
-  nightsPerWeek: 7,
-  toursPerTruck: 1,
-  avgLoadsPerTour: 4,
+  numberOfTrips: 7,
   dtrRate: 452.09,
-  avgAccessorialRate: 34.12,
-  hourlyWage: 20,
-  hoursPerNight: 10,
-  includeOvertime: false,
-  overtimeMultiplier: 1.5,
-  payrollTaxRate: 0.0765,
-  workersCompRate: 0.05,
-  weeklyOverhead: 0,
+  avgAccessorialPerTrip: 70,
 };
 
 export function ForecastCalculator({ onSave }: ForecastCalculatorProps) {
@@ -54,7 +45,7 @@ export function ForecastCalculator({ onSave }: ForecastCalculatorProps) {
 
   // Generate scaling table
   const scalingTable = useMemo(
-    () => generateScalingTable(inputs, [2, 4, 6, 8, 10]),
+    () => generateScalingTable(inputs, [7, 14, 21, 28, 35, 42]),
     [inputs]
   );
 
@@ -66,8 +57,8 @@ export function ForecastCalculator({ onSave }: ForecastCalculatorProps) {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -83,18 +74,9 @@ export function ForecastCalculator({ onSave }: ForecastCalculatorProps) {
         name: scenarioName,
         description: scenarioDescription || null,
         isDefault,
-        truckCount: inputs.truckCount,
-        nightsPerWeek: inputs.nightsPerWeek,
-        toursPerTruck: inputs.toursPerTruck,
-        avgLoadsPerTour: inputs.avgLoadsPerTour,
+        numberOfTrips: inputs.numberOfTrips,
         dtrRate: inputs.dtrRate,
-        avgAccessorialRate: inputs.avgAccessorialRate,
-        hourlyWage: inputs.hourlyWage,
-        hoursPerNight: inputs.hoursPerNight,
-        overtimeMultiplier: inputs.overtimeMultiplier,
-        payrollTaxRate: inputs.payrollTaxRate,
-        workersCompRate: inputs.workersCompRate,
-        weeklyOverhead: inputs.weeklyOverhead,
+        avgAccessorialPerTrip: inputs.avgAccessorialPerTrip,
       };
 
       const result = await createForecast(data);
@@ -123,168 +105,101 @@ export function ForecastCalculator({ onSave }: ForecastCalculatorProps) {
         {/* Input Parameters */}
         <Card>
           <CardHeader>
-            <CardTitle>Input Parameters</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Input Parameters
+            </CardTitle>
             <CardDescription>Adjust values to model different scenarios</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Operations */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium">Operations</h4>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Number of Trucks</Label>
-                  <div className="flex items-center gap-3">
-                    <Slider
-                      value={[inputs.truckCount]}
-                      onValueChange={([v]) => updateInput("truckCount", v)}
-                      min={1}
-                      max={10}
-                      step={1}
-                      className="flex-1"
-                    />
-                    <span className="w-8 text-right font-medium">{inputs.truckCount}</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Nights per Week</Label>
-                  <div className="flex items-center gap-3">
-                    <Slider
-                      value={[inputs.nightsPerWeek]}
-                      onValueChange={([v]) => updateInput("nightsPerWeek", v)}
-                      min={1}
-                      max={7}
-                      step={1}
-                      className="flex-1"
-                    />
-                    <span className="w-8 text-right font-medium">{inputs.nightsPerWeek}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Rates */}
-            <div className="space-y-4 pt-4 border-t">
-              <h4 className="text-sm font-medium">Rates</h4>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>DTR Rate</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                    <Input
-                      type="number"
-                      value={inputs.dtrRate}
-                      onChange={(e) => updateInput("dtrRate", parseFloat(e.target.value) || 0)}
-                      className="pl-7"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Avg Accessorial</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                    <Input
-                      type="number"
-                      value={inputs.avgAccessorialRate}
-                      onChange={(e) => updateInput("avgAccessorialRate", parseFloat(e.target.value) || 0)}
-                      className="pl-7"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Avg Loads per Tour</Label>
-                <div className="flex items-center gap-3">
-                  <Slider
-                    value={[inputs.avgLoadsPerTour]}
-                    onValueChange={([v]) => updateInput("avgLoadsPerTour", v)}
-                    min={1}
-                    max={8}
-                    step={0.5}
-                    className="flex-1"
-                  />
-                  <span className="w-8 text-right font-medium">{inputs.avgLoadsPerTour}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Labor Costs */}
-            <div className="space-y-4 pt-4 border-t">
-              <h4 className="text-sm font-medium">Labor Costs</h4>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Hourly Wage</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                    <Input
-                      type="number"
-                      value={inputs.hourlyWage}
-                      onChange={(e) => updateInput("hourlyWage", parseFloat(e.target.value) || 0)}
-                      className="pl-7"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Hours per Night</Label>
-                  <Input
-                    type="number"
-                    value={inputs.hoursPerNight}
-                    onChange={(e) => updateInput("hoursPerNight", parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Payroll Tax Rate</Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={(inputs.payrollTaxRate * 100).toFixed(2)}
-                      onChange={(e) => updateInput("payrollTaxRate", (parseFloat(e.target.value) || 0) / 100)}
-                      className="pr-7"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Workers Comp Rate</Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={(inputs.workersCompRate * 100).toFixed(2)}
-                      onChange={(e) => updateInput("workersCompRate", (parseFloat(e.target.value) || 0) / 100)}
-                      className="pr-7"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={inputs.includeOvertime}
-                  onCheckedChange={(v) => updateInput("includeOvertime", v)}
+            {/* Number of Trips */}
+            <div className="space-y-3">
+              <Label className="text-base font-medium">Number of Trips</Label>
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[inputs.numberOfTrips]}
+                  onValueChange={([v]) => updateInput("numberOfTrips", v)}
+                  min={1}
+                  max={50}
+                  step={1}
+                  className="flex-1"
                 />
-                <Label>Include Overtime Calculation</Label>
+                <span className="w-10 text-right text-lg font-bold tabular-nums">
+                  {inputs.numberOfTrips}
+                </span>
               </div>
-              <div className="space-y-2">
-                <Label>Weekly Overhead</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                  <Input
-                    type="number"
-                    value={inputs.weeklyOverhead}
-                    onChange={(e) => updateInput("weeklyOverhead", parseFloat(e.target.value) || 0)}
-                    className="pl-7"
-                  />
-                </div>
+              <p className="text-xs text-muted-foreground">
+                Total trips (tours) per week. Each trip earns one DTR payment.
+              </p>
+            </div>
+
+            {/* DTR Rate */}
+            <div className="space-y-2 pt-4 border-t">
+              <Label className="text-base font-medium">DTR Rate (per trip)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={inputs.dtrRate}
+                  onChange={(e) => updateInput("dtrRate", parseFloat(e.target.value) || 0)}
+                  className="pl-7 text-lg font-mono"
+                />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Daily Trip Rate — base pay per completed trip/tour.
+              </p>
+            </div>
+
+            {/* Avg Accessorial per Trip */}
+            <div className="space-y-2 pt-4 border-t">
+              <Label className="text-base font-medium">Avg Accessorials per Trip</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={inputs.avgAccessorialPerTrip}
+                  onChange={(e) => updateInput("avgAccessorialPerTrip", parseFloat(e.target.value) || 0)}
+                  className="pl-7 text-lg font-mono"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Average accessorial payout per trip.
+              </p>
             </div>
           </CardContent>
         </Card>
 
         {/* Projected Results */}
         <div className="space-y-6">
-          {/* Weekly Revenue */}
+          {/* Revenue per Trip */}
           <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Revenue per Trip
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-emerald-600 font-mono">
+                {formatCurrency(results.revenuePerTrip)}
+              </div>
+              <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>DTR</span>
+                  <span className="font-mono">{formatCurrency(inputs.dtrRate)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Accessorials</span>
+                  <span className="font-mono">{formatCurrency(inputs.avgAccessorialPerTrip)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Weekly Revenue */}
+          <Card className="bg-primary/5">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
@@ -292,78 +207,38 @@ export function ForecastCalculator({ onSave }: ForecastCalculatorProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-emerald-600">
+              <div className="text-3xl font-bold text-emerald-600 font-mono">
                 {formatCurrency(results.weeklyRevenue)}
               </div>
-              <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                <div className="flex justify-between">
-                  <span>Tour Pay ({results.weeklyTours} tours)</span>
-                  <span>{formatCurrency(results.tourPay)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Accessorials ({results.weeklyLoads} loads)</span>
-                  <span>{formatCurrency(results.accessorialPay)}</span>
-                </div>
-              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {inputs.numberOfTrips} trips &times; {formatCurrency(results.revenuePerTrip)}/trip
+              </p>
             </CardContent>
           </Card>
 
-          {/* Weekly Costs */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Weekly Costs
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-red-600">
-                {formatCurrency(results.weeklyCost)}
-              </div>
-              <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                <div className="flex justify-between">
-                  <span>Labor</span>
-                  <span>{formatCurrency(results.laborCost)}</span>
+          {/* Monthly & Annual */}
+          <div className="grid grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-medium text-muted-foreground">Monthly</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold font-mono">
+                  {formatCurrency(results.monthlyRevenue)}
                 </div>
-                <div className="flex justify-between">
-                  <span>Payroll Tax</span>
-                  <span>{formatCurrency(results.payrollTax)}</span>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-medium text-muted-foreground">Annual</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold font-mono">
+                  {formatCurrency(results.annualRevenue)}
                 </div>
-                <div className="flex justify-between">
-                  <span>Workers Comp</span>
-                  <span>{formatCurrency(results.workersComp)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Overhead</span>
-                  <span>{formatCurrency(results.overhead)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Weekly Profit */}
-          <Card className="bg-primary/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Weekly Profit
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-3xl font-bold ${results.weeklyProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                {formatCurrency(results.weeklyProfit)}
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <Calculator className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Contribution Margin:{" "}
-                  <span className="font-medium text-foreground">
-                    {formatCurrency(results.contributionMargin)}/truck/day
-                  </span>
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           <Button onClick={() => setShowSaveModal(true)} className="w-full">
             <Save className="mr-2 h-4 w-4" />
@@ -376,35 +251,38 @@ export function ForecastCalculator({ onSave }: ForecastCalculatorProps) {
       <Card>
         <CardHeader>
           <CardTitle>Scaling Scenarios</CardTitle>
-          <CardDescription>See how profit scales with additional trucks</CardDescription>
+          <CardDescription>See how revenue scales with additional trips</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Trucks</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Revenue</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Costs</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Profit</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Margin/Truck/Day</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Trips/Week</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Weekly</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Monthly</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Annual</th>
                 </tr>
               </thead>
               <tbody>
                 {scalingTable.map((row) => (
                   <tr
-                    key={row.trucks}
-                    className={`border-b last:border-0 hover:bg-muted/50 ${
-                      row.trucks === inputs.truckCount ? "bg-primary/5" : ""
-                    }`}
+                    key={row.trips}
+                    className={cn(
+                      "border-b last:border-0 hover:bg-muted/50",
+                      row.trips === inputs.numberOfTrips && "bg-primary/5 font-medium"
+                    )}
                   >
-                    <td className="py-3 px-4 font-medium">{row.trucks}</td>
-                    <td className="text-right py-3 px-4">{formatCurrency(row.weeklyRevenue)}</td>
-                    <td className="text-right py-3 px-4">{formatCurrency(row.weeklyCost)}</td>
-                    <td className={`text-right py-3 px-4 font-medium ${row.weeklyProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                      {formatCurrency(row.weeklyProfit)}
+                    <td className="py-3 px-4 font-medium">{row.trips}</td>
+                    <td className="text-right py-3 px-4 font-mono text-emerald-600">
+                      {formatCurrency(row.weeklyRevenue)}
                     </td>
-                    <td className="text-right py-3 px-4">{formatCurrency(row.contributionMargin)}</td>
+                    <td className="text-right py-3 px-4 font-mono">
+                      {formatCurrency(row.monthlyRevenue)}
+                    </td>
+                    <td className="text-right py-3 px-4 font-mono">
+                      {formatCurrency(row.annualRevenue)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -445,6 +323,22 @@ export function ForecastCalculator({ onSave }: ForecastCalculatorProps) {
                 onCheckedChange={setIsDefault}
               />
               <Label>Set as default scenario</Label>
+            </div>
+
+            {/* Preview */}
+            <div className="p-3 bg-muted rounded-lg text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Trips/week</span>
+                <span className="font-medium">{inputs.numberOfTrips}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Revenue/trip</span>
+                <span className="font-medium font-mono">{formatCurrency(results.revenuePerTrip)}</span>
+              </div>
+              <div className="flex justify-between pt-1 border-t">
+                <span className="text-muted-foreground">Weekly revenue</span>
+                <span className="font-bold text-emerald-600 font-mono">{formatCurrency(results.weeklyRevenue)}</span>
+              </div>
             </div>
           </div>
           <DialogFooter>

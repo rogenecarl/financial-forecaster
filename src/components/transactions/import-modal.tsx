@@ -11,15 +11,17 @@ import {
 } from "@/components/ui/dialog";
 import { parseFile, type ParseResult } from "@/lib/parsers";
 import type { ImportTransactionRow } from "@/schema/transaction.schema";
+import type { ImportMode } from "@/actions/transactions";
 import { cn } from "@/lib/utils";
 
 interface ImportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImport: (transactions: ImportTransactionRow[], fileName: string, fileType: "CSV" | "XLSX") => void;
+  mode?: ImportMode;
 }
 
-export function ImportModal({ open, onOpenChange, onImport }: ImportModalProps) {
+export function ImportModal({ open, onOpenChange, onImport, mode = "APPEND" }: ImportModalProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
@@ -108,9 +110,11 @@ export function ImportModal({ open, onOpenChange, onImport }: ImportModalProps) 
     >
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Import Bank Transactions</DialogTitle>
+          <DialogTitle>{mode === "REPLACE" ? "Re-import Transactions" : "Import Bank Transactions"}</DialogTitle>
           <DialogDescription>
-            Upload a CSV or Excel file exported from your bank.
+            {mode === "REPLACE"
+              ? "Upload a CSV or Excel file. This will replace all existing transactions in this batch."
+              : "Upload a CSV or Excel file. Duplicates will be skipped."}
           </DialogDescription>
         </DialogHeader>
 

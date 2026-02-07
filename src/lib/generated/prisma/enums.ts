@@ -39,6 +39,15 @@ export const ReviewStatus = {
 export type ReviewStatus = (typeof ReviewStatus)[keyof typeof ReviewStatus]
 
 
+export const TransactionBatchStatus = {
+  EMPTY: 'EMPTY',
+  ACTIVE: 'ACTIVE',
+  RECONCILED: 'RECONCILED'
+} as const
+
+export type TransactionBatchStatus = (typeof TransactionBatchStatus)[keyof typeof TransactionBatchStatus]
+
+
 export const BatchStatus = {
   EMPTY: 'EMPTY',
   UPCOMING: 'UPCOMING',

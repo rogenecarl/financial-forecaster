@@ -20,8 +20,8 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-function formatContributionMargin(value: number): string {
-  return `$${value.toFixed(0)}/truck/day`;
+function formatRevenuePerTrip(value: number): string {
+  return `$${value.toFixed(2)}/trip`;
 }
 
 export default function DashboardPage() {
@@ -98,13 +98,13 @@ export default function DashboardPage() {
           loading={loading}
         />
         <MetricCard
-          title="Contribution"
+          title="Forecast/Trip"
           value={
             hasMetrics
-              ? formatContributionMargin(metrics.contributionMargin)
-              : "$0/truck/day"
+              ? formatRevenuePerTrip(metrics.forecastRevenuePerTrip)
+              : "$0.00/trip"
           }
-          description={hasMetrics ? `${metrics.truckCount} trucks active` : "0 trucks"}
+          description={hasMetrics ? `${metrics.forecastTripsPerWeek} trips/week` : "No forecast"}
           iconName="truck"
           loading={loading}
         />

@@ -1,0 +1,150 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import {
+  useCreateTransactionBatch,
+  useUpdateTransactionBatch,
+  type TransactionBatchSummary,
+} from "@/hooks";
+
+interface TransactionBatchCreateModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+  editBatch?: TransactionBatchSummary | null;
+}
+
+export function TransactionBatchCreateModal({
+  open,
+  onOpenChange,
+  onSuccess,
+  editBatch,
+}: TransactionBatchCreateModalProps) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  const { createBatchAsync, isPending: isCreating } = useCreateTransactionBatch();
+  const { updateBatchAsync, isPending: isUpdating } = useUpdateTransactionBatch();
+  const isPending = isCreating || isUpdating;
+
+  const isEditing = !!editBatch;
+
+  // Reset form state when dialog opens
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (open) {
+      if (editBatch) {
+        setName(editBatch.name);
+        setDescription(editBatch.description || "");
+      } else {
+        setName("");
+        setDescription("");
+      }
+    }
+  }, [open, editBatch]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+
+    try {
+      if (isEditing) {
+        await updateBatchAsync({
+          id: editBatch.id,
+          name: name.trim(),
+          description: description.trim() || undefined,
+        });
+        toast.success("Batch updated");
+      } else {
+        await createBatchAsync({
+          name: name.trim(),
+          description: description.trim() || undefined,
+        });
+        toast.success("Batch created");
+      }
+      onSuccess();
+      onOpenChange(false);
+    } catch {
+      // Error toasts handled by the hooks
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>
+              {isEditing ? "Edit Batch" : "Create New Batch"}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditing
+                ? "Update the batch name and description."
+                : "Create a new batch to organize your bank transactions."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">
+                Name <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="name"
+                placeholder="e.g., January 2026 Bank Statement"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (optional)</Label>
+              <Textarea
+                id="description"
+                placeholder="e.g., Chase business checking account"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isPending || !name.trim()}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEditing ? "Save Changes" : "Create Batch"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

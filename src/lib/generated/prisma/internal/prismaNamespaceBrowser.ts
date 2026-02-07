@@ -57,7 +57,7 @@ export const ModelName = {
   Verification: 'Verification',
   Category: 'Category',
   Transaction: 'Transaction',
-  ImportBatch: 'ImportBatch',
+  TransactionBatch: 'TransactionBatch',
   TripBatch: 'TripBatch',
   CategoryRule: 'CategoryRule',
   AmazonInvoice: 'AmazonInvoice',
@@ -160,7 +160,7 @@ export const TransactionScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   categoryId: 'categoryId',
-  importBatchId: 'importBatchId',
+  transactionBatchId: 'transactionBatchId',
   details: 'details',
   postingDate: 'postingDate',
   description: 'description',
@@ -180,18 +180,25 @@ export const TransactionScalarFieldEnum = {
 export type TransactionScalarFieldEnum = (typeof TransactionScalarFieldEnum)[keyof typeof TransactionScalarFieldEnum]
 
 
-export const ImportBatchScalarFieldEnum = {
+export const TransactionBatchScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
-  fileName: 'fileName',
-  fileType: 'fileType',
-  recordCount: 'recordCount',
+  name: 'name',
+  description: 'description',
   status: 'status',
-  errorMessage: 'errorMessage',
-  createdAt: 'createdAt'
+  lastImportFileName: 'lastImportFileName',
+  lastImportedAt: 'lastImportedAt',
+  transactionCount: 'transactionCount',
+  uncategorizedCount: 'uncategorizedCount',
+  netRevenue: 'netRevenue',
+  grossProfit: 'grossProfit',
+  operatingIncome: 'operatingIncome',
+  operatingMargin: 'operatingMargin',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 } as const
 
-export type ImportBatchScalarFieldEnum = (typeof ImportBatchScalarFieldEnum)[keyof typeof ImportBatchScalarFieldEnum]
+export type TransactionBatchScalarFieldEnum = (typeof TransactionBatchScalarFieldEnum)[keyof typeof TransactionBatchScalarFieldEnum]
 
 
 export const TripBatchScalarFieldEnum = {
@@ -352,22 +359,13 @@ export const ForecastScalarFieldEnum = {
   name: 'name',
   description: 'description',
   isDefault: 'isDefault',
-  truckCount: 'truckCount',
-  nightsPerWeek: 'nightsPerWeek',
-  toursPerTruck: 'toursPerTruck',
-  avgLoadsPerTour: 'avgLoadsPerTour',
+  numberOfTrips: 'numberOfTrips',
   dtrRate: 'dtrRate',
-  avgAccessorialRate: 'avgAccessorialRate',
-  hourlyWage: 'hourlyWage',
-  hoursPerNight: 'hoursPerNight',
-  overtimeMultiplier: 'overtimeMultiplier',
-  payrollTaxRate: 'payrollTaxRate',
-  workersCompRate: 'workersCompRate',
+  avgAccessorialPerTrip: 'avgAccessorialPerTrip',
+  revenuePerTrip: 'revenuePerTrip',
   weeklyRevenue: 'weeklyRevenue',
-  weeklyLaborCost: 'weeklyLaborCost',
-  weeklyOverhead: 'weeklyOverhead',
-  weeklyProfit: 'weeklyProfit',
-  contributionMargin: 'contributionMargin',
+  monthlyRevenue: 'monthlyRevenue',
+  annualRevenue: 'annualRevenue',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

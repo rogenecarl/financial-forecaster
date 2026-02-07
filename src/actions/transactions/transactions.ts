@@ -79,6 +79,27 @@ export async function createTransaction(
       };
     }
 
+    // Check for duplicate in the same batch (same date, description, amount)
+    // Pass amount as string to avoid JS float → Decimal precision issues
+    if (validated.data.transactionBatchId) {
+      const existing = await prisma.transaction.findFirst({
+        where: {
+          userId: session.user.id,
+          transactionBatchId: validated.data.transactionBatchId,
+          postingDate: validated.data.postingDate,
+          description: validated.data.description,
+          amount: Number(validated.data.amount).toFixed(2),
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        return {
+          success: false,
+          error: "A transaction with the same date, description, and amount already exists in this batch.",
+        };
+      }
+    }
+
     const transaction = await prisma.transaction.create({
       data: {
         userId: session.user.id,
@@ -90,11 +111,18 @@ export async function createTransaction(
         balance: validated.data.balance ?? null,
         checkOrSlipNum: validated.data.checkOrSlipNum ?? null,
         categoryId: validated.data.categoryId ?? null,
+        transactionBatchId: validated.data.transactionBatchId ?? null,
         manualOverride: validated.data.categoryId ? true : false,
         reviewStatus: validated.data.categoryId ? "REVIEWED" : "PENDING",
       },
       include: { category: true },
     });
+
+    // Recalculate batch financials if transaction belongs to a batch
+    if (transaction.transactionBatchId) {
+      const { recalculateBatchFinancials } = await import("./transaction-batches");
+      await recalculateBatchFinancials(transaction.transactionBatchId);
+    }
 
     revalidatePath("/transactions");
     revalidatePath("/dashboard");
@@ -174,6 +202,11 @@ export async function getTransactions(
       if (validatedFilters.dateTo) {
         where.postingDate.lte = validatedFilters.dateTo;
       }
+    }
+
+    // Transaction batch filter
+    if (validatedFilters.transactionBatchId) {
+      where.transactionBatchId = validatedFilters.transactionBatchId;
     }
 
     // Amount range
@@ -298,6 +331,12 @@ export async function updateTransaction(
       include: { category: true },
     });
 
+    // Recalculate batch financials if transaction belongs to a batch
+    if (transaction.transactionBatchId && updateData.categoryId !== undefined) {
+      const { recalculateBatchFinancials } = await import("./transaction-batches");
+      await recalculateBatchFinancials(transaction.transactionBatchId);
+    }
+
     revalidatePath("/transactions");
     return { success: true, data: serializeTransaction(transaction) };
   } catch (error) {
@@ -323,7 +362,15 @@ export async function deleteTransaction(id: string): Promise<ActionResponse<void
       return { success: false, error: "Transaction not found" };
     }
 
+    const batchId = existing.transactionBatchId;
+
     await prisma.transaction.delete({ where: { id } });
+
+    // Recalculate batch financials if transaction belonged to a batch
+    if (batchId) {
+      const { recalculateBatchFinancials } = await import("./transaction-batches");
+      await recalculateBatchFinancials(batchId);
+    }
 
     revalidatePath("/transactions");
     return { success: true, data: undefined };
@@ -347,6 +394,19 @@ export async function bulkDeleteTransactions(
       return { success: false, error: "No transactions specified" };
     }
 
+    // Find affected batches before deleting
+    const affectedTransactions = await prisma.transaction.findMany({
+      where: {
+        id: { in: transactionIds },
+        userId: session.user.id,
+        transactionBatchId: { not: null },
+      },
+      select: { transactionBatchId: true },
+    });
+    const affectedBatchIds = new Set(
+      affectedTransactions.map((t) => t.transactionBatchId as string)
+    );
+
     // Delete all transactions in a single query (only user's own transactions)
     const result = await prisma.transaction.deleteMany({
       where: {
@@ -354,6 +414,14 @@ export async function bulkDeleteTransactions(
         userId: session.user.id,
       },
     });
+
+    // Recalculate batch financials for any affected batches
+    if (affectedBatchIds.size > 0) {
+      const { recalculateBatchFinancials } = await import("./transaction-batches");
+      for (const batchId of affectedBatchIds) {
+        await recalculateBatchFinancials(batchId);
+      }
+    }
 
     revalidatePath("/transactions");
     revalidatePath("/dashboard");
@@ -423,6 +491,19 @@ export async function bulkUpdateCategory(
           isActive: true,
         },
       });
+    }
+
+    // Recalculate batch financials for any affected batches
+    const affectedBatchIds = new Set(
+      transactions
+        .filter((t) => t.transactionBatchId)
+        .map((t) => t.transactionBatchId as string)
+    );
+    if (affectedBatchIds.size > 0) {
+      const { recalculateBatchFinancials } = await import("./transaction-batches");
+      for (const batchId of affectedBatchIds) {
+        await recalculateBatchFinancials(batchId);
+      }
     }
 
     revalidatePath("/transactions");

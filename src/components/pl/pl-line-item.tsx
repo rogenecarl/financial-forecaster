@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Circle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { getTransactionsByCategory, type CategoryTransaction } from "@/actions/transactions";
+import { getTransactionsByCategory, getTransactionsByCategoryInBatch, type CategoryTransaction } from "@/actions/transactions";
 import type { PLLineItem } from "@/schema/transaction.schema";
 import { cn } from "@/lib/utils";
 import {
@@ -22,8 +22,9 @@ import {
 interface PLLineItemRowProps {
   item: PLLineItem;
   isNegative?: boolean;
-  startDate: Date;
-  endDate: Date;
+  startDate?: Date;
+  endDate?: Date;
+  transactionBatchId?: string;
 }
 
 export function PLLineItemRow({
@@ -31,6 +32,7 @@ export function PLLineItemRow({
   isNegative = false,
   startDate,
   endDate,
+  transactionBatchId,
 }: PLLineItemRowProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -45,18 +47,23 @@ export function PLLineItemRow({
     );
   };
 
-  // Fetch transactions when expanded
+  // Fetch transactions when expanded — batch mode or date-range mode
   const { data: transactions, isLoading } = useQuery({
-    queryKey: ["category-transactions", item.categoryId, startDate.toISOString(), endDate.toISOString()],
+    queryKey: transactionBatchId
+      ? ["category-transactions", "batch", item.categoryId, transactionBatchId]
+      : ["category-transactions", item.categoryId, startDate?.toISOString(), endDate?.toISOString()],
     queryFn: async () => {
-      const result = await getTransactionsByCategory(item.categoryId, startDate, endDate);
-      if (!result.success) {
-        throw new Error(result.error || "Failed to fetch transactions");
+      if (transactionBatchId) {
+        const result = await getTransactionsByCategoryInBatch(item.categoryId, transactionBatchId);
+        if (!result.success) throw new Error(result.error || "Failed to fetch transactions");
+        return result.data;
       }
+      const result = await getTransactionsByCategory(item.categoryId, startDate!, endDate!);
+      if (!result.success) throw new Error(result.error || "Failed to fetch transactions");
       return result.data;
     },
-    enabled: isOpen, // Only fetch when expanded
-    staleTime: 60 * 1000, // Cache for 1 minute
+    enabled: isOpen,
+    staleTime: 60 * 1000,
   });
 
   return (

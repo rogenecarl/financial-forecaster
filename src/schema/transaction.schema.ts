@@ -10,7 +10,6 @@ export const transactionSchema = z.object({
   id: z.string().uuid(),
   userId: z.string().uuid(),
   categoryId: z.string().uuid().nullable(),
-  importBatchId: z.string().uuid().nullable(),
 
   // Bank data fields
   details: z.string().min(1, "Details is required"), // DEBIT, CREDIT, CHECK, DSLIP
@@ -43,6 +42,7 @@ export const createTransactionSchema = z.object({
   balance: z.coerce.number().nullable().optional(),
   checkOrSlipNum: z.string().nullable().optional(),
   categoryId: z.string().uuid().nullable().optional(),
+  transactionBatchId: z.string().nullable().optional(),
 });
 
 export const updateTransactionSchema = z.object({
@@ -104,12 +104,6 @@ export const importPreviewItemSchema = z.object({
   csvCategoryCreated: z.boolean().optional(), // True if a new category was created from CSV
 });
 
-export const importBatchSchema = z.object({
-  fileName: z.string().min(1),
-  fileType: z.enum(["CSV", "XLSX"]),
-  transactions: z.array(importTransactionRowSchema),
-});
-
 // ============================================
 // FILTER SCHEMAS
 // ============================================
@@ -118,6 +112,7 @@ export const transactionFilterSchema = z.object({
   search: z.string().optional(),
   categoryId: z.string().uuid().optional(),
   categoryIds: z.array(z.string().uuid()).optional(),
+  transactionBatchId: z.string().optional(),
   type: z.string().optional(), // ACH_DEBIT, ACH_CREDIT, etc.
   details: z.string().optional(), // DEBIT, CREDIT, CHECK, DSLIP
   reviewStatus: reviewStatusEnum.optional(),
@@ -219,7 +214,6 @@ export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 export type BulkUpdateCategoryInput = z.infer<typeof bulkUpdateCategorySchema>;
 export type ImportTransactionRow = z.infer<typeof importTransactionRowSchema>;
 export type ImportPreviewItem = z.infer<typeof importPreviewItemSchema>;
-export type ImportBatchInput = z.infer<typeof importBatchSchema>;
 export type TransactionFilter = z.infer<typeof transactionFilterSchema>;
 export type PLPeriod = z.infer<typeof plPeriodSchema>;
 export type PLLineItem = z.infer<typeof plLineItemSchema>;

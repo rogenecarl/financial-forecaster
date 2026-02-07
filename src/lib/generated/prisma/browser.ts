@@ -48,10 +48,10 @@ export type Category = Prisma.CategoryModel
  */
 export type Transaction = Prisma.TransactionModel
 /**
- * Model ImportBatch
+ * Model TransactionBatch
  * 
  */
-export type ImportBatch = Prisma.ImportBatchModel
+export type TransactionBatch = Prisma.TransactionBatchModel
 /**
  * Model TripBatch
  * 

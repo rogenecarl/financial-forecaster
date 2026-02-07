@@ -5,7 +5,6 @@ import {
   Truck,
   TrendingUp,
   GitCompare,
-  BarChart3,
   Tags,
   LineChart,
   type LucideIcon,
@@ -76,19 +75,9 @@ export const dashboardNavigation: NavElement[] = [
     ],
   },
   {
-    title: "Reports",
-    items: [
-      {
-        title: "Analytics",
-        href: "/analytics",
-        icon: LineChart,
-      },
-      {
-        title: "Reports",
-        href: "/reports",
-        icon: BarChart3,
-      },
-    ],
+    title: "Analytics",
+    href: "/analytics",
+    icon: LineChart,
   },
 ];
 
@@ -100,7 +89,7 @@ export const routeMeta: Record<string, { title: string; description?: string }> 
   },
   "/transactions": {
     title: "Transactions",
-    description: "Track and categorize your bank transactions",
+    description: "Organize bank statements into batches for easier tracking and categorization",
   },
   "/categories": {
     title: "Categories",
@@ -125,10 +114,6 @@ export const routeMeta: Record<string, { title: string; description?: string }> 
   "/analytics": {
     title: "Analytics",
     description: "Year-over-year performance analysis and trends",
-  },
-  "/reports": {
-    title: "Reports",
-    description: "Generate and export financial reports",
   },
 };
 

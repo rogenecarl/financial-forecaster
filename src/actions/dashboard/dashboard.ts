@@ -4,7 +4,6 @@ import prisma from "@/lib/db";
 import { requireAuth } from "@/lib/auth-server";
 import type { ActionResponse } from "@/types/api";
 import { startOfWeek, endOfWeek, subWeeks, addWeeks, format, startOfYear, getWeek } from "date-fns";
-import { calculateForecast } from "@/lib/forecast-calculations";
 
 // ============================================
 // TYPES
@@ -14,8 +13,8 @@ export interface DashboardMetrics {
   cashOnHand: number;
   weeklyRevenue: number;
   weeklyProfit: number;
-  contributionMargin: number;
-  truckCount: number;
+  forecastRevenuePerTrip: number;
+  forecastTripsPerWeek: number;
   revenueChange: number | null;
   profitChange: number | null;
 }
@@ -186,30 +185,14 @@ export async function getDashboardMetrics(): Promise<ActionResponse<DashboardMet
       ? ((weeklyProfit - prevProfit) / Math.abs(prevProfit)) * 100
       : null;
 
-    // Get truck count from default forecast
+    // Get default forecast for per-trip revenue info
     const defaultForecast = await prisma.forecast.findFirst({
       where: { userId, isDefault: true },
-      select: { truckCount: true },
+      select: { numberOfTrips: true, revenuePerTrip: true },
     });
 
-    const truckCount = defaultForecast?.truckCount || 2;
-
-    // Calculate contribution margin using forecast calculations
-    const forecastResult = calculateForecast({
-      truckCount,
-      nightsPerWeek: 7,
-      toursPerTruck: 1,
-      avgLoadsPerTour: 4,
-      dtrRate: 452.09,
-      avgAccessorialRate: 34.12,
-      hourlyWage: 20,
-      hoursPerNight: 10,
-      includeOvertime: true,
-      overtimeMultiplier: 1.5,
-      payrollTaxRate: 0.0765,
-      workersCompRate: 0.05,
-      weeklyOverhead: 0,
-    });
+    const forecastTripsPerWeek = defaultForecast?.numberOfTrips || 7;
+    const forecastRevenuePerTrip = toNumber(defaultForecast?.revenuePerTrip) || 522.09;
 
     return {
       success: true,
@@ -217,8 +200,8 @@ export async function getDashboardMetrics(): Promise<ActionResponse<DashboardMet
         cashOnHand,
         weeklyRevenue,
         weeklyProfit,
-        contributionMargin: forecastResult.contributionMargin,
-        truckCount,
+        forecastRevenuePerTrip,
+        forecastTripsPerWeek,
         revenueChange,
         profitChange,
       },

@@ -11,10 +11,12 @@ import type { CategoryRule, Category } from "@/lib/generated/prisma/client";
 // TYPES
 // ============================================
 
+export type ImportMode = "REPLACE" | "APPEND";
+
 export interface ImportResult {
-  importBatchId: string;
   totalImported: number;
   totalSkipped: number;
+  totalReplaced: number;
   categoriesCreated: number;
   errors: string[];
 }
@@ -90,12 +92,13 @@ async function checkDuplicate(
   transaction: ImportTransactionRow
 ): Promise<DuplicateCheckResult> {
   // Check for exact match on date, description, and amount
+  // Pass amount as string to avoid JS float → Decimal precision issues
   const existing = await prisma.transaction.findFirst({
     where: {
       userId,
       postingDate: transaction.postingDate,
       description: transaction.description,
-      amount: transaction.amount,
+      amount: Number(transaction.amount).toFixed(2),
     },
     select: { id: true },
   });
@@ -224,7 +227,9 @@ export async function applyCategoryRules(
 // ============================================
 
 export async function generateImportPreview(
-  transactions: ImportTransactionRow[]
+  transactions: ImportTransactionRow[],
+  transactionBatchId?: string,
+  mode: ImportMode = "APPEND"
 ): Promise<ActionResponse<ImportPreviewItem[]>> {
   try {
     const session = await requireAuth();
@@ -249,16 +254,22 @@ export async function generateImportPreview(
     }
 
     // Batch duplicate check: fetch all existing transactions that could be duplicates
-    // Create composite keys for comparison
+    // Pass amounts as strings to avoid JS float → PostgreSQL Decimal precision mismatches
+    // In REPLACE mode, exclude transactions in the target batch (they'll be deleted)
+    const duplicateWhere: Record<string, unknown> = {
+      userId,
+      OR: transactions.map((t) => ({
+        postingDate: t.postingDate,
+        description: t.description,
+        amount: Number(t.amount).toFixed(2),
+      })),
+    };
+    if (mode === "REPLACE" && transactionBatchId) {
+      duplicateWhere.transactionBatchId = { not: transactionBatchId };
+    }
+
     const existingTransactions = await prisma.transaction.findMany({
-      where: {
-        userId,
-        OR: transactions.map((t) => ({
-          postingDate: t.postingDate,
-          description: t.description,
-          amount: t.amount,
-        })),
-      },
+      where: duplicateWhere,
       select: {
         id: true,
         postingDate: true,
@@ -268,16 +279,17 @@ export async function generateImportPreview(
     });
 
     // Create a Set for fast duplicate lookup using composite key
+    // Normalize amounts with toFixed(2) so Prisma Decimal and JS Number produce identical keys
     const existingKeys = new Map<string, string>();
     for (const txn of existingTransactions) {
-      const key = `${txn.postingDate.toISOString()}|${txn.description}|${txn.amount}`;
+      const key = `${txn.postingDate.toISOString()}|${txn.description}|${Number(txn.amount).toFixed(2)}`;
       existingKeys.set(key, txn.id);
     }
 
     // Process all transactions with in-memory rule matching and duplicate checking
     const previewItems: ImportPreviewItem[] = transactions.map((transaction, i) => {
       // Check for duplicate using pre-fetched data
-      const key = `${new Date(transaction.postingDate).toISOString()}|${transaction.description}|${transaction.amount}`;
+      const key = `${new Date(transaction.postingDate).toISOString()}|${transaction.description}|${Number(transaction.amount).toFixed(2)}`;
       const duplicateId = existingKeys.get(key) || null;
       const isDuplicate = !!duplicateId;
 
@@ -350,16 +362,32 @@ export async function generateImportPreview(
 export async function importTransactions(
   items: ImportPreviewItem[],
   fileName: string,
-  fileType: "CSV" | "XLSX"
+  fileType: "CSV" | "XLSX",
+  transactionBatchId?: string,
+  mode: ImportMode = "APPEND"
 ): Promise<ActionResponse<ImportResult>> {
   try {
     const session = await requireAuth();
     const userId = session.user.id;
 
+    // REPLACE mode: delete all existing transactions in the batch first
+    let totalReplaced = 0;
+    if (mode === "REPLACE" && transactionBatchId) {
+      const deleted = await prisma.transaction.deleteMany({
+        where: { transactionBatchId, userId },
+      });
+      totalReplaced = deleted.count;
+    }
+
     // Filter out duplicates
     const itemsToImport = items.filter((item) => !item.isDuplicate);
 
     if (itemsToImport.length === 0) {
+      // If REPLACE mode deleted existing, still recalculate and report success
+      if (totalReplaced > 0 && transactionBatchId) {
+        const { recalculateBatchFinancials } = await import("./transaction-batches");
+        await recalculateBatchFinancials(transactionBatchId);
+      }
       return {
         success: false,
         error: "No new transactions to import. All are duplicates.",
@@ -427,173 +455,122 @@ export async function importTransactions(
 
     // Note: allExistingCategories was already loaded above and categoryNameToId is fully populated
 
-    // Step 2: Create import batch
-    const importBatch = await prisma.importBatch.create({
-      data: {
-        userId,
-        fileName,
-        fileType,
-        recordCount: itemsToImport.length,
-        status: "processing",
-      },
-    });
+    // Step 2: Prepare all transaction data for batch insert
+    const transactionData = itemsToImport.map((item) => {
+      let categoryId: string | null = item.suggestedCategoryId;
 
-    try {
-      // Step 3: Prepare all transaction data for batch insert
-      const transactionData = itemsToImport.map((item) => {
-        let categoryId: string | null = item.suggestedCategoryId;
-
-        // If CSV category was to be created, look up the newly created category
-        if (item.csvCategoryCreated && item.transaction.csvCategory) {
-          // Use normalized name for lookup to match how we stored it
-          const normalizedName = normalizeCategoryName(item.transaction.csvCategory).toLowerCase();
-          const newCatId = categoryNameToId.get(normalizedName);
-          if (newCatId) {
-            categoryId = newCatId;
-          }
-        }
-
-        // If CSV category was matched (existing), use suggestedCategoryId
-        // which was already set in preview
-
-        const shouldAutoApply = Boolean(
-          categoryId && item.confidence >= confidenceThreshold
-        );
-
-        // Determine review status
-        let reviewStatus: "REVIEWED" | "FLAGGED" | "PENDING" = "PENDING";
-        if (shouldAutoApply) {
-          // CSV-provided categories and rule matches are auto-reviewed
-          if (item.csvCategoryMatched || item.csvCategoryCreated || item.matchedRule) {
-            reviewStatus = "REVIEWED";
-          }
-        } else if (item.confidence > 0 && item.confidence < confidenceThreshold) {
-          reviewStatus = "FLAGGED";
-        }
-
-        return {
-          userId,
-          importBatchId: importBatch.id,
-          details: item.transaction.details,
-          postingDate: item.transaction.postingDate,
-          description: item.transaction.description,
-          amount: item.transaction.amount,
-          type: item.transaction.type,
-          balance: item.transaction.balance,
-          checkOrSlipNum: item.transaction.checkOrSlipNum,
-          categoryId: shouldAutoApply ? categoryId : null,
-          aiCategorized: shouldAutoApply && !item.csvCategoryMatched && !item.csvCategoryCreated,
-          aiConfidence: item.confidence > 0 ? item.confidence : null,
-          reviewStatus,
-        };
-      });
-
-      // Step 4: Bulk insert all transactions at once
-      const createResult = await prisma.transaction.createMany({
-        data: transactionData,
-        skipDuplicates: true,
-      });
-
-      // Step 5: Aggregate and batch update rule hit counts
-      const ruleHitCounts = new Map<string, number>();
-      for (const item of itemsToImport) {
-        const shouldAutoApply = Boolean(
-          item.suggestedCategoryId && item.confidence >= confidenceThreshold
-        );
-        if (item.matchedRule && shouldAutoApply && !item.csvCategoryMatched && !item.csvCategoryCreated) {
-          ruleHitCounts.set(
-            item.matchedRule,
-            (ruleHitCounts.get(item.matchedRule) || 0) + 1
-          );
+      // If CSV category was to be created, look up the newly created category
+      if (item.csvCategoryCreated && item.transaction.csvCategory) {
+        // Use normalized name for lookup to match how we stored it
+        const normalizedName = normalizeCategoryName(item.transaction.csvCategory).toLowerCase();
+        const newCatId = categoryNameToId.get(normalizedName);
+        if (newCatId) {
+          categoryId = newCatId;
         }
       }
 
-      // Update rule hit counts in parallel
-      const ruleUpdatePromises = Array.from(ruleHitCounts.entries()).map(
-        ([pattern, count]) =>
-          prisma.categoryRule.updateMany({
-            where: {
-              userId,
-              pattern,
-              isActive: true,
-            },
-            data: {
-              hitCount: { increment: count },
-            },
-          })
+      // If CSV category was matched (existing), use suggestedCategoryId
+      // which was already set in preview
+
+      const shouldAutoApply = Boolean(
+        categoryId && item.confidence >= confidenceThreshold
       );
-      await Promise.all(ruleUpdatePromises);
 
-      // Step 6: Mark import batch as completed
-      await prisma.importBatch.update({
-        where: { id: importBatch.id },
-        data: { status: "completed" },
-      });
-
-      revalidatePath("/transactions");
-      revalidatePath("/dashboard");
-      revalidatePath("/categories"); // Categories may have been created
+      // Determine review status
+      let reviewStatus: "REVIEWED" | "FLAGGED" | "PENDING" = "PENDING";
+      if (shouldAutoApply) {
+        // CSV-provided categories and rule matches are auto-reviewed
+        if (item.csvCategoryMatched || item.csvCategoryCreated || item.matchedRule) {
+          reviewStatus = "REVIEWED";
+        }
+      } else if (item.confidence > 0 && item.confidence < confidenceThreshold) {
+        reviewStatus = "FLAGGED";
+      }
 
       return {
-        success: true,
-        data: {
-          importBatchId: importBatch.id,
-          totalImported: createResult.count,
-          totalSkipped: items.length - itemsToImport.length,
-          categoriesCreated,
-          errors: [],
-        },
+        userId,
+        transactionBatchId: transactionBatchId || null,
+        details: item.transaction.details,
+        postingDate: item.transaction.postingDate,
+        description: item.transaction.description,
+        amount: item.transaction.amount,
+        type: item.transaction.type,
+        balance: item.transaction.balance,
+        checkOrSlipNum: item.transaction.checkOrSlipNum,
+        categoryId: shouldAutoApply ? categoryId : null,
+        aiCategorized: shouldAutoApply && !item.csvCategoryMatched && !item.csvCategoryCreated,
+        aiConfidence: item.confidence > 0 ? item.confidence : null,
+        reviewStatus,
       };
-    } catch (error) {
-      // Mark import batch as failed
-      await prisma.importBatch.update({
-        where: { id: importBatch.id },
-        data: { status: "failed" },
-      });
-      throw error;
+    });
+
+    // Step 3: Bulk insert all transactions at once
+    const createResult = await prisma.transaction.createMany({
+      data: transactionData,
+      skipDuplicates: true,
+    });
+
+    // Step 4: Aggregate and batch update rule hit counts
+    const ruleHitCounts = new Map<string, number>();
+    for (const item of itemsToImport) {
+      const shouldAutoApply = Boolean(
+        item.suggestedCategoryId && item.confidence >= confidenceThreshold
+      );
+      if (item.matchedRule && shouldAutoApply && !item.csvCategoryMatched && !item.csvCategoryCreated) {
+        ruleHitCounts.set(
+          item.matchedRule,
+          (ruleHitCounts.get(item.matchedRule) || 0) + 1
+        );
+      }
     }
+
+    // Update rule hit counts in parallel
+    const ruleUpdatePromises = Array.from(ruleHitCounts.entries()).map(
+      ([pattern, count]) =>
+        prisma.categoryRule.updateMany({
+          where: {
+            userId,
+            pattern,
+            isActive: true,
+          },
+          data: {
+            hitCount: { increment: count },
+          },
+        })
+    );
+    await Promise.all(ruleUpdatePromises);
+
+    // Step 5: If importing into a transaction batch, recalculate financials
+    if (transactionBatchId) {
+      const { recalculateBatchFinancials } = await import("./transaction-batches");
+      await recalculateBatchFinancials(transactionBatchId);
+
+      // Update batch import tracking
+      await prisma.transactionBatch.update({
+        where: { id: transactionBatchId },
+        data: {
+          lastImportFileName: fileName,
+          lastImportedAt: new Date(),
+        },
+      });
+    }
+
+    revalidatePath("/transactions");
+    revalidatePath("/dashboard");
+    revalidatePath("/categories"); // Categories may have been created
+
+    return {
+      success: true,
+      data: {
+        totalImported: createResult.count,
+        totalSkipped: items.length - itemsToImport.length,
+        totalReplaced,
+        categoriesCreated,
+        errors: [],
+      },
+    };
   } catch (error) {
     console.error("Failed to import transactions:", error);
     return { success: false, error: "Failed to import transactions" };
-  }
-}
-
-// ============================================
-// GET IMPORT HISTORY
-// ============================================
-
-export async function getImportHistory(): Promise<
-  ActionResponse<
-    {
-      id: string;
-      fileName: string;
-      fileType: string;
-      recordCount: number;
-      status: string;
-      createdAt: Date;
-    }[]
-  >
-> {
-  try {
-    const session = await requireAuth();
-
-    const imports = await prisma.importBatch.findMany({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      select: {
-        id: true,
-        fileName: true,
-        fileType: true,
-        recordCount: true,
-        status: true,
-        createdAt: true,
-      },
-    });
-
-    return { success: true, data: imports };
-  } catch (error) {
-    console.error("Failed to fetch import history:", error);
-    return { success: false, error: "Failed to fetch import history" };
   }
 }
